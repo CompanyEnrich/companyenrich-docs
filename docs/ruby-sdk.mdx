@@ -1,0 +1,119 @@
+---
+title: "Ruby"
+description: "Use the official Ruby SDK for authentication, pagination, retries, and batch downloads."
+---
+
+The official client for the CompanyEnrich API in Ruby. It wraps every v2 endpoint in plain Ruby methods and takes care of authentication, retries, pagination, and bulk job downloads for you.
+
+|                    |                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Package            | [`companyenrich`](https://rubygems.org/gems/companyenrich)                                                 |
+| Source             | [github.com/CompanyEnrich/companyenrich-ruby-sdk](https://github.com/CompanyEnrich/companyenrich-ruby-sdk) |
+| Documented version | 1.0.0                                                                                                      |
+| Runtime            | Ruby 3.1+                                                                                                  |
+| Dependencies       | None. It uses `Net::HTTP` from the standard library                                                        |
+| License            | MIT                                                                                                        |
+
+Usage examples for every resource live in the [README](https://github.com/CompanyEnrich/companyenrich-ruby-sdk#readme). This page covers what the README doesn't: what the SDK does on your behalf and the details worth knowing before you ship.
+
+## Install and verify
+
+```sh
+gem install companyenrich
+```
+
+Or add it to your `Gemfile`:
+
+```ruby
+gem "companyenrich"
+```
+
+`me` is free, so it is the quickest way to confirm your key works. It returns your credit balance and the capabilities of your plan.
+
+```ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+p client.me
+```
+
+## What the SDK handles for you
+
+| Concern            | With raw HTTP                               | With the SDK                                                                |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication     | Set the `Authorization` header on each call | Set once on the client                                                      |
+| Rate limits        | Read the 429 response and schedule a retry  | Waits for the time the API asks for, then retries                           |
+| Transient failures | Write your own backoff                      | Exponential backoff with jitter, only where a retry can't double charge you |
+| Pagination         | Pass `nextCursor` back in a loop            | A block or a lazy `Enumerator` from a `*_all` method                        |
+| Bulk jobs          | Poll the batch, then parse NDJSON           | `wait_for_completion` and `stream`                                          |
+| Errors             | Parse the problem document                  | Error classes with `trace_id`                                               |
+
+## Good to know
+
+### Responses are plain hashes
+
+Methods return hashes with the API's own field names as string keys, such as `page["nextCursor"]`. Optional fields can be absent or `nil`, so `dig` is handy for nested values.
+
+Method arguments are `snake_case` keywords, such as `page_size:`. Hashes you pass in, such as `filter` or `semantic`, use the API's field names, such as `autoFilter`.
+
+### API key resolution
+
+The API key is read from the `COMPANYENRICH_API_KEY` environment variable. If your secrets come from somewhere else, such as Rails credentials, pass the key explicitly:
+
+```ruby
+client = CompanyEnrich::Client.new(api_key: Rails.application.credentials.companyenrich_api_key)
+```
+
+The constructor raises `CompanyEnrich::Error` immediately if no key is found, so a missing key fails at startup and not on the first request.
+
+### Retry timing
+
+* Failed requests are retried up to twice by default.
+* Backoff starts at about 0.5 seconds, doubles on each attempt, and is capped at 8 seconds.
+* On a 429, the SDK waits for the period the API specifies instead of guessing.
+* If the API asks for a wait longer than 60 seconds, the SDK raises `RateLimitError` right away so your process isn't left hanging. Catch it and reschedule the work.
+* POST requests that consume credits or start a job are retried only on a 429. They are not repeated after a 5xx, timeout, or dropped connection, because the first attempt may already have been charged.
+* `max_retries` can be overridden per call, not only on the client. Pass `options: { max_retries: 0 }` to turn retries off for a single request.
+
+### Timeouts and large downloads
+
+`timeout` is in seconds and defaults to 120. It applies separately to opening the connection, each read, and each write, and not to the request as a whole. A large `stream` or `csv_chunks` download is not cut off as long as data keeps arriving. Pass `timeout: nil` to disable it.
+
+A download that fails partway through raises `APIConnectionError` or `APITimeoutError` and is never restarted, so you won't receive duplicate records. A truncated response is treated as a failure, not as a complete download.
+
+For large exports, prefer `stream` and `csv_chunks` over `results` and `csv`, which load the whole result into memory.
+
+### Waiting for bulk jobs
+
+`batches.wait_for_completion` checks the batch every 2 seconds and waits indefinitely by default. In production, set a ceiling:
+
+```ruby
+client.batches.wait_for_completion(
+  job["id"],
+  poll_interval: 5,
+  timeout: 15 * 60 # raises APITimeoutError after 15 minutes
+)
+```
+
+A timeout here only stops the waiting. The job keeps running on our side, and you can pick it up later with `batches.get(id)`. To stop the job itself, call `batches.cancel(id)`. Results that were already charged stay downloadable.
+
+### Pagination and credits
+
+The `*_all` methods and the download methods take a block. Without a block they return a lazy `Enumerator`, so `search_all(...).first(10)` requests only the pages it needs.
+
+Search credits are charged for every result on a fetched page, even if you stop iterating partway through it. Set `page_size` close to the number of results you plan to use.
+
+### Threads and connections
+
+Each request opens its own connection, so you can share one client across threads, for example in Puma or Sidekiq. There is nothing to close when you are done.
+
+### Proxies and tracing
+
+* `base_url` points the client at your own proxy or gateway. It is also the simplest way to aim the client at a stub server in tests.
+* `default_headers` (client) and `options: { headers: ... }` (per request) let you attach your own correlation IDs.
+* Requests identify themselves as `companyenrich-ruby/<version>`. The same version string is available as `CompanyEnrich::VERSION`.
+
+## Support
+
+* Bugs and feature requests: [GitHub issues](https://github.com/CompanyEnrich/companyenrich-ruby-sdk/issues)
+* When reporting a failed request, include the `trace_id` from the error. It lets us find the exact call in our logs.

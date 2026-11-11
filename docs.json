@@ -52,9 +52,13 @@
             ]
           },
           {
-            "group": "SDK & AI agents",
+            "group": "SDKs, CLI & AI agents",
             "pages": [
               "docs/javascript-typescript-sdk",
+              "docs/python-sdk",
+              "docs/ruby-sdk",
+              "docs/php-sdk",
+              "docs/cli",
               "docs/mcp-server"
             ]
           }

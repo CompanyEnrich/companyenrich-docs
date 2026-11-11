@@ -1,0 +1,286 @@
+---
+title: "CLI"
+description: "Enrich companies, search companies and people, and run bulk jobs from your terminal."
+---
+
+The official command-line interface for the CompanyEnrich API. It covers every v2 endpoint, prints tables at a terminal and JSON when piped, and estimates credit costs before it spends them. That makes it work for people, shell scripts, and AI agents.
+
+```sh
+companyenrich company enrich stripe.com
+companyenrich company search --semantic "B2B payments startups in Europe" --limit 20
+companyenrich company similar stripe.com --country US
+companyenrich people search --domain stripe.com --seniority vp --department sales
+```
+
+|                    |                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| Package            | [`@companyenrich/cli`](https://www.npmjs.com/package/@companyenrich/cli)                         |
+| Source             | [github.com/CompanyEnrich/companyenrich-cli](https://github.com/CompanyEnrich/companyenrich-cli) |
+| Documented version | 0.1.0                                                                                            |
+| Runtime            | Node.js 22+, or a standalone binary for macOS, Linux, and Windows                                |
+| License            | MIT                                                                                              |
+
+The [README](https://github.com/CompanyEnrich/companyenrich-cli#readme) lists every search filter and more recipes. Every command also has `--help` with examples and its credit cost.
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install -g @companyenrich/cli
+```
+
+```bash Homebrew
+brew install companyenrich/tap/companyenrich
+```
+
+```bash Install script
+curl -fsSL https://raw.githubusercontent.com/CompanyEnrich/companyenrich-cli/main/install.sh | sh
+```
+
+</CodeGroup>
+
+* The npm package needs Node.js 22 or newer. To run it once without installing, use `npx @companyenrich/cli`.
+* Homebrew and the install script fetch a standalone binary for macOS or Linux, so you don't need Node.js.
+* The install script verifies the download's SHA-256 and puts the binary in `~/.local/bin`. Set `COMPANYENRICH_INSTALL_DIR` to change the location, or `COMPANYENRICH_VERSION` to pin a version.
+* On Alpine, run `apk add libstdc++ libgcc` first.
+* On Windows, use npm or download the zip from [Releases](https://github.com/CompanyEnrich/companyenrich-cli/releases/latest).
+
+## Sign in
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys), then:
+
+```sh
+companyenrich auth login      # paste the key, input is hidden
+companyenrich me              # credits left and what your plan allows
+```
+
+`me` is free, so it is the quickest way to confirm your key works.
+
+The CLI looks for a key in this order:
+
+1. The `--api-key` flag.
+2. The `COMPANYENRICH_API_KEY` environment variable.
+3. The key saved by `auth login` in `~/.companyenrich/api_key`, a file only your user can read.
+
+`auth status` shows which key is in use, and `auth logout` removes the saved one.
+
+## Commands
+
+| Command                                               | What it does                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------- |
+| `company enrich <domain...>`                          | Enrich by domain, or by `--name`, `--linkedin-url`, and similar |
+| `company get <id>`                                    | Fetch a company by ID                                           |
+| `company search`                                      | Search with filters, plain language, or lookalike seeds         |
+| `company similar <domain...>`                         | Find lookalikes of one or more companies                        |
+| `company count`, `company preview`                    | Size or sample a company search for free                        |
+| `company autocomplete <text>`                         | Suggest companies by domain                                     |
+| `company workforce <domain>`                          | Headcount by department, with history                           |
+| `company bulk-enrich`                                 | Enrich up to 10,000 domains as a background job                 |
+| `company export`                                      | Export a large search as a background job                       |
+| `people search`                                       | Search by role, seniority, company, location, or school         |
+| `people count`, `people preview`                      | Size or sample a people search for free                         |
+| `people get <id>`                                     | Fetch a person by ID                                            |
+| `people enrich <email...>`                            | Find the person behind an email                                 |
+| `people email <id...>`                                | Find a work email                                               |
+| `people export`                                       | Export a large people search as a background job                |
+| `batch list`, `get`, `wait`, `cancel`, `results`      | Track and download background jobs                              |
+| `geo regions`, `countries`, `states`, `cities`        | Look up IDs and codes for location filters                      |
+| `industries`, `keywords`, `technologies`, `positions` | Look up values for search filters                               |
+| `values [list]`                                       | List the fixed values a flag accepts. Works offline             |
+| `me`, `auth login`, `status`, `logout`, `token`       | Manage your account and key                                     |
+| `api <method> <path>`                                 | Call any endpoint directly                                      |
+
+Run any command with `--help` to see its flags, examples, and price. See [Credits](/docs/credits) for how credits work.
+
+## Search
+
+Company search has three modes, and filters work with all of them:
+
+```sh
+# Filters
+companyenrich company search --country US,CA --employees 51-200,201-500 --category saas
+
+# Plain language
+companyenrich company search --semantic "AI startups building developer tools in Europe"
+
+# Lookalikes
+companyenrich company search --similar-to stripe.com,adyen.com --country US
+```
+
+People search filters on the person, their current and past roles, and the kind of company they work at:
+
+```sh
+companyenrich people search --domain stripe.com --seniority vp,c-suite --department sales
+companyenrich people search --position "head of growth" --company-category saas --company-employees 51-200
+companyenrich people search --domain notion.so --joined-after 90d
+```
+
+A few rules apply to every filter:
+
+* **Lists** take commas or repeated flags: `--country US,CA` or `--country US --country CA`.
+* **Exclusions** use an `exclude-` prefix: `--exclude-country US --exclude-keyword agency`.
+* **Ranges** use `..`: `2015..2020`, `2020..` for 2020 or later, `..2010` for 2010 or earlier.
+* **Amounts** take suffixes: `500k`, `2.5M`, `1B`.
+* **Company filters on people** use a `company-` prefix: `--company-country US`, `--company-semantic "developer tools"`.
+
+The CLI validates values before it sends anything, so a typo in a filter costs nothing.
+
+## Paging
+
+Searches return 10 results unless you ask for more.
+
+```sh
+companyenrich company search --country DE --limit 500     # follows cursors for you
+companyenrich company search --country DE --all           # everything that matches
+companyenrich company search --country DE --cursor <nextCursor>
+```
+
+`--all` counts the matches first, which is free, then fetches exactly that many.
+
+If a page fails partway or you press Ctrl-C, the CLI still writes what it already fetched, along with the cursor to resume from. You paid for those pages, so none of them are thrown away.
+
+## Output
+
+At a terminal you get tables. When output is piped or written to a file you get JSON in the same shape the API returns.
+
+```sh
+companyenrich company search --country US --format csv            # table, json, jsonl, csv
+companyenrich company search --country US -o companies.csv        # format follows the extension
+companyenrich company search --country US --fields name,domain,location.country.code
+companyenrich people search --domain stripe.com --format jsonl | jq -r .name
+```
+
+`--fields` takes dot paths. A name applied to a list maps over it, so `experiences.company.name` returns every employer.
+
+With `-o`, the CLI checks that it can write the file before it sends the request. A bad path fails right away, not after the credits are spent.
+
+## Control credit spend
+
+Most calls cost credits, so the CLI gives you three ways to avoid surprises.
+
+<Steps>
+  <Step title="Size the search for free">
+    `company count`, `people count`, and the `preview` commands cost nothing.
+  </Step>
+  <Step title="Preview the request">
+    `--dry-run` prints the exact request and a credit estimate, and sends nothing. It works without an API key and never touches your `-o` file.
+
+    ```sh
+    companyenrich company search --similar-to stripe.com -n 40 --dry-run
+    ```
+  </Step>
+  <Step title="Confirm large spends">
+    Before a command that could use 1,000 credits or more, the CLI asks for confirmation. In a script, where nobody can answer, it stops and tells you to pass `--yes`.
+  </Step>
+</Steps>
+
+Change the confirmation threshold with `COMPANYENRICH_CONFIRM_ABOVE`. Set it to `0` to turn the check off.
+
+<Note>
+  The estimate for `people search --expand company` is a ceiling, not a forecast. That expansion is charged per unique company across everyone's employers, which can't be known up front, so the CLI assumes the API's limit of 500 companies per page.
+</Note>
+
+## Bulk jobs
+
+For large lists, run a background job instead of looping.
+
+```sh
+# Enrich up to 10,000 domains and wait for the result
+companyenrich company bulk-enrich -f domains.txt --wait -o enriched.csv
+
+# Export a large search
+companyenrich company export --country US --category saas --limit 5000 --wait -o saas.csv
+
+# Or start it now and collect it later
+companyenrich company bulk-enrich -f domains.txt
+companyenrich batch wait <id>
+companyenrich batch results <id> -o enriched.csv
+```
+
+Results download as JSON, JSON Lines, or CSV and stream straight to the file. Input files hold one value per line. A CSV also works: the CLI reads the first column and skips a header row.
+
+For smaller lists, `company enrich` accepts several domains and sends them 50 at a time:
+
+```sh
+companyenrich company enrich -f domains.txt -o companies.csv
+cat domains.txt | companyenrich company enrich -f - --format jsonl
+```
+
+## Call any endpoint
+
+`api` sends a request to any endpoint with your key and the same retry behavior.
+
+```sh
+companyenrich api --list
+companyenrich api /v2/me
+companyenrich api POST companies/search/count -d '{"filter":{"country":"DE"}}'
+companyenrich api GET companies/enrich -p domain=stripe.com -p expand=financial
+```
+
+## Use it in scripts and AI agents
+
+The CLI behaves the same without a terminal: JSON on stdout, errors on stderr, stable exit codes, and no prompts.
+
+| Exit code | Meaning                                              |
+| --------- | ---------------------------------------------------- |
+| 0         | Success                                              |
+| 1         | Any other error, including a rejected request        |
+| 2         | Bad flags or arguments. Nothing was sent             |
+| 3         | No key, a rejected key, or a feature your plan lacks |
+| 4         | Not found                                            |
+| 5         | Not enough credits                                   |
+| 6         | Rate limited, and retries were used up               |
+| 7         | Could not reach the API, or the request timed out    |
+| 130       | Interrupted with Ctrl-C                              |
+
+If you hand the CLI to an AI agent, give it two instructions:
+
+* Run `--dry-run` first to see the request and its cost.
+* Pass `--yes` only when a large spend is intended.
+
+For agents that speak MCP, the [MCP server](/docs/mcp-server) is the alternative.
+
+## Configuration
+
+| Variable                      | What it does                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `COMPANYENRICH_API_KEY`       | API key. Takes priority over the saved key                                       |
+| `COMPANYENRICH_CONFIRM_ABOVE` | Credit estimate that triggers a confirmation. Default `1000`; `0` turns it off   |
+| `COMPANYENRICH_CONFIG_DIR`    | Directory that holds the key file. Default `~/.companyenrich`                    |
+| `COMPANYENRICH_BASE_URL`      | API base URL, for testing                                                        |
+| `NO_COLOR`                    | Turns color off                                                                  |
+
+Global flags: `--format`, `--json`, `--fields`, `-o/--output`, `--dry-run`, `-y/--yes`, `--timeout`, `--retries`, `-v/--verbose`, and `--no-color`.
+
+### Retries and timeouts
+
+* Rate limits and temporary server errors are retried 3 times by default. Change that with `--retries`, from 0 to 10.
+* On a 429, the CLI waits for the period the API specifies.
+* A request that timed out is not retried, because it may already have run and been charged.
+* `--timeout` is in seconds and defaults to 120. For downloads it covers the wait for the response to start, not the length of the download.
+
+### Shell completion
+
+Completion covers commands, flags, and allowed values such as `--seniority` or `--employees`.
+
+<CodeGroup>
+
+```bash zsh
+companyenrich completion zsh > "${fpath[1]}/_companyenrich"
+```
+
+```bash bash
+companyenrich completion bash >> ~/.bashrc
+```
+
+```bash fish
+companyenrich completion fish > ~/.config/fish/completions/companyenrich.fish
+```
+
+</CodeGroup>
+
+## Support
+
+* Bugs and feature requests: [GitHub issues](https://github.com/CompanyEnrich/companyenrich-cli/issues)
+* When reporting a failed request, include the `Trace ID` printed with the error. It lets us find the exact call in our logs. `--verbose` shows the full request and response.
