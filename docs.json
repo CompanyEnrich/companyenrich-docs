@@ -52,6 +52,14 @@
             ]
           },
           {
+            "group": "Data reference",
+            "pages": [
+              "docs/company-schema",
+              "docs/person-schema",
+              "docs/field-values"
+            ]
+          },
+          {
             "group": "SDKs, CLI & AI agents",
             "pages": [
               "docs/javascript-typescript-sdk",

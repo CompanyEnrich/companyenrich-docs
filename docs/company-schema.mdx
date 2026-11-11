@@ -1,0 +1,304 @@
+---
+title: "Company schema"
+description: "Every field in a CompanyEnrich company record: firmographics, location, social profiles, funding, technologies, NAICS codes, and workforce data."
+---
+
+A company record is the object the V2 API returns when you [enrich a company](/api-reference/v2/get-companies-enrich), [get a company by ID](/api-reference/v2/get-companies-companyid), or [search companies](/api-reference/v2/post-companies-search). Batch enrichment, bulk enrichment, and search exports return the same record.
+
+This page lists every field with its type and meaning. Field names are exactly as they appear in the JSON response.
+
+* **Always** means the field is present on every record.
+* **When known** means the field is omitted or `null` when we have no value. You can [check how often a field is filled](#check-how-often-a-field-is-filled) in your market.
+* **With `expand`** means the field is returned only when you request that [expansion](#expansions).
+
+## Company fields
+
+| Field          | Type             | Present       | Description                                                                              |
+| -------------- | ---------------- | ------------- | ---------------------------------------------------------------------------------------- |
+| `id`           | string (UUID)    | Always        | The CompanyEnrich ID of the company.                                                     |
+| `name`         | string           | When known    | The company name.                                                                        |
+| `legalName`    | string           | When known    | The legal name of the company.                                                           |
+| `domain`       | string           | Always        | The primary domain of the company, such as `stripe.com`.                                 |
+| `website`      | string           | Always        | The company website URL.                                                                 |
+| `logoUrl`      | string           | Always        | The company logo URL.                                                                    |
+| `description`  | string           | When known    | The company description.                                                                 |
+| `type`         | string           | When known    | The company type. One of the [company types](/docs/field-values#company-types).          |
+| `foundedYear`  | integer          | When known    | The year the company was founded.                                                        |
+| `employees`    | string           | When known    | The estimated employee count range. One of the [employee ranges](/docs/field-values#employee-ranges). |
+| `revenue`      | string           | When known    | The estimated annual revenue range in USD. One of the [revenue ranges](/docs/field-values#revenue-ranges). |
+| `industry`     | string           | When known    | The primary industry of the company.                                                     |
+| `industries`   | array of strings | When known    | The industries associated with the company.                                              |
+| `categories`   | array of strings | When known    | The [categories](/docs/field-values#company-categories) associated with the company, from most to least specific. |
+| `location`     | object           | When known    | The company location and contact details. See [Location](#location).                     |
+| `socials`      | object           | When known    | The company social profiles. See [Social profiles](#social-profiles).                    |
+| `updatedAt`    | string (date-time) | Always      | When the company data was last updated.                                                  |
+| `financial`    | object           | With `expand` | Financial and funding data. See [Financial](#financial).                                 |
+| `keywords`     | array of strings | With `expand` | Keywords associated with the company.                                                    |
+| `naicsCodes`   | array of strings | With `expand` | The NAICS codes associated with the company.                                             |
+| `technologies` | array of strings | With `expand` | Technologies used by the company.                                                        |
+| `workforce`    | object           | With `expand` | Workforce insights. See [Workforce](#workforce).                                         |
+
+## Location
+
+The `location` object holds the company's headquarters location and contact details.
+
+| Field                   | Type    | Description                                  |
+| ----------------------- | ------- | -------------------------------------------- |
+| `location.country.code` | string  | The ISO 3166-1 alpha-2 country code.         |
+| `location.country.name` | string  | The country name.                            |
+| `location.state.id`     | integer | The CompanyEnrich state ID.                  |
+| `location.state.name`   | string  | The state or province name.                  |
+| `location.state.code`   | string  | The ISO 3166-2 subdivision code.             |
+| `location.city.id`      | integer | The CompanyEnrich city ID.                   |
+| `location.city.name`    | string  | The city name.                               |
+| `location.address`      | string  | The company street address.                  |
+| `location.postalCode`   | string  | The company postal code.                     |
+| `location.phone`        | string  | The company phone number.                    |
+
+State and city IDs are the same IDs the search filters accept. Look them up with the free [geo endpoints](/api-reference/v2/post-geo-states).
+
+## Social profiles
+
+The `socials` object holds links to the company's profiles on other sites.
+
+| Field                   | Type   | Description                    |
+| ----------------------- | ------ | ------------------------------ |
+| `socials.linkedinUrl`   | string | The company LinkedIn URL.      |
+| `socials.linkedinId`    | string | The company LinkedIn ID.       |
+| `socials.twitterUrl`    | string | The company Twitter/X URL.     |
+| `socials.facebookUrl`   | string | The company Facebook URL.      |
+| `socials.instagramUrl`  | string | The company Instagram URL.     |
+| `socials.angellistUrl`  | string | The company AngelList URL.     |
+| `socials.crunchbaseUrl` | string | The company Crunchbase URL.    |
+| `socials.youtubeUrl`    | string | The company YouTube URL.       |
+| `socials.githubUrl`     | string | The company GitHub URL.        |
+| `socials.g2Url`         | string | The company G2 URL.            |
+
+## Expansions
+
+Five fields are returned only when you name them in the `expand` parameter: `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. Each one adds 1 credit per company returned. See [Credits](/docs/credits#expansions).
+
+```bash
+curl --get \
+  --url https://api.companyenrich.com/v2/companies/enrich \
+  --data-urlencode "domain=stripe.com" \
+  --data-urlencode "expand=financial" \
+  --data-urlencode "expand=technologies" \
+  --header "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+### Financial
+
+| Field                                | Type               | Description                                    |
+| ------------------------------------ | ------------------ | ---------------------------------------------- |
+| `financial.stockSymbol`              | string             | The company stock symbol.                      |
+| `financial.stockExchange`            | string             | The stock exchange where the company is listed. |
+| `financial.totalFunding`             | integer            | The total disclosed funding in USD.            |
+| `financial.fundingStage`             | string             | The latest funding stage.                      |
+| `financial.fundingDate`              | string (date-time) | The date of the latest funding round.          |
+| `financial.fundingRounds`            | array of objects   | The company's disclosed funding rounds.        |
+| `financial.fundingRounds[].date`     | string (date-time) | The funding round date.                        |
+| `financial.fundingRounds[].amount`   | string             | The disclosed funding amount and currency.     |
+| `financial.fundingRounds[].type`     | string             | The funding round type.                        |
+| `financial.fundingRounds[].url`      | string             | A source URL for the funding round.            |
+| `financial.fundingRounds[].investors` | string            | The disclosed investors.                       |
+
+### Keywords, NAICS codes, and technologies
+
+| Field          | Type             | Description                                   |
+| -------------- | ---------------- | --------------------------------------------- |
+| `keywords`     | array of strings | Keywords associated with the company.         |
+| `naicsCodes`   | array of strings | The NAICS codes associated with the company.  |
+| `technologies` | array of strings | Technologies used by the company.             |
+
+These are the same values the search filters match. Look up valid values with the free [keyword](/api-reference/v2/get-keywords-autocomplete), [technology](/api-reference/v2/get-technologies-autocomplete), and [industry](/api-reference/v2/get-industries) endpoints.
+
+### Workforce
+
+The `workforce` object reports headcount observed in our people dataset, split by department, with 12 months of history. The [workforce endpoint](/api-reference/v2/get-companies-workforce) returns the same object and pages back through earlier years.
+
+| Field                             | Type             | Description                                                                                   |
+| --------------------------------- | ---------------- | --------------------------------------------------------------------------------------------- |
+| `workforce.companyId`             | string (UUID)    | The CompanyEnrich ID of the company.                                                          |
+| `workforce.domain`                | string           | The canonical company domain.                                                                 |
+| `workforce.observedEmployeeCount` | integer          | The observed number of distinct current employees in the people dataset.                      |
+| `workforce.employeeCountRange`    | string           | The estimated employee count range. One of the [employee ranges](/docs/field-values#employee-ranges). |
+| `workforce.departmentHeadcount`   | object           | Observed headcount grouped by department. See the keys below.                                 |
+| `workforce.unclassifiedHeadcount` | integer          | Observed headcount that could not be classified by department.                                |
+| `workforce.historyFrom`           | string (date)    | The inclusive first month of the returned 12-month history window.                            |
+| `workforce.historyTo`             | string (date)    | The exclusive end of the returned 12-month history window.                                    |
+| `workforce.history`               | array of objects | Workforce change points within the history window, newest first.                              |
+| `workforce.nextCursor`            | string           | A cursor for the preceding year of history. Omitted when no older history is available.       |
+
+`workforce.departmentHeadcount` has one integer per department. Every key is optional.
+
+| Key                     | Department             |
+| ----------------------- | ---------------------- |
+| `cSuite`                | C-suite                |
+| `productManagement`     | Product management     |
+| `engineeringTechnical`  | Engineering and technical |
+| `design`                | Design                 |
+| `education`             | Education              |
+| `finance`               | Finance                |
+| `humanResources`        | Human resources        |
+| `informationTechnology` | Information technology |
+| `legal`                 | Legal                  |
+| `marketing`             | Marketing              |
+| `medicalHealth`         | Medical and health     |
+| `operations`            | Operations             |
+| `sales`                 | Sales                  |
+| `consulting`            | Consulting             |
+
+Each entry in `workforce.history` is a snapshot for one month:
+
+| Field                                         | Type          | Description                                                     |
+| --------------------------------------------- | ------------- | --------------------------------------------------------------- |
+| `workforce.history[].date`                    | string (date) | The first day of the snapshot month.                            |
+| `workforce.history[].observedEmployeeCount`   | integer       | The observed number of distinct employees in the people dataset. |
+| `workforce.history[].employeeCountRange`      | string        | The estimated employee count range.                             |
+| `workforce.history[].departmentHeadcount`     | object        | Observed headcount grouped by department.                       |
+| `workforce.history[].unclassifiedHeadcount`   | integer       | Observed headcount that could not be classified by department.  |
+
+## Example company record
+
+This record is illustrative. It shows a fictional company with every expansion requested.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "legalName": "Acme Analytics, Inc.",
+  "domain": "acme-analytics.example",
+  "website": "https://acme-analytics.example",
+  "logoUrl": "https://api.companyenrich.com/logo/acme-analytics.example",
+  "description": "Acme Analytics builds a product analytics platform that helps software teams understand how customers use their apps.",
+  "type": "private",
+  "foundedYear": 2016,
+  "employees": "201-500",
+  "revenue": "10m-50m",
+  "industry": "Software Publishers",
+  "industries": ["Software Publishers"],
+  "categories": ["saas", "b2b"],
+  "location": {
+    "country": { "code": "US", "name": "United States" },
+    "state": { "id": 1416, "name": "California", "code": "US-CA" },
+    "city": { "id": 125634, "name": "San Francisco" },
+    "address": "500 Example Street",
+    "postalCode": "94105",
+    "phone": "+1 415 555 0100"
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/company/acme-analytics",
+    "linkedinId": "1234567",
+    "twitterUrl": "https://twitter.com/acmeanalytics",
+    "githubUrl": "https://github.com/acme-analytics"
+  },
+  "updatedAt": "2026-10-01T12:00:00Z",
+  "financial": {
+    "totalFunding": 48000000,
+    "fundingStage": "Series B",
+    "fundingDate": "2023-03-15T00:00:00Z",
+    "fundingRounds": [
+      {
+        "date": "2023-03-15T00:00:00Z",
+        "amount": "$36M",
+        "type": "Series B",
+        "url": "https://acme-analytics.example/blog/series-b",
+        "investors": "Example Ventures, Sample Capital"
+      },
+      {
+        "date": "2019-06-04T00:00:00Z",
+        "amount": "$12M",
+        "type": "Series A",
+        "investors": "Example Ventures"
+      }
+    ]
+  },
+  "keywords": ["product analytics", "saas", "data visualization"],
+  "naicsCodes": ["511210"],
+  "technologies": ["React", "PostgreSQL", "Amazon Web Services"],
+  "workforce": {
+    "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+    "domain": "acme-analytics.example",
+    "observedEmployeeCount": 312,
+    "employeeCountRange": "201-500",
+    "departmentHeadcount": {
+      "cSuite": 6,
+      "engineeringTechnical": 124,
+      "sales": 58,
+      "marketing": 27
+    },
+    "unclassifiedHeadcount": 41,
+    "historyFrom": "2025-11-01",
+    "historyTo": "2026-11-01",
+    "history": [
+      {
+        "date": "2026-10-01",
+        "observedEmployeeCount": 312,
+        "employeeCountRange": "201-500",
+        "departmentHeadcount": { "engineeringTechnical": 124, "sales": 58 },
+        "unclassifiedHeadcount": 41
+      },
+      {
+        "date": "2026-04-01",
+        "observedEmployeeCount": 287,
+        "employeeCountRange": "201-500",
+        "departmentHeadcount": { "engineeringTechnical": 113, "sales": 52 },
+        "unclassifiedHeadcount": 38
+      }
+    ],
+    "nextCursor": "eyJ5IjoyMDI1fQ"
+  }
+}
+```
+
+## Shorter company objects
+
+Some responses carry a reduced company object:
+
+| Where                                      | Fields                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| A person's `experiences[].company`         | `id`, `name`, `domain`, `logoUrl`, `industry`. The `company` expansion adds the standard profile. See [Person schema](/docs/person-schema#experiences). |
+| [Company search preview](/api-reference/v2/post-companies-search-preview) results | `id`, `name`, `logoUrl`, `industry`, `updatedAt`.           |
+| [Batch enrichment](/api-reference/v2/post-companies-enrich-batch) items | `domain`, `status`, and the full `company` record when `status` is `found`. |
+
+## Check how often a field is filled
+
+How often a field has a value depends on the market you look at, so measure it for your own segment. The [count endpoint](/api-reference/v2/post-companies-search-count) takes the same filters as a search and costs no credits.
+
+Count your segment twice: once as it is, and once with the field added to the `require` filter. Divide the second `total` by the first.
+
+```bash
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "country": "US",
+      "categories": "saas",
+      "employees": ["51-200", "201-500"],
+      "require": "revenue"
+    }
+  }'
+```
+
+Use `total` from the response. `count` is capped by your plan's search limit.
+
+`require` accepts the social profiles, location, `revenue`, `foundedYear`, and `anyFunding`. See the [full list](/docs/field-values#required-features). The same filter works in a real search, so you can return only companies that have the fields you need.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every fixed value for company type, size, revenue, and category.
+  </Card>
+  <Card title="Search companies" icon="magnifying-glass" href="/api-reference/v2/post-companies-search">
+    Find companies with filters, natural language, or lookalike domains.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>
