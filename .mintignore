@@ -1,5 +1,6 @@
 README.md
 MIGRATION.md
+AGENTS.md
 scripts/**
 node_modules/**
 package.json
