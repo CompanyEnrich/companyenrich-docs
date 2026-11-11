@@ -1,20 +1,166 @@
 ---
 title: "Credits"
-description: "Understand credit usage and monitor your balance through API response headers."
+description: "See what each API call costs, when you are not charged, and how to estimate and track your credit spend."
 ---
 
-Our API uses a credit-based system to ensure fair usage and maintain service stability. Paid endpoints consume credits according to their documented prices; some endpoints are free. If your balance cannot cover a paid request, the API returns `402 Payment Required`. Response headers help you track your balance and plan subsequent requests.
+CompanyEnrich bills in credits. Paid endpoints deduct credits for the data they return, and many endpoints are free. As a rule, you pay for results, not for requests: a lookup that finds nothing is usually not charged.
 
-## Credit Headers
+The prices on this page are for the V2 API. [V1 prices](#v1-prices) differ in a few places. Each endpoint's page in the [API reference](/api-reference/v2/overview) states its own price.
 
-Credit headers on API responses show your current credit status:
+## V2 prices
 
-| Header             | Description                                      | Example |
-| ------------------ | ------------------------------------------------ | ------- |
-| x-credit-balance   | Total credits available before the request       | 684712  |
-| x-credit-cost      | Credits consumed by the current request          | 1       |
-| x-credit-remaining | Credits left after the current request completes | 684711  |
+### Companies
 
-Prices can differ between V1 and V2. Check the endpoint description in the [API reference](/api-reference/v2/overview) for its base cost, paid expansions, and whether empty results are charged.
+| Action                                 | Endpoint                                                                 | Credits                         |
+| -------------------------------------- | ------------------------------------------------------------------------ | ------------------------------- |
+| Enrich a company by domain             | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich)     | 1 per company returned          |
+| Enrich a company by properties         | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)   | 1 per request                   |
+| Enrich up to 50 domains in one request | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | 1 per unique company found |
+| Get a company by ID                    | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid) | 1 per company returned      |
+| Search by filters                      | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)   | 1 per company returned          |
+| Search by description (semantic)       | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)   | 2 per company returned          |
+| Search for lookalikes                  | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)   | 5 per company returned          |
+| Get workforce data                     | [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) | 1 per page (12 months of history) |
 
-Use the free current-user endpoint to check your credit balance and account capabilities. You can also manage your account in the [dashboard](https://app.companyenrich.com).
+### People
+
+| Action                       | Endpoint                                                                     | Credits                              |
+| ---------------------------- | ---------------------------------------------------------------------------- | ------------------------------------ |
+| Search people                | [`POST /v2/people/search`](/api-reference/v2/post-people-search)             | 2 per person returned                |
+| Get a person by ID           | [`GET /v2/people/{personId}`](/api-reference/v2/get-people-personid)         | 2 per person returned                |
+| Find the person behind an email | [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich)          | 5 when a person is returned          |
+| Find a work email            | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) | 10 when a new email is found     |
+
+People search costs 2 credits per person in every mode, including semantic queries and company queries.
+
+### Free endpoints
+
+These endpoints never deduct credits:
+
+* **Counts:** [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count) and [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count).
+* **Previews:** [`POST /v2/companies/search/preview`](/api-reference/v2/post-companies-search-preview) and [`POST /v2/people/search/preview`](/api-reference/v2/post-people-search-preview). Previews need a plan that includes them.
+* **Lookups for filter values:** company, keyword, technology, and position autocomplete, the industry list, and every `geo` endpoint.
+* **Your account:** [`GET /v2/me`](/api-reference/v2/get-me).
+
+## Expansions
+
+The `expand` parameter adds paid data to a record. Expansions are charged on top of the base price, and only for records that are returned.
+
+| Record  | Expansion                                                        | Extra credits                              |
+| ------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| Company | `financial`, `keywords`, `naicsCodes`, `technologies`, `workforce` | 1 each, per company returned             |
+| Person  | `education`                                                      | 1 per person returned                      |
+| Person  | `company`                                                        | 1 per unique company expanded              |
+
+Details worth knowing:
+
+* Repeating an expansion in the same request does not multiply its cost.
+* The `workforce` expansion includes the latest 12 months of history. Each earlier 12-month page from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) costs another credit.
+* The person `company` expansion adds full company profiles to a person's current and past experiences. In a search it is charged once per unique company on each response page, even when several people share an employer. The same company on a later page or in another request is charged again.
+* A people search page can expand at most 500 unique companies. A page over that limit returns `400` before anything is charged. Reduce `pageSize` or remove `company` from `expand`.
+
+## When you are not charged
+
+| Situation                                                          | Charge                                   |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| Company or person not found (`404`)                                | None                                     |
+| Batch enrichment item that is `not-found`, `invalid-domain`, or `pending` | None                              |
+| Several batch domains that resolve to the same company             | Charged once                             |
+| Work email lookup that is `not-found`, `unavailable`, or `pending` | None                                     |
+| Work email your account has already accessed                       | None                                     |
+| Invalid cursor, or a workforce history page that does not exist    | None                                     |
+
+There are two exceptions to "no result, no charge":
+
+<Warning>
+  A search that returns no results costs one result's base price: 1 credit for a filter search, 2 for a semantic search, 5 for a lookalike search, and 2 for a people search. Use the free count endpoints to check a query first.
+
+  `POST /v2/companies/enrich` costs 1 credit when a company is returned and also when the properties you sent cannot be resolved to a company domain.
+</Warning>
+
+## Worked examples
+
+| Request                                                                    | Calculation      | Credits |
+| -------------------------------------------------------------------------- | ---------------- | ------- |
+| Enrich `stripe.com`                                                        | 1                | 1       |
+| Enrich `stripe.com` with `technologies` and `workforce`                    | 1 + 2            | 3       |
+| Filter search, one page of 25 companies                                    | 25 × 1           | 25      |
+| Semantic search, 25 companies, with `technologies`                         | 25 × (2 + 1)     | 75      |
+| Lookalike search, 25 companies                                             | 25 × 5           | 125     |
+| People search, 25 people, with `education`                                 | 25 × (2 + 1)     | 75      |
+| People search for 25 people, then a work email for 10 of them, all found   | 25 × 2 + 10 × 10 | 150     |
+
+## Bulk jobs and exports
+
+Background jobs use the same prices as the equivalent synchronous calls.
+
+* **Bulk enrichment** ([`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk)) checks your balance when you create the job. It returns `402` unless your balance covers every domain at the enrichment price plus the expansions you asked for. Credits are not reserved, and you are charged as results complete.
+* **Search exports** ([companies](/api-reference/v2/post-companies-search-export) and [people](/api-reference/v2/post-people-search-export)) run as a series of ordinary search pages. There is no upfront balance check. If your credits run out partway, the export stops and the records already exported stay downloadable.
+* **Cancelling** a batch stops the remaining work. Results that were already charged stay downloadable.
+
+## Estimate before you spend
+
+<Steps>
+  <Step title="Count the matches">
+    The count endpoints take the same query as a search and return how many records match, for free.
+
+    ```bash
+    curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+      -H "Authorization: Bearer YOUR_API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"filter": {"country": "US", "employees": ["51-200"]}}'
+    ```
+  </Step>
+  <Step title="Preview a sample">
+    If your plan includes previews, the preview endpoints return a small sample of summaries for free, so you can check that a query finds the right kind of record.
+  </Step>
+  <Step title="Set the page size to what you need">
+    Search is charged for every record on a page you fetch, even if you only use the first few. Set `pageSize` close to the number of results you plan to use.
+  </Step>
+</Steps>
+
+The [CLI](/docs/cli#control-credit-spend) adds a `--dry-run` flag that prints a credit estimate without sending the request, and asks for confirmation before large spends.
+
+## Track your balance
+
+API responses include headers that show what a request cost:
+
+| Header               | Description                                      | Example |
+| -------------------- | ------------------------------------------------ | ------- |
+| `x-credit-balance`   | Total credits available before the request       | 684712  |
+| `x-credit-cost`      | Credits consumed by the current request          | 1       |
+| `x-credit-remaining` | Credits left after the current request completes | 684711  |
+
+To check your balance without spending anything, call the free current-user endpoint. It returns your credits and the capabilities of your plan.
+
+```bash
+curl https://api.companyenrich.com/v2/me \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+You can also see your balance and manage your plan in the [dashboard](https://app.companyenrich.com).
+
+## When you run out
+
+If your balance cannot cover a paid request, the API returns `402 Payment Required`.
+
+The official SDKs raise a dedicated error for this response, such as `PaymentRequiredError` in the Python and Ruby SDKs and `PaymentRequiredException` in the PHP SDK. The CLI exits with code `5`. A `402` can also mean your plan does not include the feature you requested, so check the response's `detail` field.
+
+## V1 prices
+
+The V1 API uses the same credits and the same headers. Most prices match V2, with a few differences.
+
+| Action                         | V1                             | V2                                              |
+| ------------------------------ | ------------------------------ | ----------------------------------------------- |
+| Enrich a company               | 1                              | 1                                               |
+| Search companies               | 1 per company                  | 1 per company (2 for semantic)                  |
+| Find similar companies         | 5 per company                  | 5 per company, through company search           |
+| Get workforce data             | 5 per call                     | 1 per 12-month page                             |
+| Search people                  | 2 per person                   | 2 per person                                    |
+| Get a person by ID             | 2                              | 2                                               |
+| Find the person behind an email | 5                             | 5                                               |
+| Get a person's education       | 1 per call                     | 1 per person, as the `education` expansion      |
+| Find a work email              | 10 per new email found         | 10 per new email found                          |
+| Asynchronous search            | Credits reserved when the job is created | No reservation; charged page by page  |
+
+Empty search results are charged the same way in both versions. Check the endpoint's page in the [V1 reference](/api-reference/v1/overview) before relying on a V1 price.
