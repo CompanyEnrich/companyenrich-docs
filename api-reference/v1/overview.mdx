@@ -1,0 +1,21 @@
+---
+title: "API V1"
+description: "Reference for existing V1 integrations, saved company lists, and V1 job workflows."
+---
+
+The V1 API uses `https://api.companyenrich.com` without a `/v1` path prefix. Every request requires [Bearer authentication](/authentication).
+
+V1 includes company enrichment, search, similar-company discovery, people search, saved company lists, and asynchronous job workflows. Its request formats, response formats, pagination, and credit costs can differ from V2. Use the endpoint's own schema when maintaining a V1 integration.
+
+<CardGroup cols={2}>
+  <Card title="Company enrichment" icon="building" href="/api-reference/v1/get-companies-enrich">Enrich a company by domain.</Card>
+  <Card title="Similar companies" icon="magnifying-glass" href="/api-reference/v1/post-companies-similar">Find companies similar to your seed companies.</Card>
+  <Card title="Company lists" icon="list" href="/api-reference/v1/get-lists-companies">Create and manage saved company lists.</Card>
+  <Card title="Background jobs" icon="layer-group" href="/api-reference/v1/get-jobs">Inspect V1 asynchronous jobs.</Card>
+</CardGroup>
+
+## OpenAPI specification
+
+[Download the V1 specification](/openapi/v1.json) used to generate this reference, or view the [live published specification](https://api.companyenrich.com/openapi/v1.json).
+
+For V2 company and people APIs with cursor pagination and explicit data expansions, see the [V2 reference](/api-reference/v2/overview).

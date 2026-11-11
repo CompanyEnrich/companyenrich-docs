@@ -1,0 +1,20 @@
+---
+title: "Credits"
+description: "Understand credit usage and monitor your balance through API response headers."
+---
+
+Our API uses a credit-based system to ensure fair usage and maintain service stability. Paid endpoints consume credits according to their documented prices; some endpoints are free. If your balance cannot cover a paid request, the API returns `402 Payment Required`. Response headers help you track your balance and plan subsequent requests.
+
+## Credit Headers
+
+Credit headers on API responses show your current credit status:
+
+| Header             | Description                                      | Example |
+| ------------------ | ------------------------------------------------ | ------- |
+| x-credit-balance   | Total credits available before the request       | 684712  |
+| x-credit-cost      | Credits consumed by the current request          | 1       |
+| x-credit-remaining | Credits left after the current request completes | 684711  |
+
+Prices can differ between V1 and V2. Check the endpoint description in the [API reference](/api-reference/v2/overview) for its base cost, paid expansions, and whether empty results are charged.
+
+Use the free current-user endpoint to check your credit balance and account capabilities. You can also manage your account in the [dashboard](https://app.companyenrich.com).

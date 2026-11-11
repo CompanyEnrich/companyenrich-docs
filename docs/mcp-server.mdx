@@ -1,0 +1,376 @@
+---
+title: "MCP server"
+description: "Connect Claude, Codex, Cursor, VS Code, and other MCP clients to CompanyEnrich."
+---
+
+The CompanyEnrich MCP server lets AI clients like Claude, Codex, Cursor, and VS Code use our data directly. Ask in plain English to enrich companies, search companies and people, find lookalikes, or get work emails.
+
+## Hosted or local?
+
+There are two ways to connect. Both have the same tools.
+
+|                  | Hosted                                  | Local (npm)                                                                                  |
+| :--------------- | :-------------------------------------- | :------------------------------------------------------------------------------------------- |
+| **Runs on**      | `https://mcp.companyenrich.com/mcp`     | Your machine, using [`@companyenrich/mcp`](https://www.npmjs.com/package/@companyenrich/mcp) |
+| **Sign in with** | Your CompanyEnrich login, or an API key | An API key                                                                                   |
+| **You need**     | Nothing to install                      | Node.js 20 or newer                                                                          |
+
+Not sure? Use hosted and sign in. Use local if your client only runs stdio servers, or you want calls to go straight from your machine to our API.
+
+You only need an API key if you skip sign-in or run locally. Create one at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+## Connect your client
+
+Find your client and pick a tab. Replace `your-api-key` with your real key.
+
+### Claude Code
+
+<CodeGroup>
+
+```bash Sign in
+claude mcp add --transport http companyenrich https://mcp.companyenrich.com/mcp
+```
+```bash API key
+claude mcp add --transport http companyenrich https://mcp.companyenrich.com/mcp \
+  --header "Authorization: Bearer your-api-key"
+```
+```bash Local (npm)
+claude mcp add companyenrich --transport stdio \
+  --env COMPANYENRICH_API_KEY=your-api-key -- npx -y @companyenrich/mcp
+```
+
+</CodeGroup>
+
+If you picked Sign in, open `/mcp` in Claude Code and finish logging in.
+
+### Codex CLI
+
+<CodeGroup>
+
+```bash Sign in
+codex mcp add companyenrich --url https://mcp.companyenrich.com/mcp
+```
+```bash API key
+export COMPANYENRICH_API_KEY=your-api-key
+codex mcp add companyenrich --url https://mcp.companyenrich.com/mcp \
+  --bearer-token-env-var COMPANYENRICH_API_KEY
+```
+```bash Local (npm)
+codex mcp add companyenrich --env COMPANYENRICH_API_KEY=your-api-key \
+  -- npx -y @companyenrich/mcp
+```
+
+</CodeGroup>
+
+Sign-in starts right after `codex mcp add`. If you close it, run `codex mcp login companyenrich`. With the API key option, the variable has to be set in the shell where you run Codex.
+
+### Claude Desktop
+
+**Hosted:** open [**Customize** > **Connectors**](https://claude.ai/customize/connectors), click **+ Add**, then **Add custom connector**. Give it a name, paste `https://mcp.companyenrich.com/mcp`, and follow the steps to sign in. On Team and Enterprise plans, an Owner adds it under **Organization settings** > **Connectors**.
+
+To use an API key instead, add a request header named `Authorization` with the value `Bearer your-api-key` when it asks.
+
+**Local:** open **Settings** > **Developer** > **Edit Config**, add this, then fully quit and reopen the app.
+
+```json
+{
+  "mcpServers": {
+    "companyenrich": {
+      "command": "npx",
+      "args": ["-y", "@companyenrich/mcp"],
+      "env": {
+        "COMPANYENRICH_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add this to `~/.cursor/mcp.json`. You can use `.cursor/mcp.json` to set it up for one project, but don't commit that file with your key in it.
+
+<CodeGroup>
+
+```json Sign in
+{
+  "mcpServers": {
+    "companyenrich": {
+      "url": "https://mcp.companyenrich.com/mcp"
+    }
+  }
+}
+```
+```json API key
+{
+  "mcpServers": {
+    "companyenrich": {
+      "url": "https://mcp.companyenrich.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+```json Local (npm)
+{
+  "mcpServers": {
+    "companyenrich": {
+      "command": "npx",
+      "args": ["-y", "@companyenrich/mcp"],
+      "env": {
+        "COMPANYENRICH_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### VS Code
+
+Add this to `.vscode/mcp.json`. To use it in all your projects, run **MCP: Open User Configuration** and add it there. With the API key and Local tabs, VS Code asks for your key once and stores it, so it stays out of your repo.
+
+<CodeGroup>
+
+```json Sign in
+{
+  "servers": {
+    "companyenrich": {
+      "type": "http",
+      "url": "https://mcp.companyenrich.com/mcp"
+    }
+  }
+}
+```
+```json API key
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "companyenrich-key",
+      "description": "CompanyEnrich API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "companyenrich": {
+      "type": "http",
+      "url": "https://mcp.companyenrich.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:companyenrich-key}"
+      }
+    }
+  }
+}
+```
+```json Local (npm)
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "companyenrich-key",
+      "description": "CompanyEnrich API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "companyenrich": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@companyenrich/mcp"],
+      "env": {
+        "COMPANYENRICH_API_KEY": "${input:companyenrich-key}"
+      }
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Raycast
+
+```json API key
+{
+  "mcpServers": {
+    "companyenrich": {
+      "url": "https://mcp.companyenrich.com/mcp",
+      "httpHeaders": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+### Other clients
+
+Add a remote or Streamable HTTP server with the URL `https://mcp.companyenrich.com/mcp` and sign in when asked. To use an API key, send the header `Authorization: Bearer your-api-key`.
+
+To run it locally, use `npx` as the command and `-y @companyenrich/mcp` as the arguments, then set `COMPANYENRICH_API_KEY` in the server's environment.
+
+## Check that it works
+
+Ask your client this:
+
+> What's my CompanyEnrich credit balance?
+
+It runs `get_current_user`, which is free. If you see your balance, you're connected. If you don't, see [Troubleshooting](#troubleshooting).
+
+## What you can ask
+
+| Ask                                                                           | Tool                                   | Usual cost                                        |
+| :---------------------------------------------------------------------------- | :------------------------------------- | :------------------------------------------------ |
+| "Get company information for stripe.com."                                     | `enrich_company`                       | 1 credit                                          |
+| "How many engineers does notion.com have?"                                    | `get_company_workforce`                | 5 credits                                         |
+| "Find 10 HVAC manufacturers in the United States."                            | `search_companies`                     | 10 credits                                        |
+| "Find 5 companies similar to stripe.com and square.com."                      | `find_similar_companies`               | 25 credits                                        |
+| "Find 10 VPs of sales at SaaS companies in Germany with 51 to 200 employees." | `search_people`                        | 20 credits                                        |
+| "Who is `jane@example.com`?"                                                  | `lookup_person_by_email`               | 5 credits                                         |
+| "Get the work email for the head of marketing at notion.com."                 | `search_people`, `enrich_person_email` | 2 credits per person found, plus 10 for the email |
+
+## Tools and credits
+
+Your client finds these tools by itself, so you don't have to remember them. The costs are here so you know what you're spending.
+
+<Note>
+The npm MCP server uses the V1 API. Its workforce pricing differs from the V2 API and JavaScript SDK.
+</Note>
+
+| Tool                           | What it does                                                     | Cost                                             |
+| :----------------------------- | :--------------------------------------------------------------- | :----------------------------------------------- |
+| `enrich_company`               | Enrich a company by domain                                       | 1 credit, plus 5 with `includeWorkforce`         |
+| `get_company_by_id`            | Get a company by its CompanyEnrich ID                            | 1 credit, plus 5 with `includeWorkforce`         |
+| `enrich_company_by_properties` | Enrich a company from its name or a social profile URL           | 1 credit, plus 5 with `includeWorkforce`         |
+| `get_company_workforce`        | Get workforce insights for one company                           | 5 credits per successful call                    |
+| `search_companies`             | Search companies by description, name, domain, or filters        | 1 credit per company returned, 1 credit minimum  |
+| `find_similar_companies`       | Find lookalikes from 1 to 10 seed domains                        | 5 credits per company returned, 5 credit minimum |
+| `search_people`                | Search people by name, job title, seniority, company, or country | 2 credits per person returned, 2 credit minimum  |
+| `get_person_by_id`             | Get a person by their CompanyEnrich ID                           | 2 credits                                        |
+| `lookup_person_by_email`       | Find a person from an email address                              | 5 credits per successful call                    |
+| `enrich_person_email`          | Find a person's work email (beta)                                | 10 credits per newly accessed found email        |
+| `get_current_user`             | Check your credit balance and account                            | Free                                             |
+
+A few things to watch:
+
+* Search tools charge per result. A default page has 20 results, so one `find_similar_companies` call can cost up to 100 credits and one `search_people` call up to 40. Say how many results you want.
+* `includeWorkforce` adds 5 credits per company, including every company in a search.
+* Your client can make several calls for one question. Most clients ask before running a tool, so keep that on while you're testing.
+
+Tool responses include your balance under `creditInfo`. See [Credits](/docs/credits) for how credits work.
+
+## Install or pin the npm package
+
+The Local tabs use `npx`, which runs the package without you installing it.
+
+**Lock a version:** keep `npx` and put the version in `args`: `["-y", "@companyenrich/mcp@2.0.0"]`.
+
+**Install as a Node module:** use this if you don't want your client going through `npx` every time it starts.
+
+<CodeGroup>
+
+```bash Global
+npm install -g @companyenrich/mcp
+npm root -g
+```
+```bash Project
+npm install @companyenrich/mcp
+```
+
+</CodeGroup>
+
+Then run it with `node`. Replace `/path/to/node_modules` with what `npm root -g` printed, or with the full path to your project's `node_modules` folder.
+
+```json
+{
+  "mcpServers": {
+    "companyenrich": {
+      "command": "node",
+      "args": ["/path/to/node_modules/@companyenrich/mcp/dist/stdio.js"],
+      "env": {
+        "COMPANYENRICH_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+In VS Code, use `servers` as the top-level key and add `"type": "stdio"`.
+
+To update, run `npm install @companyenrich/mcp@latest`, with `-g` for a global install.
+
+The package only ships the server, so there's nothing to import in your own code. It reads `COMPANYENRICH_API_KEY` (required) and `COMPANYENRICH_API_URL` (optional, defaults to `https://api.companyenrich.com`).
+
+## Troubleshooting
+
+**The tools don't show up**
+
+Restart your client after changing its config. Then check that your JSON is valid and in the right file. To see what's connected:
+
+* Claude Code: run `claude mcp list`
+* Codex CLI: run `codex mcp list`
+* Cursor: open **Customize** and make sure the server is on. Logs are in the Output panel under **MCP Logs**.
+* VS Code: run **MCP: List Servers**
+* Claude Desktop on macOS: check the logs in `~/Library/Logs/Claude`
+
+`Authentication failed. Please check your API key.`
+
+Your key is wrong, or the config still says `your-api-key`. Fix it and restart your client. We only check the key when a tool runs, so the tools can show up even with a bad key.
+
+`COMPANYENRICH_API_KEY is not set`
+
+The local server can't find your key. Add it to the `env` block for this server and restart your client.
+
+`Insufficient credits. Please check your account balance.`
+
+Your account is out of credits. Tool calls will fail until you add more.
+
+`Rate limit exceeded. Please try again later.`
+
+You're sending too many requests. Wait a bit and try again. See [Rate Limit](/docs/rate-limit).
+
+**`env: node: No such file or directory`, or your client can't find `npx`**
+
+Run `node -v` and make sure you're on Node.js 20 or newer. Desktop apps often can't see Node if you installed it with nvm or Homebrew. Two changes fix it:
+
+1. Run `which npx` and use that full path as the `command`. If you installed the package as a Node module, use the full path from `which node` instead.
+2. Run `dirname $(which node)` and add that folder to `PATH` in the `env` block.
+
+```json
+{
+  "mcpServers": {
+    "companyenrich": {
+      "command": "npx",
+      "args": ["-y", "@companyenrich/mcp"],
+      "env": {
+        "COMPANYENRICH_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+To test the package without a client, run this in a terminal:
+
+```bash
+COMPANYENRICH_API_KEY=your-api-key npx -y @companyenrich/mcp
+```
+
+It prints nothing and waits for a client, which is normal. Press Ctrl+C to stop it. If you get an error, it's a Node or npm problem.
+
+**401 from the hosted server, or your client keeps asking you to sign in**
+
+The server didn't get your login or key. Finish signing in through your client, or send your key as `Authorization: Bearer your-api-key`.
+
+**Your config points to `/sse`**
+
+We don't serve the old SSE endpoint anymore. Switch to `https://mcp.companyenrich.com/mcp`.
+
+## Privacy
+
+Once it's running, the local server only talks to the CompanyEnrich API. It stores nothing and has no telemetry.
+
+The hosted server doesn't store an API key you send as a bearer token. For OAuth sign-ins, we keep your grant with the API key encrypted.

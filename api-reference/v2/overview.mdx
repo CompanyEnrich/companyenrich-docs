@@ -1,0 +1,31 @@
+---
+title: "API V2"
+description: "Enrich companies and people, search with cursor pagination, and run bulk workflows."
+---
+
+The V2 API is available at `https://api.companyenrich.com/v2`. Every request requires [Bearer authentication](/authentication).
+
+<CardGroup cols={2}>
+  <Card title="Company enrichment" icon="building" href="/api-reference/v2/get-companies-enrich">Retrieve company profiles by domain or identifying properties.</Card>
+  <Card title="Company search" icon="magnifying-glass" href="/api-reference/v2/post-companies-search">Combine filters with semantic or lookalike search.</Card>
+  <Card title="People search" icon="users" href="/api-reference/v2/post-people-search">Find people by role, company, location, and experience.</Card>
+  <Card title="Bulk enrichment" icon="layer-group" href="/api-reference/v2/post-companies-enrich-bulk">Submit an asynchronous job and download the results.</Card>
+</CardGroup>
+
+## Responses and billing
+
+Each endpoint documents its request and response schemas, credit cost, and error responses. Optional expansions add data and may add credits. Check the endpoint's billing description before choosing expansions.
+
+Company and people searches use cursor pagination. Send the same query with the returned cursor to continue; search cursors expire 24 hours after the first page. Geographic lookup cursors expire after 30 minutes.
+
+## Asynchronous work
+
+V2 includes bulk company enrichment and company and people search exports. Use the [batch endpoints](/api-reference/v2/get-batches) to inspect progress and cancel remaining requests, then download results from the corresponding workflow's results endpoint.
+
+## V1 compatibility
+
+V1 remains documented separately. Saved company lists, list-based exports, and filtering by saved-list IDs remain V1 features; they are not part of V2. See the [V1 reference](/api-reference/v1/overview) for those workflows.
+
+## OpenAPI specification
+
+[Download the V2 specification](/openapi/v2.json) used to generate this reference, or view the [live published specification](https://api.companyenrich.com/openapi/v2.json).

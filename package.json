@@ -1,0 +1,21 @@
+{
+  "name": "companyenrich-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CompanyEnrich documentation, powered by Mintlify",
+  "type": "module",
+  "scripts": {
+    "dev": "mint dev --no-open",
+    "validate": "mint validate",
+    "check:links": "mint broken-links",
+    "check:api": "node scripts/sync-openapi.mjs --check",
+    "check": "npm run check:api && npm run validate && npm run check:links",
+    "sync:openapi": "node scripts/sync-openapi.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "mint": "4.3.16"
+  }
+}

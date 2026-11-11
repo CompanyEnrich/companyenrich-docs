@@ -1,0 +1,107 @@
+---
+title: "JavaScript / TypeScript"
+description: "Use the official typed SDK for authentication, pagination, retries, and batch downloads."
+---
+
+The official client for the CompanyEnrich API in Node.js and other JavaScript runtimes. It wraps every v2 endpoint in typed methods and takes care of authentication, retries, pagination, and bulk job downloads for you.
+
+|                 |                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| Package         | [`@companyenrich/sdk`](https://www.npmjs.com/package/@companyenrich/sdk)                               |
+| Source          | [github.com/CompanyEnrich/companyenrich-js-sdk](https://github.com/CompanyEnrich/companyenrich-js-sdk) |
+| Documented version | 1.0.1                                                                                                  |
+| Runtime         | Node.js 20+, or any runtime with a standard `fetch`                                                    |
+| Module formats  | ESM and CommonJS, with type definitions for both                                                       |
+| Dependencies    | None                                                                                                   |
+| License         | MIT                                                                                                    |
+
+Usage examples for every resource live in the [README](https://github.com/CompanyEnrich/companyenrich-js-sdk#readme). This page covers what the README doesn't: what the SDK does on your behalf and the details worth knowing before you ship.
+
+## Install and verify
+
+```sh
+npm install @companyenrich/sdk
+```
+
+`me()` is free, so it is the quickest way to confirm your key works. It returns your credit balance and the capabilities of your plan.
+
+```ts
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+console.log(await client.me());
+```
+
+CommonJS projects can use `require` instead:
+
+```js
+const { CompanyEnrich } = require('@companyenrich/sdk');
+```
+
+## What the SDK handles for you
+
+| Concern                     | With raw HTTP                               | With the SDK                                                                |
+| --------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication              | Set the `Authorization` header on each call | Set once on the client                                                      |
+| Rate limits                 | Read the 429 response and schedule a retry  | Waits for the time the API asks for, then retries                           |
+| Transient failures          | Write your own backoff                      | Exponential backoff with jitter, only where a retry can't double charge you |
+| Pagination                  | Pass `nextCursor` back in a loop            | `for await` over a `*All` method                                            |
+| Bulk jobs                   | Poll the batch, then parse NDJSON           | `waitForCompletion()` and `stream()`                                        |
+| Errors                      | Parse the problem document                  | Typed error classes with `traceId`                                          |
+| Request and response shapes | Read the API reference                      | Autocomplete in your editor                                                 |
+
+## Good to know
+
+### Runtimes without `process.env`
+
+The API key is read from `process.env.COMPANYENRICH_API_KEY` when that exists. On edge runtimes that expose secrets another way (Cloudflare Workers bindings, for example), pass it explicitly:
+
+```ts
+const client = new CompanyEnrich({ apiKey: env.COMPANYENRICH_API_KEY });
+```
+
+The constructor throws immediately if no key is found, so a missing key fails at startup and not on the first request.
+
+### Retry timing
+
+* Backoff starts at about 0.5 seconds, doubles on each attempt, and is capped at 8 seconds.
+* On a 429, the SDK waits for the period the API specifies instead of guessing.
+* If the API asks for a wait longer than 60 seconds, the SDK throws `RateLimitError` right away so your process isn't left hanging. Catch it and reschedule the work.
+* `maxRetries` can be overridden per call, not only on the client. Pass `{ maxRetries: 0 }` as the last argument to turn retries off for a single request.
+
+### Timeouts and large downloads
+
+`timeoutMs` covers the wait for a response to start. Once a bulk `stream()` or `csv()` download begins, the timer stops, so large exports are not cut off partway. If you `break` out of a `stream()` loop early, the SDK cancels the download.
+
+### Waiting for bulk jobs
+
+`batches.waitForCompletion()` checks the batch every 2 seconds and waits indefinitely by default. In production, set a ceiling:
+
+```ts
+await client.batches.waitForCompletion(job.id, {
+  pollIntervalMs: 5_000,
+  timeoutMs: 15 * 60_000, // throws TimeoutError after 15 minutes
+});
+```
+
+A timeout here only stops the waiting. The job keeps running on our side, and you can pick it up later with `batches.get(id)`. To stop the job itself, call `batches.cancel(id)`. Results that were already charged stay downloadable.
+
+### Person IDs are 64-bit
+
+Person IDs can exceed what a JavaScript `number` represents exactly. If you store IDs or receive them from another system, pass them to `people.get()` and `people.findEmail()` as a `string` or `bigint` to avoid silent rounding.
+
+### Proxies, testing, and tracing
+
+* `baseUrl` points the client at your own proxy or gateway.
+* `fetch` accepts any compatible implementation, which makes it easy to stub the API in unit tests without a mocking library.
+* `defaultHeaders` (client) and `headers` (per request) let you attach your own correlation IDs.
+* Requests identify themselves as `companyenrich-js/<version>`. The same version string is exported as `SDK_VERSION`.
+
+### Types stay in sync with the API
+
+Request and response types are generated from the public [OpenAPI spec](https://api.companyenrich.com/openapi/v2.json), so the fields you see in your editor are the fields the API returns. New API fields arrive in the SDK with the next release.
+
+## Support
+
+* Bugs and feature requests: [GitHub issues](https://github.com/CompanyEnrich/companyenrich-js-sdk/issues)
+* When reporting a failed request, include the `traceId` from the error. It lets us find the exact call in our logs.

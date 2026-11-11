@@ -1,0 +1,26 @@
+---
+title: "Rate limits"
+description: "Understand API request limits and the headers that help you schedule retries."
+---
+
+Our API uses rate limiting to promote fair usage and keep the service stable for everyone. If you exceed the limit, the API returns a 429 Too Many Requests response along with headers that help you decide when to retry.
+
+## Rate Limits
+
+* The global API limit is **500 requests per minute per IP address**.
+* Authenticated routes also have a **per-user, per-route limit** based on your plan capabilities.
+* Supplementary lookup endpoints, such as keyword, technology, and industry lookups, use a separate per-user route-level bucket.
+
+The global limit does not replace your plan limits. A request can be rejected when either applicable limit is exceeded.
+
+## Rate Limit Headers
+
+Use the rate-limit headers returned with a response to monitor the applicable limit. The values below are examples; your plan and route can have different limits:
+
+| Header                | Description                                              | Example          |
+| --------------------- | -------------------------------------------------------- | ---------------- |
+| x-ratelimit-limit     | Maximum number of requests allowed in the current window | 300              |
+| x-ratelimit-remaining | Requests left in the current window                      | 299              |
+| x-ratelimit-window    | Time counter when the current window resets              | 00:00:29.3021958 |
+
+When you receive `429 Too Many Requests`, wait for the retry time indicated by the response before sending more requests. Avoid retrying immediately in a tight loop.

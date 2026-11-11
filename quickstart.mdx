@@ -1,0 +1,90 @@
+---
+title: "Quickstart"
+description: "Make your first CompanyEnrich API request and enrich a company by domain."
+---
+
+<Steps>
+  <Step title="Get your API token">
+    Open the [dashboard](https://app.companyenrich.com) and copy your API token. Store it in an environment variable:
+
+    ```bash
+    export COMPANYENRICH_API_TOKEN="YOUR_API_TOKEN"
+    ```
+  </Step>
+  <Step title="Check your account">
+    This request verifies authentication and returns your credit balance without consuming credits.
+
+    ```bash
+    curl --request GET \
+      --url https://api.companyenrich.com/v2/me \
+      --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
+    ```
+  </Step>
+  <Step title="Enrich a company">
+    Look up a company using its domain. A successful enrichment costs 1 credit before optional expansions.
+
+    <CodeGroup>
+    ```bash cURL
+    curl --get \
+      --url https://api.companyenrich.com/v2/companies/enrich \
+      --data-urlencode "domain=stripe.com" \
+      --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
+    ```
+
+    ```javascript JavaScript
+    const url = new URL('https://api.companyenrich.com/v2/companies/enrich');
+    url.searchParams.set('domain', 'stripe.com');
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${process.env.COMPANYENRICH_API_TOKEN}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`CompanyEnrich returned ${response.status}: ${await response.text()}`);
+    }
+
+    console.log(await response.json());
+    ```
+
+    ```python Python
+    import json
+    import os
+    from urllib.request import Request, urlopen
+
+    request = Request(
+        "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com",
+        headers={"Authorization": f"Bearer {os.environ['COMPANYENRICH_API_TOKEN']}"},
+    )
+
+    with urlopen(request) as response:
+        print(json.load(response))
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Include additional data
+
+Request an expansion when you need financial data, keywords, NAICS codes, technologies, or workforce history. Each requested expansion adds 1 credit per returned company.
+
+```bash
+curl --get \
+  --url https://api.companyenrich.com/v2/companies/enrich \
+  --data-urlencode "domain=stripe.com" \
+  --data-urlencode "expand=financial" \
+  --data-urlencode "expand=technologies" \
+  --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
+```
+
+See the [endpoint reference](/api-reference/v2/get-companies-enrich) for response fields, all parameters, and billing details.
+
+<CardGroup cols={2}>
+  <Card title="Search companies" icon="magnifying-glass" href="/api-reference/v2/post-companies-search">
+    Find companies using filters, natural language, or lookalike domains.
+  </Card>
+  <Card title="Connect an AI agent" icon="robot" href="/docs/mcp-server">
+    Use CompanyEnrich from an MCP-compatible client.
+  </Card>
+</CardGroup>

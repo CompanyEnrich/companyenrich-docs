@@ -1,0 +1,57 @@
+---
+title: "Getting started"
+description: "Explore the CompanyEnrich APIs for company and people enrichment, search, lookalike discovery, and AI agents."
+---
+
+CompanyEnrich is a real-time B2B data API for enriching companies, finding people, discovering lookalike accounts, resolving emails, and powering AI agents with fresh company intelligence.
+
+Use CompanyEnrich to retrieve verified company and people information for business-to-business (B2B) workflows through a single REST API (application programming interface). Enrich a company by domain or social profile, or search 30M+ companies with 15+ filters. Find similar companies with AI, or resolve a work email to a company and person. Connect AI agents to live data through our Model Context Protocol (MCP) server.
+
+## The full API suite
+
+**Company Enrichment API.** Retrieve a company profile from any company domain, name, or social URL. The API returns industry, size, revenue range, location, technologies, employee count, and 15+ additional fields.
+
+**Company Search API.** Query 33M+ companies by 15+ criteria including industry, headcount, location, founding year, and tech stack. The API returns results in pages and includes full company enrichment data.
+
+**Similar Companies API.** Submit one or more company domains and get AI-ranked similar companies that match the target profile. Use these results to expand your ideal customer profile (ICP) and discover your total addressable market (TAM).
+
+**People Search API.** Search 193M+ verified people profiles by name, title, company, seniority, department, experience, location.
+
+**Workforce API.** Get current employee counts and historical employee-count trends for any company. Use these trends to identify growth, score accounts, and detect hiring slowdowns or expansions.
+
+**Reverse Email Lookup API.** Resolve any work email into a matched person and company record.
+
+**Bulk Enrichment API.** Enrich domains asynchronously and download completed results. V2 creates a batch and charges the standard enrichment price plus any requested paid expansions. The V1 bulk API accepts up to 10,000 domains per job, supports a completion webhook, and costs one credit per successfully enriched domain.
+
+**MCP Server.** Connect Claude, Cursor, or any MCP-compatible AI client directly to CompanyEnrich data. See [MCP Server setup](/docs/mcp-server).
+
+Full schema and parameters for every endpoint live under [API Reference](/api-reference/v2/overview). Follow the [quickstart](/quickstart) to make your first request.
+
+## Use cases
+
+Use CompanyEnrich for B2B data workflows across development and go-to-market (GTM) teams, such as sales and marketing.
+
+| Use case                                                                                       | Recommended API          |
+| ---------------------------------------------------------------------------------------------- | ------------------------ |
+| Enrich a company from a domain, name, or social profile                                        | Company Enrichment API   |
+| Search companies by industry, location, size, revenue, tech stack, keywords, or semantic query | Company Search API       |
+| Find lookalike companies based on your best customers or competitors                           | Similar Companies API    |
+| Resolve an email address to a person and company profile                                       | Reverse Email Lookup API |
+| Track employee counts, department growth, and workforce trends                                 | Workforce API            |
+| Give AI assistants access to company and people intelligence                                   | CompanyEnrich MCP Server |
+
+Some of the most common workflows we see:
+
+**Customer relationship management (CRM) enrichment.** Auto-fill missing company fields when a new lead lands in HubSpot or Salesforce. One call to Reverse Email Lookup gives you the full company record.
+
+**Lookalike prospecting.** Drop in 50 of your best customers, get back the next 5,000 companies that look like them. Sales and marketing teams use this to expand TAM without buying a separate intent tool.
+
+**AI agents.** Connect Claude or any MCP-compatible agent to our server to query live company data inside your workflow. You don’t need to write integration code.
+
+**Hiring insights.** Use the Workforce API to identify companies that expanded their engineering teams by 20% last quarter. Then use the Company Enrichment API to research those companies before you reach out.
+
+**Form enrichment.** When a prospect submits an email on your pricing page, call Reverse Email Lookup. Route the prospect based on company size or industry before adding them to your CRM.
+
+## Need Help?
+
+Contact [support@companyenrich.com](mailto:support@companyenrich.com) for help with questions or issues.

@@ -1,0 +1,922 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "CompanyEnrich",
+  "description": "Company and people intelligence for your applications, workflows, and AI agents.",
+  "colors": {
+    "primary": "#076CD9",
+    "light": "#3B82F6",
+    "dark": "#076CD9"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://companyenrich.com"
+  },
+  "favicon": "/favicon.ico",
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@companyenrich.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://app.companyenrich.com"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "docs/getting-started",
+              "quickstart",
+              "authentication",
+              "docs/data-sources"
+            ]
+          },
+          {
+            "group": "Using the API",
+            "pages": [
+              "docs/credits",
+              "docs/rate-limit"
+            ]
+          },
+          {
+            "group": "SDK & AI agents",
+            "pages": [
+              "docs/javascript-typescript-sdk",
+              "docs/mcp-server"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API V2",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/v2/overview"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Enrichment",
+            "pages": [
+              "api-reference/v2/get-companies-companyid",
+              "api-reference/v2/get-companies-enrich",
+              "api-reference/v2/post-companies-enrich",
+              "api-reference/v2/post-companies-enrich-batch",
+              "api-reference/v2/get-companies-autocomplete",
+              "api-reference/v2/get-companies-workforce"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Bulk Enrichment",
+            "pages": [
+              "api-reference/v2/post-companies-enrich-bulk",
+              "api-reference/v2/get-companies-enrich-bulk-id-results"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Search Export",
+            "pages": [
+              "api-reference/v2/post-companies-search-export",
+              "api-reference/v2/get-companies-search-export-id-results"
+            ]
+          },
+          {
+            "group": "People \u00b7 Search Export",
+            "pages": [
+              "api-reference/v2/post-people-search-export",
+              "api-reference/v2/get-people-search-export-id-results"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Search",
+            "pages": [
+              "api-reference/v2/post-companies-search",
+              "api-reference/v2/post-companies-search-count",
+              "api-reference/v2/post-companies-search-preview"
+            ]
+          },
+          {
+            "group": "People \u00b7 Search",
+            "pages": [
+              "api-reference/v2/post-people-search",
+              "api-reference/v2/post-people-search-count",
+              "api-reference/v2/post-people-search-preview"
+            ]
+          },
+          {
+            "group": "Industries",
+            "pages": [
+              "api-reference/v2/get-industries"
+            ]
+          },
+          {
+            "group": "Keywords",
+            "pages": [
+              "api-reference/v2/get-keywords-autocomplete"
+            ]
+          },
+          {
+            "group": "Technologies",
+            "pages": [
+              "api-reference/v2/get-technologies-autocomplete"
+            ]
+          },
+          {
+            "group": "Positions",
+            "pages": [
+              "api-reference/v2/get-positions-autocomplete"
+            ]
+          },
+          {
+            "group": "User",
+            "pages": [
+              "api-reference/v2/get-me"
+            ]
+          },
+          {
+            "group": "Batches",
+            "pages": [
+              "api-reference/v2/get-batches",
+              "api-reference/v2/get-batches-id",
+              "api-reference/v2/post-batches-id-cancel",
+              "api-reference/v2/get-batches-id-results"
+            ]
+          },
+          {
+            "group": "People \u00b7 Enrichment",
+            "pages": [
+              "api-reference/v2/get-people-personid",
+              "api-reference/v2/post-people-enrich",
+              "api-reference/v2/get-people-personid-email"
+            ]
+          },
+          {
+            "group": "Geo",
+            "pages": [
+              "api-reference/v2/get-geo-regions",
+              "api-reference/v2/get-geo-countries-countrycode",
+              "api-reference/v2/post-geo-countries",
+              "api-reference/v2/post-geo-states",
+              "api-reference/v2/post-geo-cities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API V1",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/v1/overview"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Enrichment",
+            "pages": [
+              "api-reference/v1/get-companies-enrich",
+              "api-reference/v1/post-companies-enrich",
+              "api-reference/v1/post-companies-enrich-batch",
+              "api-reference/v1/get-companies-workforce",
+              "api-reference/v1/get-companies-autocomplete"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Bulk Enrichment",
+            "pages": [
+              "api-reference/v1/post-companies-enrich-bulk",
+              "api-reference/v1/get-companies-enrich-bulk-jobid",
+              "api-reference/v1/get-companies-enrich-bulk-jobs"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Search",
+            "pages": [
+              "api-reference/v1/post-companies-search",
+              "api-reference/v1/post-companies-search-preview",
+              "api-reference/v1/post-companies-search-count",
+              "api-reference/v1/post-companies-search-scroll",
+              "api-reference/v1/get-companies"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Export",
+            "pages": [
+              "api-reference/v1/post-companies-search-async",
+              "api-reference/v1/get-companies-search-async-jobid",
+              "api-reference/v1/get-companies-search-async-jobs"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Similar",
+            "pages": [
+              "api-reference/v1/post-companies-similar",
+              "api-reference/v1/post-companies-similar-preview",
+              "api-reference/v1/post-companies-similar-count",
+              "api-reference/v1/post-companies-similar-scroll"
+            ]
+          },
+          {
+            "group": "Industries",
+            "pages": [
+              "api-reference/v1/get-industries"
+            ]
+          },
+          {
+            "group": "Keywords",
+            "pages": [
+              "api-reference/v1/get-keywords-autocomplete"
+            ]
+          },
+          {
+            "group": "Technologies",
+            "pages": [
+              "api-reference/v1/get-technologies-autocomplete"
+            ]
+          },
+          {
+            "group": "Positions",
+            "pages": [
+              "api-reference/v1/get-positions-autocomplete"
+            ]
+          },
+          {
+            "group": "User",
+            "pages": [
+              "api-reference/v1/get-me"
+            ]
+          },
+          {
+            "group": "Jobs",
+            "pages": [
+              "api-reference/v1/get-jobs",
+              "api-reference/v1/get-jobs-jobid"
+            ]
+          },
+          {
+            "group": "Company \u00b7 Lists",
+            "pages": [
+              "api-reference/v1/get-lists-companies",
+              "api-reference/v1/post-lists-companies",
+              "api-reference/v1/get-lists-companies-id",
+              "api-reference/v1/put-lists-companies-id",
+              "api-reference/v1/delete-lists-companies-id"
+            ]
+          },
+          {
+            "group": "People \u00b7 Search",
+            "pages": [
+              "api-reference/v1/post-people-lookup",
+              "api-reference/v1/get-people",
+              "api-reference/v1/post-people-search",
+              "api-reference/v1/post-people-search-scroll"
+            ]
+          },
+          {
+            "group": "People \u00b7 Enrichment",
+            "pages": [
+              "api-reference/v1/get-people-email",
+              "api-reference/v1/post-people-email-bulk",
+              "api-reference/v1/get-people-email-bulk-jobid",
+              "api-reference/v1/get-people-education"
+            ]
+          },
+          {
+            "group": "People \u00b7 Export",
+            "pages": [
+              "api-reference/v1/post-people-search-async",
+              "api-reference/v1/get-people-search-async-jobid",
+              "api-reference/v1/get-people-search-async-jobs"
+            ]
+          },
+          {
+            "group": "Geo",
+            "pages": [
+              "api-reference/v1/get-geo-regions",
+              "api-reference/v1/get-geo-countries-countrycode",
+              "api-reference/v1/post-geo-countries",
+              "api-reference/v1/post-geo-states",
+              "api-reference/v1/post-geo-cities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Product updates",
+            "pages": [
+              "changelog/index"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": [
+        "bash",
+        "javascript",
+        "python"
+      ]
+    }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/docs/getting-started"
+    },
+    {
+      "source": "/docs",
+      "destination": "/docs/getting-started"
+    },
+    {
+      "source": "/reference",
+      "destination": "/api-reference/v2/overview"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/changelog/index"
+    },
+    {
+      "source": "/reference/get_v2-companies-companyid",
+      "destination": "/api-reference/v2/get-companies-companyid"
+    },
+    {
+      "source": "/reference/get_v2-companies-enrich",
+      "destination": "/api-reference/v2/get-companies-enrich"
+    },
+    {
+      "source": "/reference/post_v2-companies-enrich",
+      "destination": "/api-reference/v2/post-companies-enrich"
+    },
+    {
+      "source": "/reference/post_v2-companies-enrich-batch",
+      "destination": "/api-reference/v2/post-companies-enrich-batch"
+    },
+    {
+      "source": "/reference/get_v2-companies-autocomplete",
+      "destination": "/api-reference/v2/get-companies-autocomplete"
+    },
+    {
+      "source": "/reference/post_v2-companies-enrich-bulk",
+      "destination": "/api-reference/v2/post-companies-enrich-bulk"
+    },
+    {
+      "source": "/reference/post_v2-companies-search-export",
+      "destination": "/api-reference/v2/post-companies-search-export"
+    },
+    {
+      "source": "/reference/post_v2-people-search-export",
+      "destination": "/api-reference/v2/post-people-search-export"
+    },
+    {
+      "source": "/reference/get_v2-companies-enrich-bulk-id-results",
+      "destination": "/api-reference/v2/get-companies-enrich-bulk-id-results"
+    },
+    {
+      "source": "/reference/get_v2-companies-search-export-id-results",
+      "destination": "/api-reference/v2/get-companies-search-export-id-results"
+    },
+    {
+      "source": "/reference/get_v2-people-search-export-id-results",
+      "destination": "/api-reference/v2/get-people-search-export-id-results"
+    },
+    {
+      "source": "/reference/get_v2-companies-workforce",
+      "destination": "/api-reference/v2/get-companies-workforce"
+    },
+    {
+      "source": "/reference/post_v2-companies-search",
+      "destination": "/api-reference/v2/post-companies-search"
+    },
+    {
+      "source": "/reference/post_v2-companies-search-count",
+      "destination": "/api-reference/v2/post-companies-search-count"
+    },
+    {
+      "source": "/reference/post_v2-companies-search-preview",
+      "destination": "/api-reference/v2/post-companies-search-preview"
+    },
+    {
+      "source": "/reference/post_v2-people-search",
+      "destination": "/api-reference/v2/post-people-search"
+    },
+    {
+      "source": "/reference/post_v2-people-search-count",
+      "destination": "/api-reference/v2/post-people-search-count"
+    },
+    {
+      "source": "/reference/post_v2-people-search-preview",
+      "destination": "/api-reference/v2/post-people-search-preview"
+    },
+    {
+      "source": "/reference/get_v2-industries",
+      "destination": "/api-reference/v2/get-industries"
+    },
+    {
+      "source": "/reference/get_v2-keywords-autocomplete",
+      "destination": "/api-reference/v2/get-keywords-autocomplete"
+    },
+    {
+      "source": "/reference/get_v2-technologies-autocomplete",
+      "destination": "/api-reference/v2/get-technologies-autocomplete"
+    },
+    {
+      "source": "/reference/get_v2-positions-autocomplete",
+      "destination": "/api-reference/v2/get-positions-autocomplete"
+    },
+    {
+      "source": "/reference/get_v2-me",
+      "destination": "/api-reference/v2/get-me"
+    },
+    {
+      "source": "/reference/get_v2-batches",
+      "destination": "/api-reference/v2/get-batches"
+    },
+    {
+      "source": "/reference/get_v2-batches-id",
+      "destination": "/api-reference/v2/get-batches-id"
+    },
+    {
+      "source": "/reference/post_v2-batches-id-cancel",
+      "destination": "/api-reference/v2/post-batches-id-cancel"
+    },
+    {
+      "source": "/reference/get_v2-batches-id-results",
+      "destination": "/api-reference/v2/get-batches-id-results"
+    },
+    {
+      "source": "/reference/get_v2-people-personid",
+      "destination": "/api-reference/v2/get-people-personid"
+    },
+    {
+      "source": "/reference/post_v2-people-enrich",
+      "destination": "/api-reference/v2/post-people-enrich"
+    },
+    {
+      "source": "/reference/get_v2-people-personid-email",
+      "destination": "/api-reference/v2/get-people-personid-email"
+    },
+    {
+      "source": "/reference/get_v2-geo-regions",
+      "destination": "/api-reference/v2/get-geo-regions"
+    },
+    {
+      "source": "/reference/get_v2-geo-countries-countrycode",
+      "destination": "/api-reference/v2/get-geo-countries-countrycode"
+    },
+    {
+      "source": "/reference/post_v2-geo-countries",
+      "destination": "/api-reference/v2/post-geo-countries"
+    },
+    {
+      "source": "/reference/post_v2-geo-states",
+      "destination": "/api-reference/v2/post-geo-states"
+    },
+    {
+      "source": "/reference/post_v2-geo-cities",
+      "destination": "/api-reference/v2/post-geo-cities"
+    },
+    {
+      "source": "/reference/get_companies-enrich",
+      "destination": "/api-reference/v1/get-companies-enrich"
+    },
+    {
+      "source": "/reference/post_companies-enrich",
+      "destination": "/api-reference/v1/post-companies-enrich"
+    },
+    {
+      "source": "/reference/post_companies-enrich-batch",
+      "destination": "/api-reference/v1/post-companies-enrich-batch"
+    },
+    {
+      "source": "/reference/post_companies-enrich-bulk",
+      "destination": "/api-reference/v1/post-companies-enrich-bulk"
+    },
+    {
+      "source": "/reference/get_companies-enrich-bulk-jobid",
+      "destination": "/api-reference/v1/get-companies-enrich-bulk-jobid"
+    },
+    {
+      "source": "/reference/get_companies-enrich-bulk-jobs",
+      "destination": "/api-reference/v1/get-companies-enrich-bulk-jobs"
+    },
+    {
+      "source": "/reference/post_companies-search",
+      "destination": "/api-reference/v1/post-companies-search"
+    },
+    {
+      "source": "/reference/post_companies-search-preview",
+      "destination": "/api-reference/v1/post-companies-search-preview"
+    },
+    {
+      "source": "/reference/post_companies-search-count",
+      "destination": "/api-reference/v1/post-companies-search-count"
+    },
+    {
+      "source": "/reference/post_companies-search-scroll",
+      "destination": "/api-reference/v1/post-companies-search-scroll"
+    },
+    {
+      "source": "/reference/post_companies-search-async",
+      "destination": "/api-reference/v1/post-companies-search-async"
+    },
+    {
+      "source": "/reference/get_companies-search-async-jobid",
+      "destination": "/api-reference/v1/get-companies-search-async-jobid"
+    },
+    {
+      "source": "/reference/get_companies-search-async-jobs",
+      "destination": "/api-reference/v1/get-companies-search-async-jobs"
+    },
+    {
+      "source": "/reference/post_companies-similar",
+      "destination": "/api-reference/v1/post-companies-similar"
+    },
+    {
+      "source": "/reference/post_companies-similar-preview",
+      "destination": "/api-reference/v1/post-companies-similar-preview"
+    },
+    {
+      "source": "/reference/post_companies-similar-count",
+      "destination": "/api-reference/v1/post-companies-similar-count"
+    },
+    {
+      "source": "/reference/post_companies-similar-scroll",
+      "destination": "/api-reference/v1/post-companies-similar-scroll"
+    },
+    {
+      "source": "/reference/get_companies",
+      "destination": "/api-reference/v1/get-companies"
+    },
+    {
+      "source": "/reference/get_companies-workforce",
+      "destination": "/api-reference/v1/get-companies-workforce"
+    },
+    {
+      "source": "/reference/get_companies-autocomplete",
+      "destination": "/api-reference/v1/get-companies-autocomplete"
+    },
+    {
+      "source": "/reference/get_industries",
+      "destination": "/api-reference/v1/get-industries"
+    },
+    {
+      "source": "/reference/get_keywords-autocomplete",
+      "destination": "/api-reference/v1/get-keywords-autocomplete"
+    },
+    {
+      "source": "/reference/get_technologies-autocomplete",
+      "destination": "/api-reference/v1/get-technologies-autocomplete"
+    },
+    {
+      "source": "/reference/get_positions-autocomplete",
+      "destination": "/api-reference/v1/get-positions-autocomplete"
+    },
+    {
+      "source": "/reference/get_me",
+      "destination": "/api-reference/v1/get-me"
+    },
+    {
+      "source": "/reference/get_jobs",
+      "destination": "/api-reference/v1/get-jobs"
+    },
+    {
+      "source": "/reference/get_jobs-jobid",
+      "destination": "/api-reference/v1/get-jobs-jobid"
+    },
+    {
+      "source": "/reference/get_lists-companies",
+      "destination": "/api-reference/v1/get-lists-companies"
+    },
+    {
+      "source": "/reference/post_lists-companies",
+      "destination": "/api-reference/v1/post-lists-companies"
+    },
+    {
+      "source": "/reference/get_lists-companies-id",
+      "destination": "/api-reference/v1/get-lists-companies-id"
+    },
+    {
+      "source": "/reference/put_lists-companies-id",
+      "destination": "/api-reference/v1/put-lists-companies-id"
+    },
+    {
+      "source": "/reference/delete_lists-companies-id",
+      "destination": "/api-reference/v1/delete-lists-companies-id"
+    },
+    {
+      "source": "/reference/post_people-lookup",
+      "destination": "/api-reference/v1/post-people-lookup"
+    },
+    {
+      "source": "/reference/get_people-email",
+      "destination": "/api-reference/v1/get-people-email"
+    },
+    {
+      "source": "/reference/post_people-email-bulk",
+      "destination": "/api-reference/v1/post-people-email-bulk"
+    },
+    {
+      "source": "/reference/get_people-email-bulk-jobid",
+      "destination": "/api-reference/v1/get-people-email-bulk-jobid"
+    },
+    {
+      "source": "/reference/get_people",
+      "destination": "/api-reference/v1/get-people"
+    },
+    {
+      "source": "/reference/get_people-education",
+      "destination": "/api-reference/v1/get-people-education"
+    },
+    {
+      "source": "/reference/post_people-search",
+      "destination": "/api-reference/v1/post-people-search"
+    },
+    {
+      "source": "/reference/post_people-search-scroll",
+      "destination": "/api-reference/v1/post-people-search-scroll"
+    },
+    {
+      "source": "/reference/post_people-search-async",
+      "destination": "/api-reference/v1/post-people-search-async"
+    },
+    {
+      "source": "/reference/get_people-search-async-jobid",
+      "destination": "/api-reference/v1/get-people-search-async-jobid"
+    },
+    {
+      "source": "/reference/get_people-search-async-jobs",
+      "destination": "/api-reference/v1/get-people-search-async-jobs"
+    },
+    {
+      "source": "/reference/get_geo-regions",
+      "destination": "/api-reference/v1/get-geo-regions"
+    },
+    {
+      "source": "/reference/get_geo-countries-countrycode",
+      "destination": "/api-reference/v1/get-geo-countries-countrycode"
+    },
+    {
+      "source": "/reference/post_geo-countries",
+      "destination": "/api-reference/v1/post-geo-countries"
+    },
+    {
+      "source": "/reference/post_geo-states",
+      "destination": "/api-reference/v1/post-geo-states"
+    },
+    {
+      "source": "/reference/post_geo-cities",
+      "destination": "/api-reference/v1/post-geo-cities"
+    },
+    {
+      "source": "/v1.0/reference/delete_lists-companies-id",
+      "destination": "/api-reference/v1/delete-lists-companies-id"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-autocomplete",
+      "destination": "/api-reference/v1/get-companies-autocomplete"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-enrich-bulk-jobid",
+      "destination": "/api-reference/v1/get-companies-enrich-bulk-jobid"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-enrich-bulk-jobs",
+      "destination": "/api-reference/v1/get-companies-enrich-bulk-jobs"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-enrich",
+      "destination": "/api-reference/v1/get-companies-enrich"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-search-async-jobid",
+      "destination": "/api-reference/v1/get-companies-search-async-jobid"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-search-async-jobs",
+      "destination": "/api-reference/v1/get-companies-search-async-jobs"
+    },
+    {
+      "source": "/v1.0/reference/get_companies-workforce",
+      "destination": "/api-reference/v1/get-companies-workforce"
+    },
+    {
+      "source": "/v1.0/reference/get_companies",
+      "destination": "/api-reference/v1/get-companies"
+    },
+    {
+      "source": "/v1.0/reference/get_geo-countries-countrycode",
+      "destination": "/api-reference/v1/get-geo-countries-countrycode"
+    },
+    {
+      "source": "/v1.0/reference/get_geo-regions",
+      "destination": "/api-reference/v1/get-geo-regions"
+    },
+    {
+      "source": "/v1.0/reference/get_industries",
+      "destination": "/api-reference/v1/get-industries"
+    },
+    {
+      "source": "/v1.0/reference/get_jobs-jobid",
+      "destination": "/api-reference/v1/get-jobs-jobid"
+    },
+    {
+      "source": "/v1.0/reference/get_jobs",
+      "destination": "/api-reference/v1/get-jobs"
+    },
+    {
+      "source": "/v1.0/reference/get_keywords-autocomplete",
+      "destination": "/api-reference/v1/get-keywords-autocomplete"
+    },
+    {
+      "source": "/v1.0/reference/get_lists-companies-id",
+      "destination": "/api-reference/v1/get-lists-companies-id"
+    },
+    {
+      "source": "/v1.0/reference/get_lists-companies",
+      "destination": "/api-reference/v1/get-lists-companies"
+    },
+    {
+      "source": "/v1.0/reference/get_me",
+      "destination": "/api-reference/v1/get-me"
+    },
+    {
+      "source": "/v1.0/reference/get_people-education",
+      "destination": "/api-reference/v1/get-people-education"
+    },
+    {
+      "source": "/v1.0/reference/get_people-email-bulk-jobid",
+      "destination": "/api-reference/v1/get-people-email-bulk-jobid"
+    },
+    {
+      "source": "/v1.0/reference/get_people-email",
+      "destination": "/api-reference/v1/get-people-email"
+    },
+    {
+      "source": "/v1.0/reference/get_people-search-async-jobid",
+      "destination": "/api-reference/v1/get-people-search-async-jobid"
+    },
+    {
+      "source": "/v1.0/reference/get_people-search-async-jobs",
+      "destination": "/api-reference/v1/get-people-search-async-jobs"
+    },
+    {
+      "source": "/v1.0/reference/get_people",
+      "destination": "/api-reference/v1/get-people"
+    },
+    {
+      "source": "/v1.0/reference/get_positions-autocomplete",
+      "destination": "/api-reference/v1/get-positions-autocomplete"
+    },
+    {
+      "source": "/v1.0/reference/get_technologies-autocomplete",
+      "destination": "/api-reference/v1/get-technologies-autocomplete"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-enrich-batch",
+      "destination": "/api-reference/v1/post-companies-enrich-batch"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-enrich-bulk",
+      "destination": "/api-reference/v1/post-companies-enrich-bulk"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-enrich",
+      "destination": "/api-reference/v1/post-companies-enrich"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-search-async",
+      "destination": "/api-reference/v1/post-companies-search-async"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-search-count",
+      "destination": "/api-reference/v1/post-companies-search-count"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-search-preview",
+      "destination": "/api-reference/v1/post-companies-search-preview"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-search-scroll",
+      "destination": "/api-reference/v1/post-companies-search-scroll"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-search",
+      "destination": "/api-reference/v1/post-companies-search"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-similar-count",
+      "destination": "/api-reference/v1/post-companies-similar-count"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-similar-preview",
+      "destination": "/api-reference/v1/post-companies-similar-preview"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-similar-scroll",
+      "destination": "/api-reference/v1/post-companies-similar-scroll"
+    },
+    {
+      "source": "/v1.0/reference/post_companies-similar",
+      "destination": "/api-reference/v1/post-companies-similar"
+    },
+    {
+      "source": "/v1.0/reference/post_geo-cities",
+      "destination": "/api-reference/v1/post-geo-cities"
+    },
+    {
+      "source": "/v1.0/reference/post_geo-countries",
+      "destination": "/api-reference/v1/post-geo-countries"
+    },
+    {
+      "source": "/v1.0/reference/post_geo-states",
+      "destination": "/api-reference/v1/post-geo-states"
+    },
+    {
+      "source": "/v1.0/reference/post_lists-companies",
+      "destination": "/api-reference/v1/post-lists-companies"
+    },
+    {
+      "source": "/v1.0/reference/post_people-email-bulk",
+      "destination": "/api-reference/v1/post-people-email-bulk"
+    },
+    {
+      "source": "/v1.0/reference/post_people-lookup",
+      "destination": "/api-reference/v1/post-people-lookup"
+    },
+    {
+      "source": "/v1.0/reference/post_people-search-async",
+      "destination": "/api-reference/v1/post-people-search-async"
+    },
+    {
+      "source": "/v1.0/reference/post_people-search-scroll",
+      "destination": "/api-reference/v1/post-people-search-scroll"
+    },
+    {
+      "source": "/v1.0/reference/post_people-search",
+      "destination": "/api-reference/v1/post-people-search"
+    },
+    {
+      "source": "/v1.0/reference/put_lists-companies-id",
+      "destination": "/api-reference/v1/put-lists-companies-id"
+    },
+    {
+      "source": "/v1.0",
+      "destination": "/api-reference/v1/overview"
+    },
+    {
+      "source": "/v1.0/reference",
+      "destination": "/api-reference/v1/overview"
+    },
+    {
+      "source": "/v1.0/docs",
+      "destination": "/docs/getting-started"
+    },
+    {
+      "source": "/docs/release-notes",
+      "destination": "/changelog/index"
+    },
+    {
+      "source": "/v1.0/docs/release-notes",
+      "destination": "/changelog/index"
+    },
+    {
+      "source": "/v1.0/docs/getting-started",
+      "destination": "/docs/getting-started"
+    },
+    {
+      "source": "/v1.0/docs/data-sources",
+      "destination": "/docs/data-sources"
+    },
+    {
+      "source": "/v1.0/docs/mcp-server",
+      "destination": "/docs/mcp-server"
+    },
+    {
+      "source": "/v1.0/docs/rate-limit",
+      "destination": "/docs/rate-limit"
+    },
+    {
+      "source": "/v1.0/docs/credits",
+      "destination": "/docs/credits"
+    }
+  ]
+}
