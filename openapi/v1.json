@@ -7637,11 +7637,11 @@
         "properties": {
           "used": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "total": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           }
         }
       },
@@ -10502,11 +10502,9 @@
     },
     "securitySchemes": {
       "Bearer": {
-        "type": "apiKey",
+        "type": "http",
         "description": "API Token used for authentication. Example: \"Authorization: Bearer {token}\"",
-        "name": "Authorization",
-        "in": "header",
-        "x-bearer-format": "bearer"
+        "scheme": "bearer"
       }
     }
   },
@@ -10573,12 +10571,12 @@
       "description": "Endpoints for looking up technologies used in company search filters."
     },
     {
-      "name": "User",
-      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
-    },
-    {
       "name": "Positions",
       "description": "Endpoints for looking up job positions and titles used in people search filters."
+    },
+    {
+      "name": "User",
+      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
     }
   ]
 }

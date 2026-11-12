@@ -14383,11 +14383,9 @@
     },
     "securitySchemes": {
       "Bearer": {
-        "type": "apiKey",
+        "type": "http",
         "description": "API Token used for authentication. Example: \"Authorization: Bearer {token}\"",
-        "name": "Authorization",
-        "in": "header",
-        "x-bearer-format": "bearer"
+        "scheme": "bearer"
       }
     }
   },
@@ -14410,12 +14408,24 @@
       "description": "Search companies by filters with pagination and cursor scrolling."
     },
     {
+      "name": "Company / Search Export",
+      "description": "Export a company search in the background and download the results."
+    },
+    {
       "name": "People / Search",
       "description": "Search people by various criteria with page-based or cursor-based pagination."
     },
     {
+      "name": "People / Search Export",
+      "description": "Export a people search in the background and download the results."
+    },
+    {
       "name": "People / Enrichment",
       "description": "Resolve work email addresses for individual people in realtime or background jobs."
+    },
+    {
+      "name": "Batches",
+      "description": "Endpoints for listing, monitoring, cancelling, and downloading the batches created by bulk enrichments and search exports."
     },
     {
       "name": "Geo",
@@ -14434,12 +14444,12 @@
       "description": "Endpoints for looking up technologies used in company search filters."
     },
     {
-      "name": "User",
-      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
-    },
-    {
       "name": "Positions",
       "description": "Endpoints for looking up job positions and titles."
+    },
+    {
+      "name": "User",
+      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
     }
   ]
 }

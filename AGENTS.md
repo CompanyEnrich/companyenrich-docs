@@ -20,7 +20,7 @@ Read `README.md` for development commands and `MIGRATION.md` for migration conte
 - Refresh specifications and generated pages with `npm run sync:openapi`. It downloads both versions from `https://api.companyenrich.com/openapi/v1.json` and `https://api.companyenrich.com/openapi/v2.json`.
 - Run a refresh when the task needs updated API documentation, not as a routine side effect of unrelated edits. Inspect the entire resulting diff.
 - Endpoint pages contain a generated marker and an explicit specification path in their `openapi` frontmatter. Change the generator for formatting changes; fix API descriptions upstream for contract changes.
-- The sync script rebuilds the `groups` inside the `API V1` and `API V2` navigation tabs. Keep those tab names unless updating the generator too. Make persistent changes to their generated navigation in the script.
+- The sync script rebuilds the `groups` inside the `API V1` and `API V2` navigation tabs. Keep those tab names unless updating the generator too. Make persistent changes to their generated navigation in the script. Group order follows each specification's top-level `tags` list; change the order upstream in the API, not here.
 - The two API overview pages and other hand-written guides are not generated.
 - `npm run check:api` checks local snapshots, generated pages, navigation, and generated redirects without fetching the live specifications.
 - If a guide conflicts with a current specification, verify the relevant version before correcting it. Do not infer behavior from similarly named V1 and V2 endpoints.
@@ -28,7 +28,7 @@ Read `README.md` for development commands and `MIGRATION.md` for migration conte
 ## Version and authentication details
 
 - The API base URL is `https://api.companyenrich.com`. V1 paths have no `/v1` prefix; V2 paths start with `/v2`.
-- Both specifications model authentication as an `Authorization` API-key header. The playground requires the full value `Bearer YOUR_API_TOKEN`, including the prefix.
+- Both specifications model authentication as HTTP bearer. The playground takes the bare API token and adds the `Bearer` prefix itself.
 - Credit costs, expansions, pagination, and asynchronous workflows can differ between versions. Check the relevant operation rather than copying another version's examples.
 - The published JavaScript SDK and npm MCP server may target different API versions. Verify the package version and implementation before updating their documented capabilities or prices.
 - Keep historical changelog claims and original publication dates intact. Put current behavior in guides and endpoint references.

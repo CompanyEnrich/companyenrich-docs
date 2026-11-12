@@ -15,7 +15,12 @@
   },
   "favicon": "/favicon.ico",
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude"]
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
   },
   "navbar": {
     "links": [
@@ -136,7 +141,7 @@
             ]
           },
           {
-            "group": "Company \u00b7 Enrichment",
+            "group": "Company · Enrichment",
             "pages": [
               "api-reference/v2/get-companies-companyid",
               "api-reference/v2/get-companies-enrich",
@@ -147,28 +152,14 @@
             ]
           },
           {
-            "group": "Company \u00b7 Bulk Enrichment",
+            "group": "Company · Bulk Enrichment",
             "pages": [
               "api-reference/v2/post-companies-enrich-bulk",
               "api-reference/v2/get-companies-enrich-bulk-id-results"
             ]
           },
           {
-            "group": "Company \u00b7 Search Export",
-            "pages": [
-              "api-reference/v2/post-companies-search-export",
-              "api-reference/v2/get-companies-search-export-id-results"
-            ]
-          },
-          {
-            "group": "People \u00b7 Search Export",
-            "pages": [
-              "api-reference/v2/post-people-search-export",
-              "api-reference/v2/get-people-search-export-id-results"
-            ]
-          },
-          {
-            "group": "Company \u00b7 Search",
+            "group": "Company · Search",
             "pages": [
               "api-reference/v2/post-companies-search",
               "api-reference/v2/post-companies-search-count",
@@ -176,11 +167,52 @@
             ]
           },
           {
-            "group": "People \u00b7 Search",
+            "group": "Company · Search Export",
+            "pages": [
+              "api-reference/v2/post-companies-search-export",
+              "api-reference/v2/get-companies-search-export-id-results"
+            ]
+          },
+          {
+            "group": "People · Search",
             "pages": [
               "api-reference/v2/post-people-search",
               "api-reference/v2/post-people-search-count",
               "api-reference/v2/post-people-search-preview"
+            ]
+          },
+          {
+            "group": "People · Search Export",
+            "pages": [
+              "api-reference/v2/post-people-search-export",
+              "api-reference/v2/get-people-search-export-id-results"
+            ]
+          },
+          {
+            "group": "People · Enrichment",
+            "pages": [
+              "api-reference/v2/get-people-personid",
+              "api-reference/v2/post-people-enrich",
+              "api-reference/v2/get-people-personid-email"
+            ]
+          },
+          {
+            "group": "Batches",
+            "pages": [
+              "api-reference/v2/get-batches",
+              "api-reference/v2/get-batches-id",
+              "api-reference/v2/post-batches-id-cancel",
+              "api-reference/v2/get-batches-id-results"
+            ]
+          },
+          {
+            "group": "Geo",
+            "pages": [
+              "api-reference/v2/get-geo-regions",
+              "api-reference/v2/get-geo-countries-countrycode",
+              "api-reference/v2/post-geo-countries",
+              "api-reference/v2/post-geo-states",
+              "api-reference/v2/post-geo-cities"
             ]
           },
           {
@@ -212,33 +244,6 @@
             "pages": [
               "api-reference/v2/get-me"
             ]
-          },
-          {
-            "group": "Batches",
-            "pages": [
-              "api-reference/v2/get-batches",
-              "api-reference/v2/get-batches-id",
-              "api-reference/v2/post-batches-id-cancel",
-              "api-reference/v2/get-batches-id-results"
-            ]
-          },
-          {
-            "group": "People \u00b7 Enrichment",
-            "pages": [
-              "api-reference/v2/get-people-personid",
-              "api-reference/v2/post-people-enrich",
-              "api-reference/v2/get-people-personid-email"
-            ]
-          },
-          {
-            "group": "Geo",
-            "pages": [
-              "api-reference/v2/get-geo-regions",
-              "api-reference/v2/get-geo-countries-countrycode",
-              "api-reference/v2/post-geo-countries",
-              "api-reference/v2/post-geo-states",
-              "api-reference/v2/post-geo-cities"
-            ]
           }
         ]
       },
@@ -252,7 +257,7 @@
             ]
           },
           {
-            "group": "Company \u00b7 Enrichment",
+            "group": "Company · Enrichment",
             "pages": [
               "api-reference/v1/get-companies-enrich",
               "api-reference/v1/post-companies-enrich",
@@ -262,7 +267,7 @@
             ]
           },
           {
-            "group": "Company \u00b7 Bulk Enrichment",
+            "group": "Company · Bulk Enrichment",
             "pages": [
               "api-reference/v1/post-companies-enrich-bulk",
               "api-reference/v1/get-companies-enrich-bulk-jobid",
@@ -270,7 +275,7 @@
             ]
           },
           {
-            "group": "Company \u00b7 Search",
+            "group": "Company · Search",
             "pages": [
               "api-reference/v1/post-companies-search",
               "api-reference/v1/post-companies-search-preview",
@@ -280,7 +285,7 @@
             ]
           },
           {
-            "group": "Company \u00b7 Export",
+            "group": "Company · Export",
             "pages": [
               "api-reference/v1/post-companies-search-async",
               "api-reference/v1/get-companies-search-async-jobid",
@@ -288,12 +293,65 @@
             ]
           },
           {
-            "group": "Company \u00b7 Similar",
+            "group": "Company · Similar",
             "pages": [
               "api-reference/v1/post-companies-similar",
               "api-reference/v1/post-companies-similar-preview",
               "api-reference/v1/post-companies-similar-count",
               "api-reference/v1/post-companies-similar-scroll"
+            ]
+          },
+          {
+            "group": "People · Search",
+            "pages": [
+              "api-reference/v1/post-people-lookup",
+              "api-reference/v1/get-people",
+              "api-reference/v1/post-people-search",
+              "api-reference/v1/post-people-search-scroll"
+            ]
+          },
+          {
+            "group": "People · Enrichment",
+            "pages": [
+              "api-reference/v1/get-people-email",
+              "api-reference/v1/post-people-email-bulk",
+              "api-reference/v1/get-people-email-bulk-jobid",
+              "api-reference/v1/get-people-education"
+            ]
+          },
+          {
+            "group": "People · Export",
+            "pages": [
+              "api-reference/v1/post-people-search-async",
+              "api-reference/v1/get-people-search-async-jobid",
+              "api-reference/v1/get-people-search-async-jobs"
+            ]
+          },
+          {
+            "group": "Jobs",
+            "pages": [
+              "api-reference/v1/get-jobs",
+              "api-reference/v1/get-jobs-jobid"
+            ]
+          },
+          {
+            "group": "Company · Lists",
+            "pages": [
+              "api-reference/v1/get-lists-companies",
+              "api-reference/v1/post-lists-companies",
+              "api-reference/v1/get-lists-companies-id",
+              "api-reference/v1/put-lists-companies-id",
+              "api-reference/v1/delete-lists-companies-id"
+            ]
+          },
+          {
+            "group": "Geo",
+            "pages": [
+              "api-reference/v1/get-geo-regions",
+              "api-reference/v1/get-geo-countries-countrycode",
+              "api-reference/v1/post-geo-countries",
+              "api-reference/v1/post-geo-states",
+              "api-reference/v1/post-geo-cities"
             ]
           },
           {
@@ -324,59 +382,6 @@
             "group": "User",
             "pages": [
               "api-reference/v1/get-me"
-            ]
-          },
-          {
-            "group": "Jobs",
-            "pages": [
-              "api-reference/v1/get-jobs",
-              "api-reference/v1/get-jobs-jobid"
-            ]
-          },
-          {
-            "group": "Company \u00b7 Lists",
-            "pages": [
-              "api-reference/v1/get-lists-companies",
-              "api-reference/v1/post-lists-companies",
-              "api-reference/v1/get-lists-companies-id",
-              "api-reference/v1/put-lists-companies-id",
-              "api-reference/v1/delete-lists-companies-id"
-            ]
-          },
-          {
-            "group": "People \u00b7 Search",
-            "pages": [
-              "api-reference/v1/post-people-lookup",
-              "api-reference/v1/get-people",
-              "api-reference/v1/post-people-search",
-              "api-reference/v1/post-people-search-scroll"
-            ]
-          },
-          {
-            "group": "People \u00b7 Enrichment",
-            "pages": [
-              "api-reference/v1/get-people-email",
-              "api-reference/v1/post-people-email-bulk",
-              "api-reference/v1/get-people-email-bulk-jobid",
-              "api-reference/v1/get-people-education"
-            ]
-          },
-          {
-            "group": "People \u00b7 Export",
-            "pages": [
-              "api-reference/v1/post-people-search-async",
-              "api-reference/v1/get-people-search-async-jobid",
-              "api-reference/v1/get-people-search-async-jobs"
-            ]
-          },
-          {
-            "group": "Geo",
-            "pages": [
-              "api-reference/v1/get-geo-regions",
-              "api-reference/v1/get-geo-countries-countrycode",
-              "api-reference/v1/post-geo-countries",
-              "api-reference/v1/post-geo-states",
-              "api-reference/v1/post-geo-cities"
             ]
           }
         ]
