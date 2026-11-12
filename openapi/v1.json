@@ -7637,11 +7637,11 @@
         "properties": {
           "used": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "total": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           }
         }
       },
@@ -10502,11 +10502,9 @@
     },
     "securitySchemes": {
       "Bearer": {
-        "type": "apiKey",
+        "type": "http",
         "description": "API Token used for authentication. Example: \"Authorization: Bearer {token}\"",
-        "name": "Authorization",
-        "in": "header",
-        "x-bearer-format": "bearer"
+        "scheme": "bearer"
       }
     }
   },

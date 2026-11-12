@@ -46,7 +46,7 @@ It preserves the specifications as published, generates one MDX page per operati
 
 Endpoint MDX files are generated and should not be edited by hand. Maintain API descriptions upstream. Guide content and the two API overview pages are hand-written and are not overwritten by sync.
 
-Both specs model authentication as an `Authorization` API-key header. The playground therefore expects the complete value, **`Bearer YOUR_API_TOKEN`**. V1 API paths have no `/v1` prefix; V2 paths begin with `/v2`.
+Both specs model authentication as HTTP bearer. The playground therefore expects the bare API token and adds the `Bearer` prefix itself. V1 API paths have no `/v1` prefix; V2 paths begin with `/v2`.
 
 ## Deploy to Mintlify
 

@@ -28,7 +28,7 @@ Read `README.md` for development commands and `MIGRATION.md` for migration conte
 ## Version and authentication details
 
 - The API base URL is `https://api.companyenrich.com`. V1 paths have no `/v1` prefix; V2 paths start with `/v2`.
-- Both specifications model authentication as an `Authorization` API-key header. The playground requires the full value `Bearer YOUR_API_TOKEN`, including the prefix.
+- Both specifications model authentication as HTTP bearer. The playground takes the bare API token and adds the `Bearer` prefix itself.
 - Credit costs, expansions, pagination, and asynchronous workflows can differ between versions. Check the relevant operation rather than copying another version's examples.
 - The published JavaScript SDK and npm MCP server may target different API versions. Verify the package version and implementation before updating their documented capabilities or prices.
 - Keep historical changelog claims and original publication dates intact. Put current behavior in guides and endpoint references.
