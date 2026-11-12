@@ -1,90 +1,117 @@
 ---
 title: "Quickstart"
-description: "Make your first CompanyEnrich API request and enrich a company by domain."
+description: "Get an API key, send your first CompanyEnrich API request, and pick the API you want to use."
 ---
 
+Three steps take you from an API key to a working request.
+
 <Steps>
-  <Step title="Get your API token">
-    Open the [dashboard](https://app.companyenrich.com) and copy your API token. Store it in an environment variable:
+  <Step title="Get your API key">
+    Create a key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys), then save it in an environment variable:
 
     ```bash
-    export COMPANYENRICH_API_TOKEN="YOUR_API_TOKEN"
+    export COMPANYENRICH_API_KEY="paste-your-key-here"
     ```
   </Step>
-  <Step title="Check your account">
-    This request verifies authentication and returns your credit balance without consuming credits.
-
-    ```bash
-    curl --request GET \
-      --url https://api.companyenrich.com/v2/me \
-      --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
-    ```
-  </Step>
-  <Step title="Enrich a company">
-    Look up a company using its domain. A successful enrichment costs 1 credit before optional expansions.
+  <Step title="Send your first request">
+    This request checks that your key works and shows your credit balance. It is free.
 
     <CodeGroup>
+
     ```bash cURL
-    curl --get \
-      --url https://api.companyenrich.com/v2/companies/enrich \
-      --data-urlencode "domain=stripe.com" \
-      --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
+    curl https://api.companyenrich.com/v2/me \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
     ```
 
     ```javascript JavaScript
-    const url = new URL('https://api.companyenrich.com/v2/companies/enrich');
-    url.searchParams.set('domain', 'stripe.com');
+    // npm install @companyenrich/sdk
+    import { CompanyEnrich } from '@companyenrich/sdk';
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${process.env.COMPANYENRICH_API_TOKEN}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`CompanyEnrich returned ${response.status}: ${await response.text()}`);
-    }
-
-    console.log(await response.json());
+    const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+    console.log(await client.me());
     ```
 
     ```python Python
-    import json
-    import os
-    from urllib.request import Request, urlopen
+    # pip install companyenrich
+    from companyenrich import CompanyEnrich
 
-    request = Request(
-        "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com",
-        headers={"Authorization": f"Bearer {os.environ['COMPANYENRICH_API_TOKEN']}"},
-    )
-
-    with urlopen(request) as response:
-        print(json.load(response))
+    client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+    print(client.me())
     ```
+
+    ```ruby Ruby
+    # gem install companyenrich
+    require "companyenrich"
+
+    client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+    p client.me
+    ```
+
+    ```php PHP
+    <?php
+    // composer require companyenrich/sdk
+    require 'vendor/autoload.php';
+
+    use CompanyEnrich\Client;
+
+    $client = new Client(); // reads COMPANYENRICH_API_KEY
+    print_r($client->me());
+    ```
+
+    ```bash CLI
+    # npm install -g @companyenrich/cli
+    companyenrich me
+    ```
+
     </CodeGroup>
+
+    You get back your account's credits and what your plan allows:
+
+    ```json
+    {
+      "userId": "8d1f3c52-7b0e-4c1a-9f6d-2e5a4b3c1d90",
+      "credits": { "used": 12, "total": 1000 },
+      "capabilities": { "previews": true }
+    }
+    ```
+
+    This example is shortened. A `401` response means the key is missing or wrong.
+  </Step>
+  <Step title="Pick an API">
+    Each page below starts with a request you can copy and run.
+
+    <CardGroup cols={2}>
+      <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+        Turn a domain into a full company profile.
+      </Card>
+      <Card title="Company Search API" icon="magnifying-glass" href="/docs/company-search-api">
+        Find companies by country, size, industry, and more.
+      </Card>
+      <Card title="Semantic Company Search API" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+        Find companies from a plain-language description.
+      </Card>
+      <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+        Find companies like the ones you already know.
+      </Card>
+      <Card title="People Search API" icon="users" href="/docs/people-search-api">
+        Find people by job title, seniority, and employer.
+      </Card>
+      <Card title="Reverse Email Lookup API" icon="at" href="/docs/reverse-email-lookup-api">
+        Find the person behind a work email address.
+      </Card>
+      <Card title="Company Headcount API" icon="chart-line" href="/docs/company-headcount-api">
+        Get employee counts by department, with history.
+      </Card>
+      <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+        Connect an AI agent to CompanyEnrich data.
+      </Card>
+    </CardGroup>
   </Step>
 </Steps>
 
-## Include additional data
+## Good to know
 
-Request an expansion when you need financial data, keywords, NAICS codes, technologies, or workforce history. Each requested expansion adds 1 credit per returned company.
-
-```bash
-curl --get \
-  --url https://api.companyenrich.com/v2/companies/enrich \
-  --data-urlencode "domain=stripe.com" \
-  --data-urlencode "expand=financial" \
-  --data-urlencode "expand=technologies" \
-  --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
-```
-
-See the [endpoint reference](/api-reference/v2/get-companies-enrich) for response fields, all parameters, and billing details.
-
-<CardGroup cols={2}>
-  <Card title="Search companies" icon="magnifying-glass" href="/api-reference/v2/post-companies-search">
-    Find companies using filters, natural language, or lookalike domains.
-  </Card>
-  <Card title="Connect an AI agent" icon="robot" href="/docs/mcp-server">
-    Use CompanyEnrich from an MCP-compatible client.
-  </Card>
-</CardGroup>
+* **Base URL.** Every request goes to `https://api.companyenrich.com`. V2 paths start with `/v2`.
+* **Authentication.** Send your key in the `Authorization` header as `Bearer` followed by the key. See [Authentication](/authentication).
+* **Credits.** Most requests cost credits for the data they return. Counting matches and checking your account are free. See [Credits](/docs/credits).
+* **Rate limits.** See [Rate limits](/docs/rate-limit) before you send requests at scale.

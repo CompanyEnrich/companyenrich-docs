@@ -1,0 +1,265 @@
+---
+title: "Company Headcount API"
+sidebarTitle: "Overview"
+description: "Get a company's employee count by department with month-by-month history, and search companies by headcount and headcount growth. Covers the workforce endpoint, history paging, filters, pricing, and limits."
+---
+
+The Company Headcount API returns how many people work at a company, split into 14 departments, with a month-by-month history. Look up one company with [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce), add the same data to any company record, or search for companies by headcount and growth.
+
+## Ways to use headcount data
+
+| You want to                                           | Use                                                                                          | Credits                                  |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Get one company's headcount and history               | [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce)                   | 1 per 12-month page                      |
+| Get headcount together with the company profile       | The `workforce` expansion on enrichment or search                                            | 1 extra per company                      |
+| Find companies by headcount or headcount growth       | The `workforceSize` and `workforceGrowth` filters on [company search](/docs/company-search-api) | No extra charge on top of the search   |
+
+<CardGroup cols={2}>
+  <Card title="Examples" icon="code" href="/docs/company-headcount-api-examples">
+    Headcount lookups and searches in cURL, four SDKs, and the CLI.
+  </Card>
+  <Card title="Workforce fields" icon="building" href="/docs/company-schema#workforce">
+    Every field in the workforce object.
+  </Card>
+</CardGroup>
+
+## Get a company's headcount
+
+This request returns the current headcount for a company, by domain. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+console.log(workforce.observedEmployeeCount, workforce.employeeCountRange);
+console.log(workforce.departmentHeadcount.engineeringTechnical);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain="stripe.com")
+
+print(workforce["observedEmployeeCount"], workforce.get("employeeCountRange"))
+print(workforce["departmentHeadcount"].get("engineeringTechnical"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain: "stripe.com")
+
+puts workforce["observedEmployeeCount"], workforce["employeeCountRange"]
+puts workforce.dig("departmentHeadcount", "engineeringTechnical")
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+echo $workforce['observedEmployeeCount'], ' ', $workforce['employeeCountRange'] ?? '', PHP_EOL;
+echo $workforce['departmentHeadcount']['engineeringTechnical'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company workforce stripe.com
+```
+
+</CodeGroup>
+
+The response has the current headcount and the latest 12 months of history. This example shows a fictional company.
+
+```json
+{
+  "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "domain": "acme-analytics.example",
+  "observedEmployeeCount": 312,
+  "employeeCountRange": "201-500",
+  "departmentHeadcount": {
+    "cSuite": 6,
+    "engineeringTechnical": 124,
+    "sales": 58,
+    "marketing": 27
+  },
+  "unclassifiedHeadcount": 41,
+  "historyFrom": "2025-11-01",
+  "historyTo": "2026-11-01",
+  "history": [
+    {
+      "date": "2026-10-01",
+      "observedEmployeeCount": 312,
+      "employeeCountRange": "201-500",
+      "departmentHeadcount": { "engineeringTechnical": 124, "sales": 58 },
+      "unclassifiedHeadcount": 41
+    },
+    {
+      "date": "2026-04-01",
+      "observedEmployeeCount": 287,
+      "employeeCountRange": "201-500",
+      "departmentHeadcount": { "engineeringTechnical": 113, "sales": 52 },
+      "unclassifiedHeadcount": 38
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+## Request parameters
+
+| Parameter | Description                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------- |
+| `domain`  | The company domain, such as `stripe.com`.                                                           |
+| `id`      | The CompanyEnrich company ID.                                                                       |
+| `cursor`  | The `nextCursor` from a previous response, to get the preceding 12 months. Omit it for the latest 12 months. |
+
+Send exactly one of `domain` or `id`.
+
+## Response fields
+
+| Field                   | Description                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `companyId`             | The CompanyEnrich ID of the company.                                                     |
+| `domain`                | The canonical company domain.                                                            |
+| `observedEmployeeCount` | The number of distinct current employees observed in the CompanyEnrich people dataset.   |
+| `employeeCountRange`    | The estimated employee count range, such as `201-500`.                                   |
+| `departmentHeadcount`   | Observed headcount for each department. Every department is optional.                    |
+| `unclassifiedHeadcount` | Observed headcount that could not be assigned to a department.                           |
+| `historyFrom`           | The first month of the returned 12-month history window, inclusive.                      |
+| `historyTo`             | The end of the returned history window, exclusive.                                       |
+| `history`               | The points where headcount changed within the window, newest first.                      |
+| `nextCursor`            | A cursor for the preceding 12 months. Omitted when no older history is available.        |
+
+`departmentHeadcount` uses these keys: `cSuite`, `productManagement`, `engineeringTechnical`, `design`, `education`, `finance`, `humanResources`, `informationTechnology`, `legal`, `marketing`, `medicalHealth`, `operations`, `sales`, and `consulting`. See [Workforce departments](/docs/field-values#workforce-departments).
+
+## Observed count and estimated range
+
+The two size fields answer different questions:
+
+* `observedEmployeeCount` counts the people in the CompanyEnrich people dataset who currently work at the company. The department numbers break this count down.
+* `employeeCountRange` is the estimated size range of the whole company, using the same [employee ranges](/docs/field-values#employee-ranges) as the company record.
+
+## Headcount history
+
+Each response covers a 12-month window, from `historyFrom` up to `historyTo`.
+
+* `history` lists the months where headcount changed, newest first. Each point has a `date`, which is the first day of that month, and the same count and department fields as the current headcount.
+* A point at the start of the window carries forward the last known earlier headcount when one is available.
+* To go further back, send the request again with `cursor` set to `nextCursor`. Each earlier 12-month page costs 1 credit.
+* A cursor expires 30 minutes after the first page.
+* When `nextCursor` is missing, there is no older history.
+
+See [Go back further than 12 months](/docs/company-headcount-api-examples#go-back-further-than-12-months).
+
+## Search companies by headcount
+
+Two [company search filters](/docs/company-search-api-filters#workforce) use the same headcount data. They add nothing to the price of the search.
+
+| Filter            | What it matches                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `workforceSize`   | Companies whose headcount, overall or in one department, falls within a range.               |
+| `workforceGrowth` | Companies whose headcount grew or shrank by a ratio over 6 months, 1 year, or 2 years.       |
+
+This search finds companies whose sales team grew at least 15% in the last year and that have at least 20 people in sales:
+
+```json
+{
+  "filter": {
+    "workforceGrowth": { "period": "y1", "department": "sales", "min": 0.15 },
+    "workforceSize": [{ "department": "sales", "min": 20 }]
+  }
+}
+```
+
+A growth ratio of `0.15` means 15%. A negative ratio means the headcount fell, so `"max": -0.1` finds companies that shrank by 10% or more. Department names in these filters use underscores, such as `engineering_technical`.
+
+## What headcount data costs
+
+* 1 credit for each successful page from the workforce endpoint. A page is 12 months of history.
+* 1 extra credit per company for the `workforce` expansion on enrichment or search. It includes the latest 12 months.
+* Nothing for a company that is not found, an invalid cursor, or a history page that does not exist.
+* The search filters cost nothing extra. You pay the normal price of the search.
+
+For example, three years of history for one company costs 3 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                | Value                             |
+| -------------------- | --------------------------------- |
+| Lookup               | Exactly one of `domain` or `id`   |
+| History per page     | 12 months                         |
+| Cursor lifetime      | 30 minutes after the first page   |
+
+## Coming from the V1 workforce endpoint
+
+|             | V1                                                                      | V2                                                               |
+| ----------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Endpoint    | [`GET /companies/workforce`](/api-reference/v1/get-companies-workforce) | `GET /v2/companies/workforce`                                    |
+| History     | Returned in one response, with no paging                                | Returned 12 months per page, with `nextCursor` for earlier pages |
+| Field names | snake_case, such as `observed_employee_count`                           | camelCase, such as `observedEmployeeCount`                       |
+| Price       | 5 credits per successful call                                           | 1 credit per successful page                                     |
+
+Both versions take `id` or `domain`, and both return current headcount, the employee range, department headcounts, and history. Which one costs less depends on how much history you read, because V2 charges for each 12-month page.
+
+## Common questions
+
+### How far back does the history go?
+
+It depends on the company. Keep requesting earlier pages with `nextCursor` until the response has no `nextCursor`.
+
+### Can I get headcount for many companies at once?
+
+Yes. Request the `workforce` expansion on a [company search](/docs/company-search-api), a [batch enrichment](/docs/company-enrichment-api-examples#enrich-up-to-50-domains-in-one-request), or a [bulk enrichment](/docs/company-enrichment-api-examples#enrich-thousands-of-domains-in-the-background). It adds 1 credit per company.
+
+### How do I find companies that are growing?
+
+Use the `workforceGrowth` filter on company search with a `min` ratio. See [Find companies that are growing](/docs/company-headcount-api-examples#find-companies-that-are-growing).
+
+### How do I find companies that are shrinking?
+
+Use `workforceGrowth` with a negative `max` ratio. See [Find companies that are shrinking](/docs/company-headcount-api-examples#find-companies-that-are-shrinking).
+
+### Can I measure growth for one department?
+
+Yes. Set `department` on `workforceGrowth`, such as `sales` or `engineering_technical`. Use `overall` for the whole company.
+
+### Why is the observed count different from the employee range?
+
+They measure different things. The observed count is the number of people in the CompanyEnrich people dataset who work at the company, and the range is an estimate of the company's total size.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Headcount API examples" icon="code" href="/docs/company-headcount-api-examples">
+    Ready-to-run headcount lookups and searches.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters#workforce">
+    The headcount and growth filters in full.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values#workforce-departments">
+    Department names in each spelling.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/get-companies-workforce">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

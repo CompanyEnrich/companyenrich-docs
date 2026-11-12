@@ -1,0 +1,641 @@
+---
+title: "Semantic Company Search API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run semantic company searches: describe a market, read what the API inferred, combine a description with filters, turn off inference, tune ranking, count for free, export, and find people at matching companies."
+---
+
+Each example on this page is one [Semantic Company Search API](/docs/semantic-company-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+<Note>
+  A semantic search costs 2 credits for every company returned. To check a description for free first, see [Count the matches for free](#count-the-matches-for-free).
+</Note>
+
+## Describe the companies you want
+
+Write what the companies do in plain language. You do not need industry codes or keyword lists.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "AI tools for hospitals"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'AI tools for hospitals' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "AI tools for hospitals"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  semantic: { query: "AI tools for hospitals" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    semantic: ['query' => 'AI tools for hospitals'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "AI tools for hospitals" --limit 25
+```
+
+</CodeGroup>
+
+## See what the API inferred from your query
+
+By default, the API reads attributes such as location and size from your description. This query returns only companies in Turkey and ranks companies categorized as SaaS higher.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "saas companies in Turkey"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const results = await client.companies.search({
+  semantic: { query: 'saas companies in Turkey' },
+  pageSize: 25,
+});
+
+for (const company of results.items) {
+  console.log(company.name, company.domain);
+}
+
+console.log(results.interpretation?.filter); // filters inferred from the query
+console.log(results.interpretation?.boost); // attributes that rank companies higher
+```
+
+```python Python
+results = client.companies.search(
+    semantic={"query": "saas companies in Turkey"},
+    page_size=25,
+)
+
+for company in results["items"]:
+    print(company.get("name"), company["domain"])
+
+interpretation = results.get("interpretation") or {}
+print(interpretation.get("filter"))  # filters inferred from the query
+print(interpretation.get("boost"))  # attributes that rank companies higher
+```
+
+```ruby Ruby
+results = client.companies.search(
+  semantic: { query: "saas companies in Turkey" },
+  page_size: 25
+)
+
+results["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+
+p results.dig("interpretation", "filter") # filters inferred from the query
+p results.dig("interpretation", "boost") # attributes that rank companies higher
+```
+
+```php PHP
+$results = $client->companies->search(
+    semantic: ['query' => 'saas companies in Turkey'],
+    pageSize: 25,
+);
+
+foreach ($results['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+
+print_r($results['interpretation']['filter'] ?? []); // filters inferred from the query
+print_r($results['interpretation']['boost'] ?? []); // attributes that rank companies higher
+```
+
+```bash CLI
+companyenrich company search --semantic "saas companies in Turkey" --limit 25
+```
+
+</CodeGroup>
+
+`interpretation.filter` holds the filters that were applied, and `interpretation.boost` holds the attributes that only affect ranking. See [How your query is interpreted](/docs/semantic-company-search-api#how-your-query-is-interpreted).
+
+## Combine a description with filters
+
+Add exact criteria in `filter`. This search finds dental software companies in the United States and Canada with 11 to 200 employees.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "vertical SaaS for dentists"},
+    "filter": {"country": ["US", "CA"], "employees": ["11-50", "51-200"]},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'vertical SaaS for dentists' },
+  filter: { country: ['US', 'CA'], employees: ['11-50', '51-200'] },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "vertical SaaS for dentists"},
+    filter={"country": ["US", "CA"], "employees": ["11-50", "51-200"]},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  semantic: { query: "vertical SaaS for dentists" },
+  filter: { country: ["US", "CA"], employees: ["11-50", "51-200"] },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    semantic: ['query' => 'vertical SaaS for dentists'],
+    filter: ['country' => ['US', 'CA'], 'employees' => ['11-50', '51-200']],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "vertical SaaS for dentists" --country US,CA \
+  --employees 11-50,51-200 --limit 25
+```
+
+</CodeGroup>
+
+A filter you send takes precedence over a value inferred from the description. Every [company search filter](/docs/company-search-api-filters) works with a semantic search.
+
+## Turn off inference
+
+Set `autoFilter` to `false` when you want the description used only for semantic matching. The results are then limited only by the filters you send.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "AI tools for hospitals", "autoFilter": false},
+    "filter": {"country": "US"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'AI tools for hospitals', autoFilter: false },
+  filter: { country: 'US' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "AI tools for hospitals", "autoFilter": False},
+    filter={"country": "US"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  semantic: { query: "AI tools for hospitals", autoFilter: false },
+  filter: { country: "US" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    semantic: ['query' => 'AI tools for hospitals', 'autoFilter' => false],
+    filter: ['country' => 'US'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "AI tools for hospitals" --no-auto-filter --country US --limit 25
+```
+
+</CodeGroup>
+
+## Give semantic similarity more weight
+
+`weight` takes a number from 0 to 1. Larger values make semantic similarity count more in the ranking.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "developer tools for data engineers", "weight": 0.9},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'developer tools for data engineers', weight: 0.9 },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "developer tools for data engineers", "weight": 0.9},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  semantic: { query: "developer tools for data engineers", weight: 0.9 },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    semantic: ['query' => 'developer tools for data engineers', 'weight' => 0.9],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "developer tools for data engineers" \
+  --semantic-weight 0.9 --limit 25
+```
+
+</CodeGroup>
+
+## Count the matches for free
+
+The count endpoint takes the same `semantic` and `filter` fields as a search and costs nothing. Its response also includes the `interpretation`, so you can check how a description is read before you pay for results.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "logistics software"},
+    "filter": {"country": "DE"}
+  }'
+```
+
+```javascript JavaScript
+const { count, total } = await client.companies.count({
+  semantic: { query: 'logistics software' },
+  filter: { country: 'DE' },
+});
+console.log(count, total);
+```
+
+```python Python
+result = client.companies.count(
+    semantic={"query": "logistics software"},
+    filter={"country": "DE"},
+)
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+result = client.companies.count(
+  semantic: { query: "logistics software" },
+  filter: { country: "DE" }
+)
+puts result["count"], result["total"]
+```
+
+```php PHP
+$result = $client->companies->count(
+    semantic: ['query' => 'logistics software'],
+    filter: ['country' => 'DE'],
+);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --semantic "logistics software" --country DE
+```
+
+</CodeGroup>
+
+`count` is the number of companies your plan can access. For a semantic query, `total` describes the pool of candidates the semantic search draws from.
+
+## Export a semantic search to CSV
+
+An export runs the search in the background and stores the results as one file. It costs the same per company as the search itself.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the export. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/search/export \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 2000,
+    "semantic": {"query": "logistics software"},
+    "filter": {"country": "DE"}
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/search/export/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o logistics.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.companies.searchExport.create({
+  limit: 2000,
+  semantic: { query: 'logistics software' },
+  filter: { country: 'DE' },
+});
+
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.companies.searchExport.csv(job.id);
+await writeFile('logistics.csv', await response.text());
+```
+
+```python Python
+job = client.companies.search_export.create(
+    2000,
+    semantic={"query": "logistics software"},
+    filter={"country": "DE"},
+)
+
+client.batches.wait_for_completion(job["id"])
+
+with open("logistics.csv", "w", encoding="utf-8") as file:
+    file.write(client.companies.search_export.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.companies.search_export.create(
+  2000,
+  semantic: { query: "logistics software" },
+  filter: { country: "DE" }
+)
+
+client.batches.wait_for_completion(job["id"])
+
+File.write("logistics.csv", client.companies.search_export.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->companies->searchExport->create(
+    2000,
+    semantic: ['query' => 'logistics software'],
+    filter: ['country' => 'DE'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('logistics.csv', $client->companies->searchExport->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company export --semantic "logistics software" --country DE --limit 2000 --wait -o logistics.csv
+```
+
+</CodeGroup>
+
+## Find people at companies that match a description
+
+Put the description in `company.semantic` on a people search. This request finds executives at companies that build AI tools for hospitals. It costs 2 credits per person.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"seniority": ["c-suite", "vp"]},
+    "company": {"semantic": {"query": "AI tools for hospitals"}},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { seniority: ['c-suite', 'vp'] },
+  company: { semantic: { query: 'AI tools for hospitals' } },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"seniority": ["c-suite", "vp"]},
+    company={"semantic": {"query": "AI tools for hospitals"}},
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { seniority: ["c-suite", "vp"] },
+  company: { semantic: { query: "AI tools for hospitals" } },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['seniority' => ['c-suite', 'vp']],
+    company: ['semantic' => ['query' => 'AI tools for hospitals']],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --seniority c-suite,vp --company-semantic "AI tools for hospitals" --limit 25
+```
+
+</CodeGroup>
+
+This search covers people at the 1,000 best-matching companies. See the [People Search API](/docs/people-search-api) for the person filters.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Semantic Company Search API" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Query interpretation, pricing, limits, and V1 mapping.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter you can add to a semantic search.
+  </Card>
+  <Card title="Similar Companies API examples" icon="clone" href="/docs/similar-companies-api-examples">
+    Find companies like ones you already know.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

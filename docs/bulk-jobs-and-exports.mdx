@@ -1,0 +1,477 @@
+---
+title: "Bulk jobs and exports"
+description: "Run bulk company enrichment and search exports as background jobs. Create a job, track its progress, download the results as JSON, NDJSON, or CSV, list your jobs, and cancel one."
+---
+
+Large requests run as background jobs. You create a job, the API works through it on its own, and you download the results when it finishes. Three kinds of job work this way, and they share the same status, download, and cancel steps.
+
+## Job types
+
+| Job                     | Create it with                                                                          | Input                               | Size limit                                                 | Credits                                |
+| ----------------------- | --------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| Bulk company enrichment | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk)        | A list of domains                   | 10,000 domains, in a request body of up to 10 MiB          | 1 per company found, plus expansions   |
+| Company search export   | [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export)    | A company search query and a `limit` | 1,000,000 results, and no more than your plan's search limit | The same as a company search        |
+| People search export    | [`POST /v2/people/search/export`](/api-reference/v2/post-people-search-export)          | A people search query and a `limit` | 1,000,000 results, and no more than your plan's search limit | The same as a people search         |
+
+Each job is a **batch**. Creating one returns a batch `id`, which you use for everything else.
+
+## How a job works
+
+<Steps>
+  <Step title="Create the job">
+    Send the create request. The API responds with `202` and a batch status that includes the batch `id`.
+  </Step>
+  <Step title="Wait for it to finish">
+    Check [`GET /v2/batches/{id}`](/api-reference/v2/get-batches-id) until `status` is `completed` or `cancelled`. The SDKs and the CLI can wait for you.
+  </Step>
+  <Step title="Download the results">
+    Fetch the results from the job's results endpoint as JSON, NDJSON, or CSV.
+  </Step>
+</Steps>
+
+The job runs on CompanyEnrich's side. Your program does not need to stay connected: keep the batch `id` and come back later.
+
+## Run a job from start to finish
+
+The SDK examples on this page assume a `client` created like this, with your API key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+This example enriches a list of domains in bulk, prints progress while it waits, and saves the results as a CSV file.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Create the job. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.so"]
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o enriched.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.companies.bulkEnrichment.create({
+  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+});
+
+await client.batches.waitForCompletion(job.id, {
+  onProgress: ({ progress }) => console.log(`${progress.succeeded}/${progress.total}`),
+});
+
+const response = await client.companies.bulkEnrichment.csv(job.id);
+await writeFile('enriched.csv', await response.text());
+```
+
+```python Python
+job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.so"])
+
+client.batches.wait_for_completion(
+    job["id"],
+    on_progress=lambda batch: print(batch["progress"]["succeeded"], batch["progress"]["total"]),
+)
+
+with open("enriched.csv", "w", encoding="utf-8") as file:
+    file.write(client.companies.bulk_enrichment.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.so"])
+
+client.batches.wait_for_completion(job["id"]) do |batch|
+  puts "#{batch['progress']['succeeded']}/#{batch['progress']['total']}"
+end
+
+File.write("enriched.csv", client.companies.bulk_enrichment.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->companies->bulkEnrichment->create(['stripe.com', 'adyen.com', 'notion.so']);
+
+$client->batches->waitForCompletion(
+    $job['id'],
+    onProgress: fn (array $batch) => print($batch['progress']['succeeded'] . '/' . $batch['progress']['total'] . PHP_EOL),
+);
+
+file_put_contents('enriched.csv', $client->companies->bulkEnrichment->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company bulk-enrich stripe.com adyen.com notion.so --wait -o enriched.csv
+```
+
+</CodeGroup>
+
+A search export follows the same three steps. See [Export a large search to CSV](/docs/company-search-api-examples#export-a-large-search-to-csv) and [Export a people search to CSV](/docs/people-search-api-examples#export-a-people-search-to-csv).
+
+## Batch status
+
+Creating a job, checking it, and cancelling it all return the same batch status object.
+
+| Field            | Description                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `id`             | The batch ID.                                                                                            |
+| `kind`           | The task the batch represents.                                                                           |
+| `status`         | The current state. See the values below.                                                                 |
+| `progress`       | Counts of the requests in each state. See the counters below.                                            |
+| `creditsCharged` | The credits charged so far.                                                                              |
+| `recordCount`    | For a search export, the number of records exported so far.                                              |
+| `recordLimit`    | For a search export, the `limit` you asked for.                                                          |
+| `createdAt`      | When the batch was created.                                                                              |
+| `completedAt`    | When the batch completed or was cancelled.                                                               |
+| `statusUrl`      | The URL for checking this batch. It needs your API key.                                                  |
+| `resultsUrl`     | A signed URL for downloading the results. It works without credentials for one hour.                     |
+| `rawResultsUrl`  | A signed URL for the raw outcome of every request, in NDJSON.                                            |
+
+`status` is one of these values:
+
+| Value        | Meaning                                                       |
+| ------------ | ------------------------------------------------------------- |
+| `pending`    | The batch has not started.                                    |
+| `running`    | The batch is in progress.                                     |
+| `completed`  | The batch finished.                                           |
+| `cancelling` | A cancellation was requested and remaining work is stopping.  |
+| `cancelled`  | The batch was cancelled.                                      |
+
+`progress` counts the requests inside the batch. A bulk enrichment has one request per domain. A search export has one request per page of results, added as each earlier page settles.
+
+| Counter     | Requests that                                          |
+| ----------- | ------------------------------------------------------ |
+| `total`     | Exist in the batch so far.                             |
+| `pending`   | Are waiting to be sent, including retries.             |
+| `running`   | Are being processed.                                   |
+| `succeeded` | Returned a successful response.                        |
+| `failed`    | Returned an error response.                            |
+| `unknown`   | Have an outcome that could not be confirmed.           |
+| `cancelled` | Were cancelled before their results were published.    |
+
+## Check on a job
+
+Fetch the batch status at any time with the batch `id`.
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.companyenrich.com/v2/batches/0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11 \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const batch = await client.batches.get('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11');
+
+console.log(batch.status, batch.creditsCharged);
+console.log(`${batch.progress.succeeded}/${batch.progress.total}`);
+```
+
+```python Python
+batch = client.batches.get("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11")
+
+print(batch["status"], batch["creditsCharged"])
+print(batch["progress"]["succeeded"], batch["progress"]["total"])
+```
+
+```ruby Ruby
+batch = client.batches.get("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11")
+
+puts batch["status"], batch["creditsCharged"]
+puts "#{batch['progress']['succeeded']}/#{batch['progress']['total']}"
+```
+
+```php PHP
+$batch = $client->batches->get('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11');
+
+echo $batch['status'], ' ', $batch['creditsCharged'], PHP_EOL;
+echo $batch['progress']['succeeded'], '/', $batch['progress']['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich batch get 0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11
+```
+
+</CodeGroup>
+
+The wait helpers poll this endpoint for you until the batch is `completed` or `cancelled`. By default they wait as long as it takes.
+
+| Client     | Wait helper                               | Check interval         | Stop waiting after                |
+| ---------- | ----------------------------------------- | ---------------------- | --------------------------------- |
+| JavaScript | `client.batches.waitForCompletion(id)`    | `pollIntervalMs`, 2 seconds by default | `timeoutMs`       |
+| Python     | `client.batches.wait_for_completion(id)`  | `poll_interval`, 2 seconds by default  | `timeout`         |
+| Ruby       | `client.batches.wait_for_completion(id)`  | `poll_interval:`, 2 seconds by default | `timeout:`        |
+| PHP        | `$client->batches->waitForCompletion($id)` | `pollInterval:`, 2 seconds by default | `timeout:`        |
+| CLI        | `companyenrich batch wait <id>`, or `--wait` when you create the job | `--poll-interval`, 5 seconds by default | `--wait-timeout` |
+
+When a wait times out, the job keeps running. Only the waiting stops.
+
+## Download results
+
+Each job type has its own results endpoint. All of them take a `format` of `json`, `ndjson`, or `csv`, and default to `json`.
+
+| Job                     | Results endpoint                                                                                              | Each record has                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Bulk company enrichment | [`GET /v2/companies/enrich/bulk/{id}/results`](/api-reference/v2/get-companies-enrich-bulk-id-results)        | `index`, `domain`, `statusCode`, `state`, `success`, and the `company` or an `error` |
+| Company search export   | [`GET /v2/companies/search/export/{id}/results`](/api-reference/v2/get-companies-search-export-id-results)    | `index`, the `company`, and a `score` for lookalike searches                    |
+| People search export    | [`GET /v2/people/search/export/{id}/results`](/api-reference/v2/get-people-search-export-id-results)          | `index` and the `person`                                                        |
+
+| Format   | What you get                                                        | Good for                          |
+| -------- | ------------------------------------------------------------------- | --------------------------------- |
+| `json`   | One document with a `results` array.                                | Small jobs                        |
+| `ndjson` | One record per line.                                                | Large jobs, read as a stream      |
+| `csv`    | One row per record.                                                 | Spreadsheets and data imports     |
+
+Things to know about downloads:
+
+* **Order.** Records come back in input order for bulk enrichment, and in search result order for exports.
+* **You can download early.** Each download is a snapshot of the results that have settled so far. A later download can include more.
+* **Signed links expire.** The `resultsUrl` in a batch status works without credentials for one hour. After that, use your API key, or get a fresh link from a new status response.
+
+The SDKs wrap the three formats. These methods exist on `companies.bulkEnrichment`, `companies.searchExport`, and `people.searchExport`, in each language's own naming style:
+
+| You want                       | JavaScript    | Python         | Ruby              | PHP               |
+| ------------------------------ | ------------- | -------------- | ----------------- | ----------------- |
+| One JSON document              | `results(id)` | `results(id)`  | `results(id)`     | `results($id)`    |
+| Records one at a time          | `stream(id)`  | `stream(id)`   | `stream(id)`      | `stream($id)`     |
+| The CSV                        | `csv(id)`     | `csv(id)`      | `csv(id)`         | `csv($id)`        |
+| The CSV in chunks, for a file  | `csv(id)`, then read `response.body` | `iter_csv(id)` | `csv_chunks(id)` | `csvChunks($id)` |
+
+This example reads a finished company search export one record at a time:
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/search/export/0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11/results?format=ndjson" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+for await (const record of client.companies.searchExport.stream('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11')) {
+  console.log(record.index, record.company.domain);
+}
+```
+
+```python Python
+for record in client.companies.search_export.stream("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11"):
+    print(record["index"], record["company"]["domain"])
+```
+
+```ruby Ruby
+client.companies.search_export.stream("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11") do |record|
+  puts "#{record['index']} #{record['company']['domain']}"
+end
+```
+
+```php PHP
+foreach ($client->companies->searchExport->stream('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11') as $record) {
+    echo $record['index'], ' ', $record['company']['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich batch results 0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11 --format jsonl
+```
+
+</CodeGroup>
+
+### Raw results
+
+[`GET /v2/batches/{id}/results`](/api-reference/v2/get-batches-id-results) returns the raw outcome of every request in the batch as NDJSON: its `index`, `state`, `statusCode`, response `body`, any `error`, and the `credits` it cost. Use it to see exactly what was charged or why a request failed. The SDKs expose it as `rawResults` or `raw_results` on `batches`, and the CLI as `companyenrich batch results <id> --raw`.
+
+## List your jobs
+
+[`GET /v2/batches`](/api-reference/v2/get-batches) returns your batches, newest first, with the same status and progress as a single batch. It returns 20 per page by default and at most 100.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/batches?pageSize=10" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const { items } = await client.batches.list({ pageSize: 10 });
+
+for (const batch of items) {
+  console.log(batch.id, batch.kind, batch.status);
+}
+```
+
+```python Python
+page = client.batches.list(page_size=10)
+
+for batch in page["items"]:
+    print(batch["id"], batch["kind"], batch["status"])
+```
+
+```ruby Ruby
+page = client.batches.list(page_size: 10)
+
+page["items"].each do |batch|
+  puts "#{batch['id']} #{batch['kind']} #{batch['status']}"
+end
+```
+
+```php PHP
+$page = $client->batches->list(pageSize: 10);
+
+foreach ($page['items'] as $batch) {
+    echo $batch['id'], ' ', $batch['kind'], ' ', $batch['status'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich batch list --limit 10
+```
+
+</CodeGroup>
+
+Pass `kind` to list one kind of batch, such as `company-enrichment`. To get the next page, send `nextCursor` as `cursor` with the same `kind`.
+
+## Cancel a job
+
+Cancelling stops the remaining work. Results that were already charged stay downloadable.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/batches/0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11/cancel \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const batch = await client.batches.cancel('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11');
+console.log(batch.status);
+```
+
+```python Python
+batch = client.batches.cancel("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11")
+print(batch["status"])
+```
+
+```ruby Ruby
+batch = client.batches.cancel("0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11")
+puts batch["status"]
+```
+
+```php PHP
+$batch = $client->batches->cancel('0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11');
+echo $batch['status'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich batch cancel 0b9f6f0e-2a53-4a43-9c69-1f2f7b8a1c11
+```
+
+</CodeGroup>
+
+The status moves to `cancelling`, then `cancelled`. Cancelling a batch that has already finished does nothing.
+
+## Credits and failures
+
+Jobs use the same prices as the equivalent single requests. The `creditsCharged` field on the batch status shows what a job has cost so far.
+
+* **Bulk enrichment checks your balance first.** It returns `402` unless your balance covers every domain at the enrichment price, including the expansions you asked for. Credits are not reserved, and you are charged as results complete.
+* **Exports have no upfront check.** An export runs as a series of ordinary search pages. If a page fails, such as with a `402` when your credits run out, the export stops and the records already exported stay downloadable.
+* **An export can return fewer records than `limit`.** Results whose record is no longer available are skipped, and a search can simply match fewer records than you asked for.
+* **People exports that expand `company`** request 25 people per page, because a page can expand at most 500 unique companies.
+
+## Limits
+
+| Limit                              | Value                                                              |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| Domains in a bulk enrichment job   | 1 to 10,000                                                        |
+| Bulk enrichment request body       | 10 MiB                                                             |
+| Export size (`limit`)              | Up to 1,000,000 results, and no more than your plan's search limit |
+| Batches per page when listing      | 1 to 100, 20 by default                                            |
+| Signed download link lifetime      | 1 hour                                                             |
+
+## Common questions
+
+### Can I download results before a job finishes?
+
+Yes. A download returns the results that have settled so far, and you can download again later for more.
+
+### Do I need to keep my program running?
+
+No. The job runs on CompanyEnrich's side. Save the batch `id`, then check the status or download the results from any later session.
+
+### What happens if I run out of credits partway through?
+
+A bulk enrichment job is refused up front unless your balance covers it. An export stops at the first page it cannot pay for, and everything exported before that stays downloadable.
+
+### How do I see which domains failed in a bulk enrichment?
+
+Each result record has a `success` flag, the `statusCode`, and an `error` when the enrichment failed. A domain that could not be enriched comes back as a record with `success` set to `false`.
+
+### How long does a download link last?
+
+The signed `resultsUrl` works without credentials for one hour. After that, download with your API key, or request the batch status again for a new link.
+
+### Should I use a batch request or a bulk job?
+
+For up to 50 domains, a [batch enrichment](/docs/company-enrichment-api-examples#enrich-up-to-50-domains-in-one-request) answers in the same request. For more, use a bulk job.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Single, batch, and bulk company enrichment.
+  </Card>
+  <Card title="Company Search API" icon="magnifying-glass" href="/docs/company-search-api">
+    The queries a company search export accepts.
+  </Card>
+  <Card title="People Search API" icon="users" href="/docs/people-search-api">
+    The queries a people search export accepts.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits#bulk-jobs-and-exports">
+    How background jobs are charged.
+  </Card>
+</CardGroup>

@@ -1,0 +1,264 @@
+---
+title: "Semantic Company Search API"
+sidebarTitle: "Overview"
+description: "Find companies from a plain-language description. Covers the semantic request, how the query is interpreted, combining it with filters, ranking weight, pricing, limits, and the V1 mapping."
+---
+
+Semantic company search finds companies from a description written in plain language, such as `AI tools for hospitals`, where a filter search needs exact values. Use it when you can say what the companies do but cannot express it as an industry code or a keyword list.
+
+In the V2 API, this is the semantic mode of [company search](/docs/company-search-api): send a `semantic` object to [`POST /v2/companies/search`](/api-reference/v2/post-companies-search). A semantic search costs 2 credits per company returned, and each result is a full [company record](/docs/company-schema).
+
+<CardGroup cols={2}>
+  <Card title="Filters" icon="filter" href="/docs/semantic-company-search-api-filters">
+    What the API infers from a description, and what needs a filter.
+  </Card>
+  <Card title="Examples" icon="code" href="/docs/semantic-company-search-api-examples">
+    Semantic searches in cURL, four SDKs, and the CLI.
+  </Card>
+</CardGroup>
+
+## Search with a description
+
+This request finds companies that build AI tools for hospitals. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "AI tools for hospitals"},
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  semantic: { query: 'AI tools for hospitals' },
+  pageSize: 10,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    semantic={"query": "AI tools for hospitals"},
+    page_size=10,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  semantic: { query: "AI tools for hospitals" },
+  page_size: 10
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    semantic: ['query' => 'AI tools for hospitals'],
+    pageSize: 10,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "AI tools for hospitals" --limit 10
+```
+
+</CodeGroup>
+
+The response holds the matching companies, a cursor for the next page, and an `interpretation` of your query when the API inferred something from it.
+
+## When to use semantic search
+
+| You have                                                        | Use                                                                 | Credits per company |
+| --------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------- |
+| Exact criteria, such as a country, a size range, or a technology | [Filter search](/docs/company-search-api-filters)                   | 1                   |
+| A description of what the companies do                          | Semantic search                                                     | 2                   |
+| Example companies you want more of                              | [Lookalike search](/docs/similar-companies-api)                     | 5                   |
+
+A semantic search can be combined with filters. It cannot be combined with a lookalike search in the same request.
+
+## Request fields
+
+| Field                 | Value                   | Description                                                                              |
+| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| `semantic.query`      | string, required        | The description of the companies you want. Up to 500 characters.                         |
+| `semantic.weight`     | number from 0 to 1      | How much semantic similarity counts in ranking. Larger values count it more.             |
+| `semantic.autoFilter` | boolean, default `true` | Whether to infer company attributes, such as location and size, from the query.          |
+| `filter`              | object                  | Any [company search filter](/docs/company-search-api-filters), to narrow the results.    |
+| `expand`              | array of strings        | Paid data to add to each company, at 1 extra credit each per company.                    |
+| `pageSize`            | integer from 1 to 100   | The number of companies to return.                                                       |
+| `cursor`              | string                  | The `nextCursor` from the previous response, to get the next page.                       |
+
+## How your query is interpreted
+
+By default, the API reads company attributes from your description and applies them for you. Some attributes filter the results, and others only change the ranking.
+
+| Attribute found in the query                              | Effect                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Location, employee range, founded year, funding           | **Filters** the results. Companies that do not match are left out.     |
+| Categories, such as SaaS, and revenue                     | **Ranks** matching companies higher, without excluding the others.     |
+| A company name                                            | **Ranks** that company first.                                          |
+
+For example, `saas companies in Turkey` returns only companies in Turkey and ranks companies categorized as SaaS higher. `Monzo digital bank` ranks Monzo first.
+
+The response's `interpretation` field reports what was inferred:
+
+| Field                             | Description                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `interpretation.filter`           | The filters inferred from the query, in the same format as the request `filter`.         |
+| `interpretation.boost.names`      | Company names found in the query. A company with a matching name or domain ranks first.  |
+| `interpretation.boost.categories` | Categories that rank a company higher.                                                   |
+| `interpretation.boost.revenue`    | Revenue ranges that rank a company higher.                                               |
+
+Parts with nothing inferred are omitted.
+
+## Combine a description with filters
+
+Add a `filter` object to set exact criteria next to your description.
+
+```json
+{
+  "semantic": { "query": "vertical SaaS for dentists" },
+  "filter": {
+    "country": ["US", "CA"],
+    "employees": ["11-50", "51-200"]
+  }
+}
+```
+
+* A filter you send takes precedence over an inferred value of the same kind. If your description mentions a country and you also send `filter.country`, your filter is used.
+* An exclusion you send, such as `notIn`, applies together with the inferred values.
+
+See [Semantic Company Search API filters](/docs/semantic-company-search-api-filters) for when a description is enough and when to add a filter.
+
+## Turn off inference
+
+Set `semantic.autoFilter` to `false` to use the description for semantic matching only. Nothing is inferred, the results are limited only by the filters you send, and the response has no `interpretation`.
+
+```json
+{
+  "semantic": { "query": "AI tools for hospitals", "autoFilter": false },
+  "filter": { "country": "US" }
+}
+```
+
+## Tune the ranking
+
+`semantic.weight` sets how much semantic similarity counts when results are ranked. It takes a number from 0 to 1, and larger values give similarity more weight.
+
+## Where semantic queries work
+
+| Endpoint                                                                                | What a semantic query does there                                             | Credits       |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------- |
+| [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)                  | Returns one page of matching companies.                                      | 2 per company |
+| [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count)      | Counts the matches and reports the `interpretation`.                         | Free          |
+| [`POST /v2/companies/search/preview`](/api-reference/v2/post-companies-search-preview)  | Returns up to 25 company summaries. Needs a plan that includes previews.     | Free          |
+| [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export)    | Exports a large semantic search in the background.                           | 2 per company |
+| [`POST /v2/people/search`](/api-reference/v2/post-people-search)                        | With `company.semantic`, finds people at companies that match a description. | 2 per person  |
+
+People search has its own semantic mode for describing the people themselves. See [Describe who you want](/docs/people-search-api-examples#describe-who-you-want).
+
+## What a semantic search costs
+
+* 2 credits per company returned, plus 1 for each expansion.
+* A search that returns no results costs 2 credits.
+* Count and preview requests are free.
+
+For example, 25 companies with the `technologies` expansion cost 25 × (2 + 1) = 75 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                         | Value                                                              |
+| ----------------------------- | ------------------------------------------------------------------ |
+| Query length                  | 500 characters                                                     |
+| Results per page (`pageSize`) | 1 to 100                                                           |
+| Cursor lifetime               | 24 hours after the first page                                      |
+| Preview size                  | Up to 25 companies                                                 |
+| Export size (`limit`)         | Up to 1,000,000 results, and no more than your plan's search limit |
+
+## Coming from the V1 API
+
+V1 company search takes the description as a top-level field. V2 groups the semantic options in one object and adds query interpretation.
+
+| V1                                               | V2                                                         |
+| ------------------------------------------------ | ---------------------------------------------------------- |
+| `semanticQuery` on [`POST /companies/search`](/api-reference/v1/post-companies-search) | `semantic.query` on `POST /v2/companies/search` |
+| `semanticWeight`                                 | `semantic.weight`                                          |
+| No query interpretation                          | `semantic.autoFilter` and the `interpretation` response field |
+| 1 credit per company                             | 2 credits per company                                      |
+
+## Common questions
+
+### How is semantic search different from filter search?
+
+A filter search matches exact values you choose, such as a country code or an employee range. A semantic search matches the meaning of a description, so it finds companies you could not list keywords for. You can use both in one request.
+
+### Why did my search leave out companies in other countries?
+
+Your description probably mentioned a place. An inferred location filters the results. Check `interpretation.filter` in the response, and set `semantic.autoFilter` to `false` if you do not want the API to infer filters.
+
+### Can I combine semantic and lookalike search?
+
+No. A request can contain `semantic` or `lookalike`, not both. Either one can be combined with `filter`.
+
+### Can I search for people with a description?
+
+Yes, in two ways. Describe the people with `semantic` on a people search, or describe their employers with `company.semantic`. See the [People Search API](/docs/people-search-api).
+
+### How do I try a description without spending credits?
+
+Send it to the [count endpoint](/api-reference/v2/post-companies-search-count), which is free and also returns the `interpretation`. If your plan includes previews, the [preview endpoint](/api-reference/v2/post-companies-search-preview) returns up to 25 company summaries for free.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Semantic Company Search API examples" icon="code" href="/docs/semantic-company-search-api-examples">
+    Ready-to-run semantic searches.
+  </Card>
+  <Card title="Semantic Company Search API filters" icon="filter" href="/docs/semantic-company-search-api-filters">
+    What the API infers, and what needs a filter.
+  </Card>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Find companies like ones you already know.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-companies-search">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

@@ -1,68 +1,168 @@
 ---
-title: "Data sources"
-description: "Learn where CompanyEnrich gets its data and how to request data access or deletion."
+title: "Data sources and compliance"
+description: "Where CompanyEnrich company and people data comes from, which personal data the API returns, how opt-out and deletion requests work, and how data is secured."
 ---
 
-## Overview
+This page answers the questions that come up in a data, privacy, or security review of the CompanyEnrich API: where the data comes from, which personal data it contains, what happens to the data you send, and how a person can have their record removed.
 
-Review where **Company Enrich** gets its data, how we handle privacy and security, and how you can request data access or deletion.
+<Note>
+  This page is a summary for teams evaluating or integrating the API. The [Privacy Policy](https://companyenrich.com/privacy-policy), [Data Processing Addendum](https://companyenrich.com/dpa), and [Trust Center](https://companyenrich.com/trust) are the governing documents. If this page differs from one of them, the legal document applies.
+</Note>
 
-***
+## Where the data comes from
 
-## Data Sources
+We build company and people records from dozens of sources in the categories below. This page names source categories, not individual providers.
 
-We combine public sources with proprietary sources (data that providers own or control). Our data sources include:
+| Source category                                      | What it contributes                                                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Government and business registries, public maps data | Company records from official registries and public maps data. These sources cover local businesses as well as larger companies. |
+| Company websites                                     | Current firmographic details. Our crawlers scan company websites continuously.                               |
+| Public filings and market data                       | Funding rounds and revenue estimates, from public filings, investor disclosures, and market data feeds.      |
+| Technology detection providers                       | The [technologies](/docs/company-schema#expansions) a company uses, from specialized detection partners.     |
+| Professional profile networks and licensed providers | People records linked to their companies, roles, and work history, from third-party data providers.          |
 
-* **Public Databases**: We combine information from verified public records, regulatory filings, and data registries.
-* **Partnered Data Providers**: We use information from vetted third-party partners to enrich and verify company insights.
-* **User-Generated Data**: We use information that users submit, when applicable, with their explicit consent.
-* **Open Web Data**: We collect data from publicly available websites through automated extraction (web scraping), following data scraping guidelines and legal requirements.
+Some fields are derived, not collected. Machine learning models classify each company's `industries`, detect its business model for `categories`, and tag its `keywords`. `revenue` is an estimated range.
 
-We routinely update and validate our data to maintain its accuracy and relevance.
+## How records are built and checked
 
-***
+Every record passes through four steps before it reaches the API.
 
-## Compliance Standards
+<Steps>
+  <Step title="Collect">
+    Raw records arrive from registries, web crawls, and partner feeds.
+  </Step>
+  <Step title="Deduplicate and merge">
+    Entity resolution matches the records that describe the same company or person across sources, merges them, and resolves conflicts between sources.
+  </Step>
+  <Step title="Validate and enrich">
+    Automated checks and AI models verify domains, addresses, and social links.
+  </Step>
+  <Step title="Refresh">
+    Records are re-verified on a rolling basis, defunct entries are removed, and new companies are added every day. The `updatedAt` field on each record shows when it was last updated.
+  </Step>
+</Steps>
 
-**Company Enrich** follows these privacy and security standards and practices:
+## Personal data in the API
 
-* **GDPR (General Data Protection Regulation)**: Our platform aligns with GDPR standards to respect the data privacy rights of individuals in the EU. We handle personal information transparently, securely, and within legal boundaries.
-* **CCPA (California Consumer Privacy Act)**: We respect the data rights of California residents, complying with CCPA requirements to protect personal data, facilitate data access requests, and manage data deletion upon request.
-* **Data Minimization**: We limit the data we collect and process to what our services require. We also limit how much personal information we expose and how long we retain it.
-* **User Consent**: We obtain explicit consent before using user-submitted information. We aim to make our data protection practices clear to users and contributors.
-* **Security Protocols**: We protect our platform with data encryption, regular security audits, and access controls that restrict unauthorized access.
+People records contain professional and business information:
 
-***
+* Name and profile image
+* Current position, seniority, and department
+* Country and reported location
+* Professional profile URL
+* Work history, and education when you request it
+* Work email, through a separate lookup
 
-## Ethical Data Use
+The [person schema](/docs/person-schema) lists every field. The API returns no personal data fields beyond that list.
 
-Our policies and procedures aim to prevent misuse of information and promote responsible data practices. We do not engage in or support practices that involve:
+We do not collect or process sensitive personal data, including:
 
-* Selling personal data without consent.
-* Using data for discriminatory profiling or purposes.
-* Gathering data from restricted sources.
+* Racial or ethnic origin
+* Religious or political beliefs
+* Genetic or biometric data
+* Information about children under 18
+* Government-issued identification, such as Social Security numbers
 
-Our goal is to support businesses while respecting the privacy and rights of individuals.
+## Privacy laws and roles
 
-***
+We maintain contractual and operational measures that support GDPR requirements: a Data Processing Addendum (DPA), EU Standard Contractual Clauses, and a process for individual data requests. Individuals can also request access or deletion, and opt out of the sale or sharing of their information, where the CCPA or a similar law applies.
 
-## Contact & Data Requests
+The DPA covers the GDPR, the UK GDPR, the Swiss Federal Act on Data Protection, Türkiye's Law No. 6698 (KVKK), and applicable US state privacy laws.
 
-Contact our Data Compliance Team at **[support@companyenrich.com](mailto:support@companyenrich.com)** to:
+Who is the controller depends on the data:
 
-* Ask about our data sources or compliance policies.
-* Request access to your data.
-* Request deletion of your data.
+| Data                                                                          | Roles                                                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Personal data you send to the API, such as emails, names, and search queries  | You are the controller. CompanyEnrich is your processor, or your subprocessor if you act as a processor. The DPA governs this processing.                      |
+| The CompanyEnrich dataset: the company and people records the API returns     | CompanyEnrich is an independent controller. When you store or use returned personal data for your own purposes, you are responsible for your own lawful basis, notices, and rights requests. |
+| Your account, billing, and usage data                                         | CompanyEnrich is an independent controller, as described in the Privacy Policy.                                                                                |
 
-***
+* **DPA.** For self-service customers, the DPA is part of the Terms and applies when you accept them. Enterprise customers can add it to an order form or sign it separately.
+* **International transfers.** Where a restricted transfer applies, the DPA incorporates the EU Standard Contractual Clauses, the UK International Data Transfer Addendum, and the adaptations for Swiss transfers. Schedule 5 of the DPA lists processing and access locations.
+* **Legal basis.** The Privacy Policy states the legal bases we rely on: legitimate interests and, where required, consent.
 
-## FAQs
+## What happens to the data you send
 
-* **Where does your data come from?**
-  We collect data from public records, vetted data partners, user submissions, and publicly available websites. We follow applicable data laws and obtain explicit consent for user-submitted information.
+We process the personal data you send only on your instructions, to provide the service you requested.
 
-* **How often is the data updated?**
-  We regularly refresh and validate our data.
+* It is not used to train models and is not added to the CompanyEnrich dataset.
+* It is not sold or shared, and it is not used for advertising targeted to individuals.
+* API response content is not stored. Logs record only whether a request succeeded or failed.
 
-* **How do I know my company’s data is protected?**
-  We use data encryption, regular security audits, and access controls to protect your data and privacy.
+| Data                                                             | Retention                                                    |
+| ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| Minimized API and MCP request inputs, kept for logging and debugging | Deleted within 90 days                                   |
+| Application and security logs                                    | Deleted within 90 days                                       |
+| API response content                                             | Not stored                                                   |
+| Support messages that contain personal data                      | Deleted within 90 days after the support interaction closes  |
+| Backups                                                          | Overwritten within 12 months                                 |
+| Account data after you close your account                        | Deleted or anonymized within 90 days, apart from limited records the law requires or permits us to keep |
+
+Cancelling a paid plan does not close your account. To close and delete it, email [legal@companyenrich.com](mailto:legal@companyenrich.com).
+
+<Warning>
+  Do not send special-category or sensitive personal data, children's data, government identification numbers, financial-account credentials, payment-card data, protected health information, biometric identifiers, or precise geolocation. The API is not intended for them.
+</Warning>
+
+## Opt-out, access, and deletion requests
+
+Any person can ask us to give them access to their data, correct it, delete it, or stop selling or sharing it. They do not need an account. Which rights apply depends on the applicable law.
+
+* **How to submit a request.** Use the [privacy request page](https://companyenrich.com/do-not-sell) or email [legal@companyenrich.com](mailto:legal@companyenrich.com). Include the name, email address, professional profile URL, or company details needed to find the right record.
+* **Opt-out timing.** We process an opt-out as soon as reasonably possible, and no later than 15 business days after we receive it. An opt-out needs no identity verification.
+* **Access, correction, and deletion.** We may verify these requests, and we respond within the period the applicable law requires.
+* **What we keep.** We use the details in an opt-out request only to identify the record, process the request, keep the record from being re-added, and maintain legally required records.
+
+If a person contacts you about data you received from CompanyEnrich, you are responsible for the copy in your own systems. To have the source record suppressed as well, direct them to the privacy request page.
+
+## Security and hosting
+
+| Area           | Measure                                                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Encryption     | TLS/HTTPS protects data in transit. Data stored by CompanyEnrich is encrypted at rest.                                                     |
+| Hosting        | Production compute, databases, backups, and replicas are hosted in Finland, with Hetzner in Helsinki.                                      |
+| Network        | All API traffic passes through Cloudflare, which provides DDoS protection and a web application firewall.                                  |
+| Access         | Production and infrastructure accounts require multi-factor authentication. Access is limited by job responsibility.                       |
+| Change control | Code changes are reviewed before they are deployed to production.                                                                          |
+| Recovery       | Backups are performed, and restoration procedures are tested.                                                                              |
+| Incidents      | We notify affected customers without undue delay after we become aware of a confirmed security incident that affects their personal data.  |
+| Subprocessors  | The [subprocessor register](https://companyenrich.com/subprocessors) lists each provider, its role, and its processing location. We give at least 30 days' notice before a new or replacement subprocessor starts processing your data, unless an urgent replacement is needed. |
+
+The [Trust Center](https://companyenrich.com/trust) lists every confirmed control and the current assurance status. Section 11 of the DPA explains how customers can review or audit our processing.
+
+## Your responsibilities
+
+* Have a lawful basis for the personal data you send and for how you use the personal data the API returns. This includes any notices and consents your use requires.
+* Respond to rights requests about the data in your own systems.
+* Keep your API tokens secret. See [Authentication](/authentication).
+
+## Contacts
+
+| Topic                                                  | Contact                                                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| Privacy requests, the DPA, and data source questions   | [legal@companyenrich.com](mailto:legal@companyenrich.com)             |
+| Security incidents                                     | [security@companyenrich.com](mailto:security@companyenrich.com)       |
+| API and integration help                               | [support@companyenrich.com](mailto:support@companyenrich.com)         |
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Trust Center" icon="shield-halved" href="https://companyenrich.com/trust">
+    Controls, infrastructure, and legal documents.
+  </Card>
+  <Card title="Our Data" icon="database" href="https://companyenrich.com/our-data">
+    Coverage, source types, and the quality pipeline.
+  </Card>
+  <Card title="Data Processing Addendum" icon="file-contract" href="https://companyenrich.com/dpa">
+    Processor terms, deletion, audits, and transfers.
+  </Card>
+  <Card title="Privacy request" icon="user-shield" href="https://companyenrich.com/do-not-sell">
+    Request access, correction, deletion, or an opt-out.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+</CardGroup>

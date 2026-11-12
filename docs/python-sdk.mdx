@@ -1,0 +1,135 @@
+---
+title: "Python"
+description: "Use the official typed SDK with sync and async clients for authentication, pagination, retries, and batch downloads."
+---
+
+The official client for the CompanyEnrich API in Python. It wraps every v2 endpoint in typed methods, ships both a sync and an async client, and takes care of authentication, retries, pagination, and bulk job downloads for you.
+
+|                    |                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Package            | [`companyenrich`](https://pypi.org/project/companyenrich/)                                                     |
+| Source             | [github.com/CompanyEnrich/companyenrich-python-sdk](https://github.com/CompanyEnrich/companyenrich-python-sdk) |
+| Documented version | 1.0.1                                                                                                          |
+| Runtime            | Python 3.10+                                                                                                   |
+| Clients            | `CompanyEnrich` (sync) and `AsyncCompanyEnrich` (async), with the same methods                                 |
+| Dependencies       | `httpx` and `typing-extensions`                                                                                |
+| License            | MIT                                                                                                            |
+
+Usage examples for every resource live in the [README](https://github.com/CompanyEnrich/companyenrich-python-sdk#readme). This page covers what the README doesn't: what the SDK does on your behalf and the details worth knowing before you ship.
+
+## Install and verify
+
+```sh
+pip install companyenrich
+```
+
+`me()` is free, so it is the quickest way to confirm your key works. It returns your credit balance and the capabilities of your plan.
+
+<CodeGroup>
+
+```python Sync
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+print(client.me())
+```
+
+```python Async
+import asyncio
+
+from companyenrich import AsyncCompanyEnrich
+
+
+async def main() -> None:
+    async with AsyncCompanyEnrich() as client:  # reads COMPANYENRICH_API_KEY
+        print(await client.me())
+
+
+asyncio.run(main())
+```
+
+</CodeGroup>
+
+## What the SDK handles for you
+
+| Concern                     | With raw HTTP                               | With the SDK                                                                |
+| --------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication              | Set the `Authorization` header on each call | Set once on the client                                                      |
+| Rate limits                 | Read the 429 response and schedule a retry  | Waits for the time the API asks for, then retries                           |
+| Transient failures          | Write your own backoff                      | Exponential backoff with jitter. Paid POST requests are not repeated after an unclear failure |
+| Pagination                  | Pass `nextCursor` back in a loop            | `for` or `async for` over a `*_all` method                                  |
+| Bulk jobs                   | Poll the batch, then parse NDJSON           | `wait_for_completion()` and `stream()`                                      |
+| Errors                      | Parse the problem document                  | Typed exception classes with `trace_id`                                     |
+| Request and response shapes | Read the API reference                      | Autocomplete and type checking through `companyenrich.types`                |
+
+## Good to know
+
+### Responses are plain dictionaries
+
+Methods return dictionaries with the API's own field names, so results pass straight to `json.dumps` or `pandas.DataFrame`. Optional fields can be absent or `None`; read them with `.get()`.
+
+Method arguments use `snake_case`, such as `page_size`. Dictionaries you pass in, such as `filter` or `semantic`, use the API's field names, such as `autoFilter`.
+
+### API key resolution
+
+The API key is read from the `COMPANYENRICH_API_KEY` environment variable. If your secrets come from somewhere else, pass the key explicitly:
+
+```python
+client = CompanyEnrich("your-api-key")
+```
+
+The constructor raises `CompanyEnrichError` immediately if no key is found, so a missing key fails at startup and not on the first request.
+
+### Retry timing
+
+* Failed requests are retried up to twice by default.
+* Backoff starts at about 0.5 seconds, doubles on each attempt, and is capped at 8 seconds.
+* On a 429, the SDK waits for the period the API specifies instead of guessing.
+* If the API asks for a wait longer than 60 seconds, the SDK raises `RateLimitError` right away so your process isn't left hanging. Catch it and reschedule the work.
+* GET requests, and POST requests that cost nothing, are retried after a 408, a 5xx, a timeout, or a dropped connection.
+* POST requests that consume credits or start a job are retried only on a 429. They are not repeated after a 5xx, timeout, or dropped connection, because the first attempt may already have been charged.
+* `max_retries` can be overridden per call, not only on the client. Pass `options={"max_retries": 0}` to turn retries off for a single request.
+
+### Timeouts and large downloads
+
+`timeout` is in seconds and defaults to 120. It applies to each network operation, such as connecting or waiting for the next chunk of data, and not to the request as a whole. A large `stream()` or `iter_csv()` download is not cut off as long as data keeps arriving. Pass `timeout=None` to disable it.
+
+For large exports, prefer `stream()` and `iter_csv()` over `results()` and `csv()`, which load the whole result into memory.
+
+### Waiting for bulk jobs
+
+`batches.wait_for_completion()` checks the batch every 2 seconds and waits indefinitely by default. In production, set a ceiling:
+
+```python
+client.batches.wait_for_completion(
+    job["id"],
+    poll_interval=5.0,
+    timeout=15 * 60,  # raises APITimeoutError after 15 minutes
+)
+```
+
+A timeout here only stops the waiting. The job keeps running on our side, and you can pick it up later with `batches.get(id)`. To stop the job itself, call `batches.cancel(id)`. Results that were already charged stay downloadable.
+
+### Pagination and credits
+
+The `*_all` methods request pages as you consume them. Search credits are charged for every result on a fetched page, even if you stop iterating partway through it. Set `page_size` close to the number of results you plan to use.
+
+### Closing connections
+
+Use either client as a context manager, or call `close()`, to release network connections. If you pass your own `http_client`, the SDK does not close it for you.
+
+### Proxies, testing, and tracing
+
+* `base_url` points the client at your own proxy or gateway.
+* `http_client` accepts a custom `httpx.Client` or `httpx.AsyncClient`. Give it an `httpx.MockTransport` to stub the API in unit tests without a mocking library.
+* `default_headers` (client) and `options={"headers": ...}` (per request) let you attach your own correlation IDs.
+* Requests identify themselves as `companyenrich-python/<version>`. The same version string is exported as `companyenrich.__version__`.
+
+### Types stay in sync with the API
+
+Request and response types are generated from the public [OpenAPI spec](https://api.companyenrich.com/openapi/v2.json), so the fields your editor and type checker see are the fields the API returns. New API fields arrive in the SDK with the next release.
+
+## Support
+
+* Bugs and feature requests: [GitHub issues](https://github.com/CompanyEnrich/companyenrich-python-sdk/issues)
+* When reporting a failed request, include the `trace_id` from the error. It lets us find the exact call in our logs.

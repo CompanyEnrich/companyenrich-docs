@@ -1,0 +1,118 @@
+---
+title: "PHP"
+description: "Use the official PHP SDK for authentication, pagination, retries, and batch downloads."
+---
+
+The official client for the CompanyEnrich API in PHP. It wraps every v2 endpoint in plain PHP methods and takes care of authentication, retries, pagination, and bulk job downloads for you.
+
+|                    |                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| Package            | [`companyenrich/sdk`](https://packagist.org/packages/companyenrich/sdk)                                  |
+| Source             | [github.com/CompanyEnrich/companyenrich-php-sdk](https://github.com/CompanyEnrich/companyenrich-php-sdk) |
+| Documented version | 1.0.0                                                                                                    |
+| Runtime            | PHP 8.1+ with the `curl` and `json` extensions                                                           |
+| Dependencies       | No Composer dependencies                                                                                 |
+| License            | MIT                                                                                                      |
+
+Usage examples for every resource live in the [README](https://github.com/CompanyEnrich/companyenrich-php-sdk#readme). This page covers what the README doesn't: what the SDK does on your behalf and the details worth knowing before you ship.
+
+## Install and verify
+
+```sh
+composer require companyenrich/sdk
+```
+
+`me()` is free, so it is the quickest way to confirm your key works. It returns your credit balance and the capabilities of your plan.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+print_r($client->me());
+```
+
+## What the SDK handles for you
+
+| Concern            | With raw HTTP                               | With the SDK                                                                |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication     | Set the `Authorization` header on each call | Set once on the client                                                      |
+| Rate limits        | Read the 429 response and schedule a retry  | Waits for the time the API asks for, then retries                           |
+| Transient failures | Write your own backoff                      | Exponential backoff with jitter. Paid POST requests are not repeated after an unclear failure |
+| Pagination         | Pass `nextCursor` back in a loop            | `foreach` over an `*All` method                                             |
+| Bulk jobs          | Poll the batch, then parse NDJSON           | `waitForCompletion()` and `stream()`                                        |
+| Errors             | Parse the problem document                  | Exception classes with `traceId`                                            |
+
+## Good to know
+
+### Responses are plain arrays
+
+Methods return associative arrays with the API's own field names, such as `$page['nextCursor']`. Optional fields can be absent or `null`, so read them with `??`.
+
+Arguments can be passed by name, such as `pageSize: 25`. Arrays you pass in, such as `filter` or `semantic`, use the API's field names.
+
+### API key resolution
+
+The API key is read from the `COMPANYENRICH_API_KEY` environment variable, through `getenv()` first and `$_ENV` second. If your secrets come from somewhere else, such as a framework config, pass the key explicitly:
+
+```php
+$client = new Client($config['companyenrich_api_key']);
+```
+
+The constructor throws `CompanyEnrichException` immediately if no key is found, so a missing key fails at startup and not on the first request.
+
+### Retry timing
+
+* Failed requests are retried up to twice by default.
+* Backoff starts at about 0.5 seconds, doubles on each attempt, and is capped at 8 seconds.
+* On a 429, the SDK waits for the period the API specifies instead of guessing.
+* If the API asks for a wait longer than 60 seconds, the SDK throws `RateLimitException` right away so your process isn't left hanging. Catch it and reschedule the work.
+* GET requests, and POST requests that cost nothing, are retried after a 408, a 5xx, a timeout, or a dropped connection.
+* POST requests that consume credits or start a job are retried only on a 429. They are not repeated after a 5xx, timeout, or dropped connection, because the first attempt may already have been charged.
+* `maxRetries` can be overridden per call, not only on the client. Pass `options: ['maxRetries' => 0]` to turn retries off for a single request.
+
+Retries and `waitForCompletion()` sleep inside the current process. In a web request, keep `timeout` and `maxRetries` low, and run bulk jobs from a queue worker or CLI command.
+
+### Timeouts and large downloads
+
+`timeout` is in seconds and defaults to 120. For regular requests it covers the whole request. For `stream()` and `csvChunks()` downloads it only applies when no data arrives, so large exports are not cut off partway, and time your own code spends on each record does not count. Pass `timeout: null` to disable it.
+
+A download that fails partway through throws `ApiConnectionException` or `ApiTimeoutException` and is never restarted, so you won't receive duplicate records. If you `break` out of a `stream()` loop early, the SDK aborts the transfer once the generator is released.
+
+For large exports, prefer `stream()` and `csvChunks()` over `results()` and `csv()`, which load the whole result into memory.
+
+### Waiting for bulk jobs
+
+`batches->waitForCompletion()` checks the batch every 2 seconds and waits indefinitely by default. In production, set a ceiling:
+
+```php
+$client->batches->waitForCompletion(
+    $job['id'],
+    pollInterval: 5.0,
+    timeout: 15 * 60, // throws ApiTimeoutException after 15 minutes
+);
+```
+
+A timeout here only stops the waiting. The job keeps running on our side, and you can pick it up later with `batches->get($id)`. To stop the job itself, call `batches->cancel($id)`. Results that were already charged stay downloadable.
+
+### Pagination and credits
+
+The `*All` methods return generators that request pages as you consume them. Search credits are charged for every result on a fetched page, even if you stop iterating partway through it. Set `pageSize` close to the number of results you plan to use.
+
+### Person IDs
+
+`people->get()` and `people->findEmail()` accept a person ID as an `int` or a `string`. If you store IDs as strings or receive them from another system, pass them through unchanged.
+
+### Proxies and tracing
+
+* `baseUrl` points the client at your own proxy or gateway. It is also the simplest way to aim the client at a stub server in tests.
+* `defaultHeaders` (client) and `options: ['headers' => [...]]` (per request) let you attach your own correlation IDs.
+* Requests identify themselves as `companyenrich-php/<version>`. The same version string is available as `CompanyEnrich\Version::VERSION`.
+
+## Support
+
+* Bugs and feature requests: [GitHub issues](https://github.com/CompanyEnrich/companyenrich-php-sdk/issues)
+* When reporting a failed request, include the `traceId` from the exception. It lets us find the exact call in our logs.

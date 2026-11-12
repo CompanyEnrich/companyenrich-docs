@@ -1,0 +1,795 @@
+---
+title: "Company Search API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run Company Search API queries for prospecting, technology targeting, funding and growth signals, semantic and lookalike search, market sizing, pagination, and CSV exports."
+---
+
+Each example on this page is one [Company Search API](/docs/company-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+<Note>
+  Searches cost credits for every company returned. To try any query for free, send the same `filter`, `semantic`, or `lookalike` fields to the count endpoint, as in [Size a market for free](#size-a-market-for-free).
+</Note>
+
+## Build a prospect list with filters
+
+Find SaaS companies in the United States and Canada with 51 to 500 employees. A filter search costs 1 credit per company returned.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "country": ["US", "CA"],
+      "employees": ["51-200", "201-500"],
+      "categories": "saas"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    country: ['US', 'CA'],
+    employees: ['51-200', '201-500'],
+    categories: 'saas',
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "country": ["US", "CA"],
+        "employees": ["51-200", "201-500"],
+        "categories": "saas",
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    country: ["US", "CA"],
+    employees: ["51-200", "201-500"],
+    categories: "saas"
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'country' => ['US', 'CA'],
+        'employees' => ['51-200', '201-500'],
+        'categories' => 'saas',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --country US,CA --employees 51-200,201-500 --category saas --limit 25
+```
+
+</CodeGroup>
+
+An array of countries or employee ranges matches any of the values. See [Company Search API filters](/docs/company-search-api-filters) for every filter.
+
+## Target companies by technology
+
+Find companies outside the United States that use Shopify and were founded in 2020 or later.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "technologies": "Shopify",
+      "country": {"notIn": ["US"]},
+      "foundedYear": {"min": 2020}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    technologies: 'Shopify',
+    country: { notIn: ['US'] },
+    foundedYear: { min: 2020 },
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "technologies": "Shopify",
+        "country": {"notIn": ["US"]},
+        "foundedYear": {"min": 2020},
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    technologies: "Shopify",
+    country: { notIn: ["US"] },
+    foundedYear: { min: 2020 }
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'technologies' => 'Shopify',
+        'country' => ['notIn' => ['US']],
+        'foundedYear' => ['min' => 2020],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --tech Shopify --exclude-country US --founded 2020.. --limit 25
+```
+
+</CodeGroup>
+
+`notIn` excludes values, and a range with only `min` has no upper limit. Look up technology names with [technology autocomplete](/api-reference/v2/get-technologies-autocomplete).
+
+## Find recently funded companies
+
+Find companies with a Series A or Series B round whose latest funding was in 2025 or later, with at least $10 million in funding. The `financial` expansion adds funding details to each company, so this search costs 2 credits per company.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "fundingRounds": ["series_a", "series_b"],
+      "fundingYear": {"min": 2025},
+      "fundingAmount": {"min": 10000000}
+    },
+    "expand": ["financial"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    fundingRounds: ['series_a', 'series_b'],
+    fundingYear: { min: 2025 },
+    fundingAmount: { min: 10000000 },
+  },
+  expand: ['financial'],
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "fundingRounds": ["series_a", "series_b"],
+        "fundingYear": {"min": 2025},
+        "fundingAmount": {"min": 10000000},
+    },
+    expand=["financial"],
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    fundingRounds: ["series_a", "series_b"],
+    fundingYear: { min: 2025 },
+    fundingAmount: { min: 10000000 }
+  },
+  expand: ["financial"],
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'fundingRounds' => ['series_a', 'series_b'],
+        'fundingYear' => ['min' => 2025],
+        'fundingAmount' => ['min' => 10000000],
+    ],
+    expand: ['financial'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --funding-round series_a,series_b --funding-year 2025.. \
+  --funding 10M.. --expand financial --limit 25
+```
+
+</CodeGroup>
+
+## Find fast-growing companies
+
+Find fintech companies whose headcount grew at least 20% over the last year and that have at least 10 people in engineering.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "keywords": "fintech",
+      "workforceGrowth": {"period": "y1", "min": 0.2},
+      "workforceSize": [{"department": "engineering_technical", "min": 10}]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    keywords: 'fintech',
+    workforceGrowth: { period: 'y1', min: 0.2 },
+    workforceSize: [{ department: 'engineering_technical', min: 10 }],
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "keywords": "fintech",
+        "workforceGrowth": {"period": "y1", "min": 0.2},
+        "workforceSize": [{"department": "engineering_technical", "min": 10}],
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    keywords: "fintech",
+    workforceGrowth: { period: "y1", min: 0.2 },
+    workforceSize: [{ department: "engineering_technical", min: 10 }]
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'keywords' => 'fintech',
+        'workforceGrowth' => ['period' => 'y1', 'min' => 0.2],
+        'workforceSize' => [['department' => 'engineering_technical', 'min' => 10]],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --keyword fintech --growth 20%.. --growth-period y1 \
+  --headcount engineering_technical=10.. --limit 25
+```
+
+</CodeGroup>
+
+A growth ratio of `0.2` means 20%. Workforce filters use underscore department names, such as `engineering_technical`.
+
+## Describe the companies you want
+
+Semantic search takes a plain-language description. It costs 2 credits per company returned. This example adds a filter to keep the results in the United States.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "AI tools for hospitals"},
+    "filter": {"country": "US"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const results = await client.companies.search({
+  semantic: { query: 'AI tools for hospitals' },
+  filter: { country: 'US' },
+  pageSize: 25,
+});
+
+for (const company of results.items) {
+  console.log(company.name, company.domain);
+}
+
+console.log(results.interpretation?.filter); // what the API inferred from the query
+```
+
+```python Python
+results = client.companies.search(
+    semantic={"query": "AI tools for hospitals"},
+    filter={"country": "US"},
+    page_size=25,
+)
+
+for company in results["items"]:
+    print(company.get("name"), company["domain"])
+
+print((results.get("interpretation") or {}).get("filter"))  # what the API inferred from the query
+```
+
+```ruby Ruby
+results = client.companies.search(
+  semantic: { query: "AI tools for hospitals" },
+  filter: { country: "US" },
+  page_size: 25
+)
+
+results["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+
+p results.dig("interpretation", "filter") # what the API inferred from the query
+```
+
+```php PHP
+$results = $client->companies->search(
+    semantic: ['query' => 'AI tools for hospitals'],
+    filter: ['country' => 'US'],
+    pageSize: 25,
+);
+
+foreach ($results['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+
+print_r($results['interpretation']['filter'] ?? []); // what the API inferred from the query
+```
+
+```bash CLI
+companyenrich company search --semantic "AI tools for hospitals" --country US --limit 25
+```
+
+</CodeGroup>
+
+By default, the API also infers attributes such as location and size from your description. The `interpretation` field in the response shows what it inferred. See [Semantic search options](/docs/company-search-api-filters#semantic-search-options).
+
+## Find lookalikes of your best customers
+
+Lookalike search finds companies similar to the seed domains you send. It costs 5 credits per company returned. You can send up to 10 seeds and narrow the results with filters.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com"]},
+    "filter": {"country": "US", "employees": ["51-200", "201-500"]},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com', 'adyen.com'] },
+  filter: { country: 'US', employees: ['51-200', '201-500'] },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com", "adyen.com"]},
+    filter={"country": "US", "employees": ["51-200", "201-500"]},
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com", "adyen.com"] },
+  filter: { country: "US", employees: ["51-200", "201-500"] },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com', 'adyen.com']],
+    filter: ['country' => 'US', 'employees' => ['51-200', '201-500']],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --similar-to stripe.com,adyen.com --country US \
+  --employees 51-200,201-500 --limit 25
+```
+
+</CodeGroup>
+
+The response includes a `scores` object keyed by company ID. Scores are not probabilities. Keep the companies in the order returned.
+
+## Size a market for free
+
+The count endpoint takes the same query as a search and costs nothing. Use it to size a market, or to check a query before you pay for results.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"country": "DE", "categories": "saas", "employees": "11-50"}
+  }'
+```
+
+```javascript JavaScript
+const { count, total } = await client.companies.count({
+  filter: { country: 'DE', categories: 'saas', employees: '11-50' },
+});
+console.log(count, total);
+```
+
+```python Python
+result = client.companies.count(
+    filter={"country": "DE", "categories": "saas", "employees": "11-50"},
+)
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+result = client.companies.count(
+  filter: { country: "DE", categories: "saas", employees: "11-50" }
+)
+puts result["count"], result["total"]
+```
+
+```php PHP
+$result = $client->companies->count(
+    filter: ['country' => 'DE', 'categories' => 'saas', 'employees' => '11-50'],
+);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --country DE --category saas --employees 11-50
+```
+
+</CodeGroup>
+
+`total` is the number of companies that match. `count` is the number your plan can access.
+
+## Fetch every result
+
+A search returns one page of up to 100 companies. The SDK helpers follow the cursors for you and fetch pages as you read them.
+
+<CodeGroup>
+
+```bash cURL
+# First page
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"country": "TR", "categories": "saas"},
+    "pageSize": 100
+  }'
+
+# Next page: send the same query with the nextCursor from the last response
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"country": "TR", "categories": "saas"},
+    "pageSize": 100,
+    "cursor": "NEXT_CURSOR"
+  }'
+```
+
+```javascript JavaScript
+const companies = client.companies.searchAll({
+  filter: { country: 'TR', categories: 'saas' },
+  pageSize: 100,
+});
+
+for await (const company of companies) {
+  console.log(company.domain);
+}
+```
+
+```python Python
+companies = client.companies.search_all(
+    filter={"country": "TR", "categories": "saas"},
+    page_size=100,
+)
+
+for company in companies:
+    print(company["domain"])
+```
+
+```ruby Ruby
+companies = client.companies.search_all(
+  filter: { country: "TR", categories: "saas" },
+  page_size: 100
+)
+
+companies.each do |company|
+  puts company["domain"]
+end
+```
+
+```php PHP
+$companies = $client->companies->searchAll(
+    filter: ['country' => 'TR', 'categories' => 'saas'],
+    pageSize: 100,
+);
+
+foreach ($companies as $company) {
+    echo $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --country TR --category saas --all
+```
+
+</CodeGroup>
+
+You are charged for each page as it is fetched. Keep the query unchanged between pages. A cursor expires 24 hours after the first page.
+
+In the CLI, `--all` counts the matches first, then fetches exactly that many. Use `--limit 500` to stop after 500 companies.
+
+## Export a large search to CSV
+
+An export runs the search in the background and stores the results as one file. It costs the same per company as the search itself.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the export. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/search/export \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 5000,
+    "filter": {"country": "US", "categories": "saas"}
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/search/export/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o saas-us.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.companies.searchExport.create({
+  limit: 5000,
+  filter: { country: 'US', categories: 'saas' },
+});
+
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.companies.searchExport.csv(job.id);
+await writeFile('saas-us.csv', await response.text());
+```
+
+```python Python
+job = client.companies.search_export.create(
+    5000,
+    filter={"country": "US", "categories": "saas"},
+)
+
+client.batches.wait_for_completion(job["id"])
+
+with open("saas-us.csv", "w", encoding="utf-8") as file:
+    file.write(client.companies.search_export.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.companies.search_export.create(
+  5000,
+  filter: { country: "US", categories: "saas" }
+)
+
+client.batches.wait_for_completion(job["id"])
+
+File.write("saas-us.csv", client.companies.search_export.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->companies->searchExport->create(
+    5000,
+    filter: ['country' => 'US', 'categories' => 'saas'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('saas-us.csv', $client->companies->searchExport->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company export --country US --category saas --limit 5000 --wait -o saas-us.csv
+```
+
+</CodeGroup>
+
+`limit` is the most companies to export. It can be up to 1,000,000, and no more than your plan's search limit. If your credits run out partway, the export stops and the companies already exported stay downloadable.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API" icon="magnifying-glass" href="/docs/company-search-api">
+    Search modes, pagination, pricing, and limits.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

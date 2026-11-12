@@ -1,0 +1,195 @@
+---
+title: "Person schema"
+description: "Every field in a CompanyEnrich person record: name, current position, seniority, department, location, work experience, education, and work email."
+---
+
+A person record is the object the V2 API returns when you [search people](/api-reference/v2/post-people-search), [get a person by ID](/api-reference/v2/get-people-personid), or [find the person behind an email](/api-reference/v2/post-people-enrich). People search exports return the same record.
+
+This page lists every field with its type and meaning. Field names are exactly as they appear in the JSON response.
+
+* **Always** means the field is present on every record.
+* **When known** means the field is omitted or `null` when we have no value.
+* **With `expand`** means the field is returned only when you request that expansion.
+
+## Person fields
+
+| Field         | Type               | Present       | Description                                                                              |
+| ------------- | ------------------ | ------------- | ---------------------------------------------------------------------------------------- |
+| `id`          | integer (64-bit)   | Always        | The CompanyEnrich ID of the person.                                                      |
+| `name`        | string             | When known    | The full name of the person.                                                             |
+| `firstName`   | string             | When known    | The first name of the person.                                                            |
+| `lastName`    | string             | When known    | The last name of the person.                                                             |
+| `imageUrl`    | string             | When known    | The person image URL.                                                                    |
+| `position`    | string             | When known    | The person's current position or title.                                                  |
+| `seniority`   | string             | When known    | The person's current seniority level. One of the [seniority levels](/docs/field-values#seniority-levels). |
+| `department`  | string             | When known    | The person's current department. One of the [departments](/docs/field-values#departments). |
+| `location`    | object             | When known    | The person location. See [Location](#location).                                          |
+| `socials`     | object             | Always        | The person social profiles. See [Social profiles](#social-profiles).                     |
+| `experiences` | array of objects   | Always        | The person's work experience. See [Experiences](#experiences).                           |
+| `updatedAt`   | string (date-time) | When known    | When the person data was last updated.                                                   |
+| `education`   | array of objects   | With `expand` | The person's education history. See [Education](#education).                             |
+
+<Note>
+  Person IDs are 64-bit integers and can exceed what a JavaScript `number` represents exactly. Parse them as strings or `BigInt` if you store them.
+</Note>
+
+## Location
+
+| Field                   | Type   | Description                          |
+| ----------------------- | ------ | ------------------------------------ |
+| `location.country.code` | string | The ISO 3166-1 alpha-2 country code. |
+| `location.country.name` | string | The country name.                    |
+| `location.address`      | string | The person's reported location.      |
+
+## Social profiles
+
+| Field                 | Type   | Description              |
+| --------------------- | ------ | ------------------------ |
+| `socials.linkedinUrl` | string | The person LinkedIn URL. |
+
+## Experiences
+
+`experiences` lists the person's current and past jobs. Each entry describes one job.
+
+| Field                       | Type          | Description                                                                 |
+| --------------------------- | ------------- | --------------------------------------------------------------------------- |
+| `experiences[].startDate`   | string (date) | The date the experience started.                                            |
+| `experiences[].endDate`     | string (date) | The date the experience ended.                                              |
+| `experiences[].isCurrent`   | boolean       | Whether this is a current experience. Always present.                       |
+| `experiences[].isMatched`   | boolean       | Whether this experience matched the search filters. Always present.         |
+| `experiences[].position`    | string        | The position or title held during the experience.                           |
+| `experiences[].seniority`   | string        | The [seniority level](/docs/field-values#seniority-levels) associated with the experience. |
+| `experiences[].department`  | string        | The [department](/docs/field-values#departments) associated with the experience. |
+| `experiences[].company`     | object        | The matched company associated with the experience.                         |
+| `experiences[].companyName` | string        | The reported company name when no company record was matched.               |
+
+### Company on an experience
+
+When an employer matches a company in our dataset, `experiences[].company` holds a summary of it:
+
+| Field                            | Type          | Description                          |
+| -------------------------------- | ------------- | ------------------------------------ |
+| `experiences[].company.id`       | string (UUID) | The CompanyEnrich ID of the company. |
+| `experiences[].company.name`     | string        | The company name.                    |
+| `experiences[].company.domain`   | string        | The primary company domain.          |
+| `experiences[].company.logoUrl`  | string        | The company logo URL.                |
+| `experiences[].company.industry` | string        | The company's primary industry.      |
+
+Request the `company` expansion to add the standard company profile to each matched employer: `legalName`, `website`, `description`, `type`, `foundedYear`, `employees`, `revenue`, `industries`, `categories`, `location`, `socials`, and `updatedAt`. These fields have the same meaning as in the [company schema](/docs/company-schema). The paid company expansions, such as `technologies` and `workforce`, are not included.
+
+The `company` expansion costs 1 credit per unique company expanded. See [Credits](/docs/credits#expansions).
+
+## Education
+
+Request the `education` expansion to add the person's education history. It costs 1 credit per person returned.
+
+| Field                         | Type             | Description                                                        |
+| ----------------------------- | ---------------- | ------------------------------------------------------------------ |
+| `education[].institutionName` | string           | The name of the educational institution. Always present.           |
+| `education[].institution`     | object           | The matched educational institution, as a company summary with `id`, `name`, `domain`, `logoUrl`, and `industry`. |
+| `education[].socialHandle`    | string           | The social media handle of the educational institution.            |
+| `education[].degree`          | array of strings | The degrees or fields of study associated with this education entry. |
+| `education[].startYear`       | integer          | The year this education entry started.                             |
+| `education[].endYear`         | integer          | The year this education entry ended.                               |
+
+## Work email
+
+Email addresses are not part of the person record. Look one up with [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), which returns:
+
+| Field       | Type             | Description                                                                                   |
+| ----------- | ---------------- | --------------------------------------------------------------------------------------------- |
+| `personId`  | integer (64-bit) | The CompanyEnrich ID of the person.                                                           |
+| `domain`    | string           | The company domain the result belongs to.                                                     |
+| `status`    | string           | The outcome of the lookup. One of the [email lookup statuses](/docs/field-values#email-lookup-status). |
+| `email`     | string           | The work email address. Included only when `status` is `found`.                               |
+| `certainty` | string           | How certain the email address is. One of the [email certainty levels](/docs/field-values#email-certainty). |
+
+A lookup costs 10 credits only when it finds an email your account has not accessed before.
+
+## Example person record
+
+This record is illustrative. It shows a fictional person with the `education` expansion requested.
+
+```json
+{
+  "id": 9000000000001,
+  "name": "Jane Doe",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "position": "VP of Sales",
+  "seniority": "vp",
+  "department": "sales",
+  "location": {
+    "country": { "code": "US", "name": "United States" },
+    "address": "San Francisco, California"
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+  },
+  "experiences": [
+    {
+      "startDate": "2021-03-01",
+      "isCurrent": true,
+      "isMatched": true,
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "company": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "logoUrl": "https://api.companyenrich.com/logo/acme-analytics.example",
+        "industry": "Software Publishers"
+      }
+    },
+    {
+      "startDate": "2017-01-01",
+      "endDate": "2021-02-01",
+      "isCurrent": false,
+      "isMatched": false,
+      "position": "Director of Sales",
+      "seniority": "director",
+      "department": "sales",
+      "companyName": "Example Corp"
+    }
+  ],
+  "updatedAt": "2026-09-15T08:30:00Z",
+  "education": [
+    {
+      "institutionName": "Example State University",
+      "degree": ["Bachelor of Science", "Business Administration"],
+      "startYear": 2009,
+      "endYear": 2013
+    }
+  ]
+}
+```
+
+## Preview results
+
+[People search preview](/api-reference/v2/post-people-search-preview) is free and returns a masked summary, not the full record:
+
+| Field         | Description                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| `id`          | The CompanyEnrich ID of the person.                                                                     |
+| `name`        | The masked name. Every name after the first keeps only its first and last letters, such as `Jason S****h`. |
+| `position`    | The person's current position or title.                                                                 |
+| `department`  | The person's current department. Sub-departments are masked, such as `engineering-technical/***`.       |
+| `experiences` | The experiences that matched the search filters, each with `isCurrent`, `position`, and the company's `id`, `name`, `logoUrl`, and `industry`. |
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every seniority level, department, and sub-department.
+  </Card>
+  <Card title="Search people" icon="magnifying-glass" href="/docs/people-search-api">
+    Find people by role, seniority, department, and company.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>

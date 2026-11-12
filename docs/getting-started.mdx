@@ -1,57 +1,88 @@
 ---
 title: "Getting started"
-description: "Explore the CompanyEnrich APIs for company and people enrichment, search, lookalike discovery, and AI agents."
+description: "What the CompanyEnrich API does, which API fits your job, how to connect, and where to start."
 ---
 
-CompanyEnrich is a real-time B2B data API for enriching companies, finding people, discovering lookalike accounts, resolving emails, and powering AI agents with fresh company intelligence.
+CompanyEnrich is a B2B data API. Give it a domain, an email address, a set of filters, or a plain-language description, and it returns company and people records as JSON.
 
-Use CompanyEnrich to retrieve verified company and people information for business-to-business (B2B) workflows through a single REST API (application programming interface). Enrich a company by domain or social profile, or search 30M+ companies with 15+ filters. Find similar companies with AI, or resolve a work email to a company and person. Connect AI agents to live data through our Model Context Protocol (MCP) server.
+You can call the REST API directly, use an official SDK or the CLI, or connect an AI agent through the MCP server. To send your first request, follow the [quickstart](/quickstart).
 
-## The full API suite
+## What you can do
 
-**Company Enrichment API.** Retrieve a company profile from any company domain, name, or social URL. The API returns industry, size, revenue range, location, technologies, employee count, and 15+ additional fields.
+| You want to                                                        | Use                                                                    | Credits                         |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------- |
+| Turn a domain, company name, or social profile into a company profile | [Company Enrichment API](/docs/company-enrichment-api)              | 1 per company                   |
+| Find companies by country, size, industry, technology, or funding  | [Company Search API](/docs/company-search-api)                         | 1 per company                   |
+| Find companies from a plain-language description                   | [Semantic Company Search API](/docs/semantic-company-search-api)       | 2 per company                   |
+| Find companies like your best customers                            | [Similar Companies API](/docs/similar-companies-api)                   | 5 per company                   |
+| Find people by job title, seniority, department, or employer       | [People Search API](/docs/people-search-api)                           | 2 per person                    |
+| Find the person behind a work email address                        | [Reverse Email Lookup API](/docs/reverse-email-lookup-api)             | 5 per person found              |
+| Get a work email address for a person                              | [Work email lookup](/docs/people-search-api-examples#get-a-work-email-for-a-person-you-found) | 10 per new email found |
+| Get employee counts by department, with history                    | [Company Headcount API](/docs/company-headcount-api)                   | 1 per 12 months of history      |
+| Enrich thousands of domains or export a large search               | [Bulk jobs and exports](/docs/bulk-jobs-and-exports)                   | The same as single requests     |
+| Give an AI agent access to company and people data                 | [MCP server](/docs/mcp-server)                                         | Charged per tool call           |
 
-**Company Search API.** Query 33M+ companies by 15+ criteria including industry, headcount, location, founding year, and tech stack. The API returns results in pages and includes full company enrichment data.
+You pay for results, not for requests: a lookup that finds nothing is usually free. Counting the matches for a search and checking your account are always free. See [Credits](/docs/credits) for every price.
 
-**Similar Companies API.** Submit one or more company domains and get AI-ranked similar companies that match the target profile. Use these results to expand your ideal customer profile (ICP) and discover your total addressable market (TAM).
+## What you get back
 
-**People Search API.** Search 193M+ verified people profiles by name, title, company, seniority, department, experience, location.
+Every API returns one of two records.
 
-**Workforce API.** Get current employee counts and historical employee-count trends for any company. Use these trends to identify growth, score accounts, and detect hiring slowdowns or expansions.
+* **Company record.** Name, domain, description, industry, employee range, revenue range, location, and social profiles. Paid expansions add funding, technologies, keywords, NAICS codes, and headcount. See the [company schema](/docs/company-schema).
+* **Person record.** Name, current position, seniority, department, country, LinkedIn URL, and work history. A paid expansion adds education. See the [person schema](/docs/person-schema).
 
-**Reverse Email Lookup API.** Resolve any work email into a matched person and company record.
+The [field values](/docs/field-values) page lists every value a field can take, such as employee ranges and seniority levels. [Data sources and compliance](/docs/data-sources) explains where the data comes from and how it is handled.
 
-**Bulk Enrichment API.** Enrich domains asynchronously and download completed results. V2 creates a batch and charges the standard enrichment price plus any requested paid expansions. The V1 bulk API accepts up to 10,000 domains per job, supports a completion webhook, and costs one credit per successfully enriched domain.
+## Ways to connect
 
-**MCP Server.** Connect Claude, Cursor, or any MCP-compatible AI client directly to CompanyEnrich data. See [MCP Server setup](/docs/mcp-server).
+| Option      | Best for                                         | Start here                                                                                   |
+| ----------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| REST API    | Any language or tool that can send HTTP requests | [API reference](/api-reference/v2/overview)                                                  |
+| SDKs        | Applications in JavaScript, Python, Ruby, or PHP | [JavaScript](/docs/javascript-typescript-sdk), [Python](/docs/python-sdk), [Ruby](/docs/ruby-sdk), [PHP](/docs/php-sdk) |
+| CLI         | Terminal work, scripts, and one-off exports      | [CLI](/docs/cli)                                                                             |
+| MCP server  | Claude, Cursor, and other AI clients             | [MCP server](/docs/mcp-server)                                                               |
 
-Full schema and parameters for every endpoint live under [API Reference](/api-reference/v2/overview). Follow the [quickstart](/quickstart) to make your first request.
+The SDKs and the CLI handle authentication, retries, pagination, and bulk job downloads for you.
 
-## Use cases
+## Common workflows
 
-Use CompanyEnrich for B2B data workflows across development and go-to-market (GTM) teams, such as sales and marketing.
+**CRM enrichment.** When a new account is created, enrich its domain to fill in industry, size, and location. When a lead arrives with only an email address, a reverse email lookup with the `company` expansion returns the person and their employer's profile in one request. See [Enrich a company by domain](/docs/company-enrichment-api-examples#enrich-a-company-by-domain).
 
-| Use case                                                                                       | Recommended API          |
-| ---------------------------------------------------------------------------------------------- | ------------------------ |
-| Enrich a company from a domain, name, or social profile                                        | Company Enrichment API   |
-| Search companies by industry, location, size, revenue, tech stack, keywords, or semantic query | Company Search API       |
-| Find lookalike companies based on your best customers or competitors                           | Similar Companies API    |
-| Resolve an email address to a person and company profile                                       | Reverse Email Lookup API |
-| Track employee counts, department growth, and workforce trends                                 | Workforce API            |
-| Give AI assistants access to company and people intelligence                                   | CompanyEnrich MCP Server |
+**Lookalike prospecting.** Send up to 10 of your best customers as seeds and get back a ranked list of similar companies. Add filters to stay in your market, and export the list to CSV. See [Use several seeds and filter by market](/docs/similar-companies-api-examples#use-several-seeds-and-filter-by-market).
 
-Some of the most common workflows we see:
+**Market sizing.** Count how many companies match a segment before you buy any of them. Counts are free. See [Size a market for free](/docs/company-search-api-examples#size-a-market-for-free).
 
-**Customer relationship management (CRM) enrichment.** Auto-fill missing company fields when a new lead lands in HubSpot or Salesforce. One call to Reverse Email Lookup gives you the full company record.
+**Finding decision makers.** Search for people at a target company by seniority and department, then look up a work email for the ones you want to reach. See [Find decision makers at a company](/docs/people-search-api-examples#find-decision-makers-at-a-company).
 
-**Lookalike prospecting.** Drop in 50 of your best customers, get back the next 5,000 companies that look like them. Sales and marketing teams use this to expand TAM without buying a separate intent tool.
+**Growth signals.** Search for companies whose headcount grew by a set percentage over 6 months, 1 year, or 2 years, overall or in one department such as engineering. See [Find companies that are growing](/docs/company-headcount-api-examples#find-companies-that-are-growing).
 
-**AI agents.** Connect Claude or any MCP-compatible agent to our server to query live company data inside your workflow. You don’t need to write integration code.
+**Job change signals.** Find people who joined a company or started a new position after a date you choose. See [Find recent hires](/docs/people-search-api-examples#find-recent-hires).
 
-**Hiring insights.** Use the Workforce API to identify companies that expanded their engineering teams by 20% last quarter. Then use the Company Enrichment API to research those companies before you reach out.
+**Form routing.** When a prospect submits an email address, look up the person behind it and route the lead by seniority, department, or company size before it reaches your CRM. See [Find the person behind an email](/docs/reverse-email-lookup-api-examples#find-the-person-behind-an-email).
 
-**Form enrichment.** When a prospect submits an email on your pricing page, call Reverse Email Lookup. Route the prospect based on company size or industry before adding them to your CRM.
+**AI agents.** Connect Claude, Cursor, or another MCP client to the hosted MCP server, and the agent can enrich and search without any integration code. See [MCP server](/docs/mcp-server).
 
-## Need Help?
+## API versions
 
-Contact [support@companyenrich.com](mailto:support@companyenrich.com) for help with questions or issues.
+The guides, SDKs, and CLI use the V2 API, whose paths start with `/v2`. The V1 API is documented separately under [API V1](/api-reference/v1/overview). Prices and request formats can differ between the two, so check the reference for the version you call. The MCP server lists its own [tool prices](/docs/mcp-server#tools-and-credits), which differ from V2 in places.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get a key and send your first request.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    How to send your API key.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each request costs, and what is free.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/overview">
+    Every endpoint, with a playground.
+  </Card>
+</CardGroup>
+
+## Need help?
+
+Contact [support@companyenrich.com](mailto:support@companyenrich.com) with questions or issues.

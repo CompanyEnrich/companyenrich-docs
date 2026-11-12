@@ -1,0 +1,249 @@
+---
+title: "Company Enrichment API"
+sidebarTitle: "Overview"
+description: "Turn a domain, company name, or social profile into a full company record. Covers lookup methods, your first request, batch and bulk enrichment, pricing, and limits."
+---
+
+The Company Enrichment API takes something you know about a company, such as its domain, and returns a full [company record](/docs/company-schema): name, description, industry, size, revenue, location, and social profiles. Paid expansions add funding, technologies, and headcount.
+
+## Ways to enrich
+
+| Method        | Endpoint                                                                             | Use it when                                                      | Credits                                                        |
+| ------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| By domain     | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich)                 | You have the company's domain. This is the preferred method.     | 1 per company returned                                         |
+| By properties | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)               | You have a name or a social profile, not a domain.               | 1 per company returned, or when the properties cannot be resolved to a domain |
+| Batch         | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch)   | You have up to 50 domains and want the results in one response.  | 1 per unique company found                                     |
+| Bulk          | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk)     | You have up to 10,000 domains and can run a background job.      | 1 per company found                                            |
+| By ID         | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid)         | You stored a CompanyEnrich ID from an earlier result.            | 1 per company returned                                         |
+
+<CardGroup cols={2}>
+  <Card title="Examples" icon="code" href="/docs/company-enrichment-api-examples">
+    Every method in cURL, four SDKs, and the CLI.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in the record you get back.
+  </Card>
+</CardGroup>
+
+## Enrich your first company
+
+This request enriches a company by its domain. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrich({ domain: 'stripe.com' });
+console.log(company.name, company.employees);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com")
+print(company.get("name"), company.get("employees"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com")
+puts company["name"], company["employees"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrich('stripe.com');
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com
+```
+
+</CodeGroup>
+
+The response is one company record. This example is shortened and shows a fictional company. See the [company schema](/docs/company-schema) for every field.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "website": "https://acme-analytics.example",
+  "description": "Acme Analytics builds a product analytics platform that helps software teams understand how customers use their apps.",
+  "type": "private",
+  "foundedYear": 2016,
+  "employees": "201-500",
+  "revenue": "10m-50m",
+  "industry": "Software Publishers",
+  "categories": ["saas", "b2b"],
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+  },
+  "updatedAt": "2026-10-01T12:00:00Z"
+}
+```
+
+## Request parameters
+
+| Parameter           | Used by                 | Description                                                                                         |
+| ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `domain`            | By domain               | The company domain, such as `stripe.com`. Required.                                                 |
+| `domains`           | Batch, bulk             | The domains to enrich: 1 to 50 for a batch, 1 to 10,000 for a bulk job. Required.                   |
+| `name`              | By properties           | The company name. Up to 250 characters.                                                             |
+| `linkedinUrl`       | By properties           | The company's LinkedIn URL.                                                                         |
+| `linkedinId`        | By properties           | The company's LinkedIn ID.                                                                          |
+| `twitterUrl`        | By properties           | The company's Twitter/X URL.                                                                        |
+| `facebookUrl`       | By properties           | The company's Facebook URL.                                                                         |
+| `instagramUrl`      | By properties           | The company's Instagram URL.                                                                        |
+| `youtubeUrl`        | By properties           | The company's YouTube URL.                                                                          |
+| `expand`            | Every method            | Paid data to add to each company. See [Add more data with expand](#add-more-data-with-expand).      |
+| `waitForEnrichment` | By domain, batch, bulk  | Whether to wait when a company is not stored yet. Defaults to `true`. See [Companies that are not stored yet](#companies-that-are-not-stored-yet). |
+
+When you enrich by properties and send several of them, all of them must match. If several companies match, the API returns the highest-ranked one.
+
+## Companies that are not stored yet
+
+When you enrich a domain that CompanyEnrich has not stored yet, the API enriches it on demand and waits for the result before it responds.
+
+Set `waitForEnrichment` to `false` to get an immediate answer from stored data only. A company that is not stored yet is then scheduled for background enrichment when eligible, and the response depends on the method:
+
+| Method    | Response when the company is not stored yet                              | Charge |
+| --------- | ------------------------------------------------------------------------ | ------ |
+| By domain | `404`                                                                    | None   |
+| Batch     | The item has the status `pending`                                        | None   |
+| Bulk      | The record can contain an error that says enrichment was scheduled       | None   |
+
+Ask again later to get the company once it has been enriched.
+
+## When a company is not found
+
+A lookup that finds nothing is not charged:
+
+* Enrichment by domain and by ID return `404`.
+* A batch returns one item per domain with a `status`. Only `found` items include a `company` and cost credits.
+
+| Batch item status | Meaning                                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `found`           | The company was found and returned.                                                      |
+| `not-found`       | No company was found for the domain.                                                     |
+| `invalid-domain`  | The value is not a valid domain.                                                         |
+| `pending`         | The company is not stored yet. Returned when `waitForEnrichment` is `false`.             |
+
+<Warning>
+  Enrichment by properties is the exception. It costs 1 credit when a company is returned, and also when the properties you sent cannot be resolved to a company domain.
+</Warning>
+
+## Enrich a list of companies
+
+| List size        | Use                 | How results arrive                                                          |
+| ---------------- | ------------------- | --------------------------------------------------------------------------- |
+| Up to 50 domains | Batch               | In one response, with one item per domain in request order.                 |
+| Up to 10,000     | Bulk                | From a background job. Download the results as JSON, NDJSON, or CSV.        |
+| More than 10,000 | Several bulk jobs   | Split the list and create one job per part.                                 |
+
+The two differ in how they treat duplicates and credits:
+
+* **Batch** enriches a duplicate domain once and shares the result. Domains that resolve to the same company are charged once.
+* **Bulk** treats each input as its own request, so duplicates are processed separately. It keeps the input order.
+* **Bulk** checks your balance when you create the job and returns `402` unless it covers every domain, including the expansions you asked for. Credits are not reserved, and you are charged as results complete.
+
+A bulk result has one record per input domain with its `index`, `domain`, `statusCode`, a `success` flag, and either the `company` or an `error`. See [Enrich thousands of domains in the background](/docs/company-enrichment-api-examples#enrich-thousands-of-domains-in-the-background).
+
+## Add more data with expand
+
+Enrichment returns the standard company profile. The `expand` parameter adds paid data.
+
+| Expansion      | Adds                                               | Extra credits per company |
+| -------------- | -------------------------------------------------- | ------------------------- |
+| `financial`    | Funding totals, rounds, and stock details          | 1                         |
+| `keywords`     | Keywords associated with the company               | 1                         |
+| `naicsCodes`   | NAICS industry codes                               | 1                         |
+| `technologies` | Technologies the company uses                      | 1                         |
+| `workforce`    | Headcount by department, with 12 months of history | 1                         |
+
+Expansions are charged only for companies that are returned. The [company schema](/docs/company-schema#expansions) lists the fields each expansion returns.
+
+## What enrichment costs
+
+* 1 credit for each company returned, plus 1 for each expansion.
+* Nothing when no company is found, except for enrichment by properties.
+* In a batch, several domains that resolve to the same company are charged once.
+
+For example, enriching `stripe.com` with `technologies` and `workforce` costs 1 + 2 = 3 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                          | Value             |
+| ------------------------------ | ----------------- |
+| Domains in a batch request     | 1 to 50           |
+| Domains in a bulk job          | 1 to 10,000       |
+| Bulk request body              | 10 MiB            |
+| Domain length                  | 1,024 characters  |
+| Company name length            | 250 characters    |
+
+## Common questions
+
+### Can I enrich a company by name?
+
+Yes. Send `name` to [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich). A name alone can match several companies, in which case the API returns the highest-ranked one. Add a social profile such as `linkedinUrl` to narrow the match, or use the domain when you have it.
+
+### Can I enrich a company by its LinkedIn URL?
+
+Yes. Send `linkedinUrl` or `linkedinId` to the same endpoint. Twitter/X, Facebook, Instagram, and YouTube URLs work too.
+
+### Am I charged when no company is found?
+
+No, with one exception. Enrichment by properties costs 1 credit when the properties you sent cannot be resolved to a company domain.
+
+### What happens when a company is not in your dataset yet?
+
+The API enriches it on demand and waits for the result. If you would rather not wait, set `waitForEnrichment` to `false`. See [Companies that are not stored yet](#companies-that-are-not-stored-yet).
+
+### Should I use batch or bulk?
+
+Use a batch for up to 50 domains when you want the answer in the same request. Use a bulk job for larger lists, when a background job and a file download suit you better.
+
+### How do I know how fresh a record is?
+
+Every company record has an `updatedAt` field with the time it was last updated.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Enrichment API examples" icon="code" href="/docs/company-enrichment-api-examples">
+    Every enrichment method, ready to run.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Company Search API" icon="magnifying-glass" href="/docs/company-search-api">
+    Find companies by filters, description, or similarity.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/get-companies-enrich">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

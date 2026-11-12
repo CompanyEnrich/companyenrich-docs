@@ -1,0 +1,804 @@
+---
+title: "People Search API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run People Search API queries: decision makers at a company, job titles, recent hires, former employees, semantic search, people at lookalike companies, audience sizing, CSV exports, and work emails."
+---
+
+Each example on this page is one [People Search API](/docs/people-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+<Note>
+  A people search costs 2 credits for every person returned. To try any query for free, send the same `filter`, `semantic`, or `company` fields to the count endpoint, as in [Size an audience for free](#size-an-audience-for-free).
+</Note>
+
+## Find decision makers at a company
+
+Find vice presidents and C-level executives in sales who currently work at Stripe.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": "stripe.com",
+      "seniority": ["vp", "c-suite"],
+      "department": "sales"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: {
+    domain: 'stripe.com',
+    seniority: ['vp', 'c-suite'],
+    department: 'sales',
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={
+        "domain": "stripe.com",
+        "seniority": ["vp", "c-suite"],
+        "department": "sales",
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: {
+    domain: "stripe.com",
+    seniority: ["vp", "c-suite"],
+    department: "sales"
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: [
+        'domain' => 'stripe.com',
+        'seniority' => ['vp', 'c-suite'],
+        'department' => 'sales',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --seniority vp,c-suite --department sales --limit 25
+```
+
+</CodeGroup>
+
+`domain`, `seniority`, and `department` match a person's current job. An array matches any of its values.
+
+## Find people by job title
+
+Find heads of growth at SaaS companies with 51 to 200 employees. The `position` filter matches phrases in the current job title, and the `company` field narrows the search to the kind of company they work at.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"position": "head of growth"},
+    "company": {"filter": {"categories": "saas", "employees": "51-200"}},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { position: 'head of growth' },
+  company: { filter: { categories: 'saas', employees: '51-200' } },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"position": "head of growth"},
+    company={"filter": {"categories": "saas", "employees": "51-200"}},
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { position: "head of growth" },
+  company: { filter: { categories: "saas", employees: "51-200" } },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['position' => 'head of growth'],
+    company: ['filter' => ['categories' => 'saas', 'employees' => '51-200']],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --position "head of growth" --company-category saas \
+  --company-employees 51-200 --limit 25
+```
+
+</CodeGroup>
+
+Look up common titles with [position autocomplete](/api-reference/v2/get-positions-autocomplete). See [Company query](/docs/people-search-api-filters#company-query) for what `company` accepts.
+
+## Find recent hires
+
+Find people who joined Notion on or after 1 August 2026. A recent start date is a common signal for outreach.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": "notion.so",
+      "currentCompanyStartDate": {"after": "2026-08-01T00:00:00Z"}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: {
+    domain: 'notion.so',
+    currentCompanyStartDate: { after: '2026-08-01T00:00:00Z' },
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={
+        "domain": "notion.so",
+        "currentCompanyStartDate": {"after": "2026-08-01T00:00:00Z"},
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: {
+    domain: "notion.so",
+    currentCompanyStartDate: { after: "2026-08-01T00:00:00Z" }
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: [
+        'domain' => 'notion.so',
+        'currentCompanyStartDate' => ['after' => '2026-08-01T00:00:00Z'],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain notion.so --joined-after 2026-08-01 --limit 25
+```
+
+</CodeGroup>
+
+In the CLI, `--joined-after 90d` means the last 90 days. Use `currentPositionStartDate` to find people who changed role at the same company.
+
+## Find former employees of a company
+
+Find founders in the United States who used to work at Google. Filters inside `pastExperience` match a previous job, and people who still work at the company are left out.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "pastExperience": {"domain": "google.com"},
+      "seniority": "founder",
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: {
+    pastExperience: { domain: 'google.com' },
+    seniority: 'founder',
+    country: 'US',
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={
+        "pastExperience": {"domain": "google.com"},
+        "seniority": "founder",
+        "country": "US",
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: {
+    pastExperience: { domain: "google.com" },
+    seniority: "founder",
+    country: "US"
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: [
+        'pastExperience' => ['domain' => 'google.com'],
+        'seniority' => 'founder',
+        'country' => 'US',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --past-domain google.com --seniority founder --country US --limit 25
+```
+
+</CodeGroup>
+
+## Describe who you want
+
+Semantic search takes a plain-language description. The API turns it into person filters and a description of the companies those people work at.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "VP of sales at Series A SaaS startups in Germany"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const results = await client.people.search({
+  semantic: { query: 'VP of sales at Series A SaaS startups in Germany' },
+  pageSize: 25,
+});
+
+for (const person of results.items) {
+  console.log(person.name, person.position);
+}
+
+console.log(results.interpretation?.filter); // inferred person filters
+console.log(results.interpretation?.company); // inferred company description
+```
+
+```python Python
+results = client.people.search(
+    semantic={"query": "VP of sales at Series A SaaS startups in Germany"},
+    page_size=25,
+)
+
+for person in results["items"]:
+    print(person.get("name"), person.get("position"))
+
+interpretation = results.get("interpretation") or {}
+print(interpretation.get("filter"))  # inferred person filters
+print(interpretation.get("company"))  # inferred company description
+```
+
+```ruby Ruby
+results = client.people.search(
+  semantic: { query: "VP of sales at Series A SaaS startups in Germany" },
+  page_size: 25
+)
+
+results["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+
+p results.dig("interpretation", "filter") # inferred person filters
+p results.dig("interpretation", "company") # inferred company description
+```
+
+```php PHP
+$results = $client->people->search(
+    semantic: ['query' => 'VP of sales at Series A SaaS startups in Germany'],
+    pageSize: 25,
+);
+
+foreach ($results['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+
+print_r($results['interpretation']['filter'] ?? []); // inferred person filters
+print_r($results['interpretation']['company'] ?? []); // inferred company description
+```
+
+```bash CLI
+companyenrich people search --semantic "VP of sales at Series A SaaS startups in Germany" --limit 25
+```
+
+</CodeGroup>
+
+The `interpretation` field shows what the API inferred. A query it cannot infer any filters from is rejected, so include something concrete, such as a role or a country. See [Semantic search options](/docs/people-search-api-filters#semantic-search-options).
+
+## Find people at companies like your customers
+
+Find executives at companies similar to two seed companies. The `company.lookalike` query picks the companies, and `filter` picks the people.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"seniority": ["c-suite", "vp"]},
+    "company": {"lookalike": {"domains": ["stripe.com", "adyen.com"]}},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { seniority: ['c-suite', 'vp'] },
+  company: { lookalike: { domains: ['stripe.com', 'adyen.com'] } },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"seniority": ["c-suite", "vp"]},
+    company={"lookalike": {"domains": ["stripe.com", "adyen.com"]}},
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { seniority: ["c-suite", "vp"] },
+  company: { lookalike: { domains: ["stripe.com", "adyen.com"] } },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['seniority' => ['c-suite', 'vp']],
+    company: ['lookalike' => ['domains' => ['stripe.com', 'adyen.com']]],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --seniority c-suite,vp --company-similar-to stripe.com,adyen.com --limit 25
+```
+
+</CodeGroup>
+
+This search covers people at the 1,000 companies most similar to the seeds. It still costs 2 credits per person.
+
+## Add education and company profiles
+
+The `education` expansion adds each person's schools and degrees. The `company` expansion replaces the short company summary in `experiences` with the standard company profile.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"domain": "stripe.com", "seniority": "director"},
+    "expand": ["education", "company"],
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { domain: 'stripe.com', seniority: 'director' },
+  expand: ['education', 'company'],
+  pageSize: 10,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"domain": "stripe.com", "seniority": "director"},
+    expand=["education", "company"],
+    page_size=10,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { domain: "stripe.com", seniority: "director" },
+  expand: ["education", "company"],
+  page_size: 10
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['domain' => 'stripe.com', 'seniority' => 'director'],
+    expand: ['education', 'company'],
+    pageSize: 10,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --seniority director --expand education,company --limit 10
+```
+
+</CodeGroup>
+
+This request costs 3 credits per person, plus 1 credit for each unique company on the page. A page can expand at most 500 unique companies, so keep `pageSize` small when you expand `company`.
+
+## Size an audience for free
+
+The count endpoint takes the same query as a search and costs nothing.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"seniority": "director", "department": "marketing", "country": "GB"}
+  }'
+```
+
+```javascript JavaScript
+const { count, total } = await client.people.count({
+  filter: { seniority: 'director', department: 'marketing', country: 'GB' },
+});
+console.log(count, total);
+```
+
+```python Python
+result = client.people.count(
+    filter={"seniority": "director", "department": "marketing", "country": "GB"},
+)
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+result = client.people.count(
+  filter: { seniority: "director", department: "marketing", country: "GB" }
+)
+puts result["count"], result["total"]
+```
+
+```php PHP
+$result = $client->people->count(
+    filter: [
+        'seniority' => 'director',
+        'department' => 'marketing',
+        'country' => 'GB',
+    ],
+);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich people count --seniority director --department marketing --country GB
+```
+
+</CodeGroup>
+
+`total` is the number of people who match. `count` is the number your plan can access.
+
+## Export a people search to CSV
+
+An export runs the search in the background and stores the results as one file. It costs the same per person as the search itself.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the export. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/people/search/export \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 5000,
+    "filter": {"seniority": "vp", "department": "sales", "country": "US"}
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/people/search/export/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o sales-vps.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.people.searchExport.create({
+  limit: 5000,
+  filter: { seniority: 'vp', department: 'sales', country: 'US' },
+});
+
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.people.searchExport.csv(job.id);
+await writeFile('sales-vps.csv', await response.text());
+```
+
+```python Python
+job = client.people.search_export.create(
+    5000,
+    filter={"seniority": "vp", "department": "sales", "country": "US"},
+)
+
+client.batches.wait_for_completion(job["id"])
+
+with open("sales-vps.csv", "w", encoding="utf-8") as file:
+    file.write(client.people.search_export.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.people.search_export.create(
+  5000,
+  filter: { seniority: "vp", department: "sales", country: "US" }
+)
+
+client.batches.wait_for_completion(job["id"])
+
+File.write("sales-vps.csv", client.people.search_export.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->people->searchExport->create(
+    5000,
+    filter: ['seniority' => 'vp', 'department' => 'sales', 'country' => 'US'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('sales-vps.csv', $client->people->searchExport->csv($job['id']));
+```
+
+```bash CLI
+companyenrich people export --seniority vp --department sales --country US \
+  --limit 5000 --wait -o sales-vps.csv
+```
+
+</CodeGroup>
+
+`limit` is the most people to export. It can be up to 1,000,000, and no more than your plan's search limit. If your credits run out partway, the export stops and the people already exported stay downloadable.
+
+## Get a work email for a person you found
+
+Email addresses are not part of a search result. Look one up with the person's `id`. A lookup costs 10 credits only when it finds an email your account has not accessed before.
+
+The ID in this example is a placeholder that belongs to no one. Replace it with the `id` of a person from your own search results.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/people/9000000000001/email" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const result = await client.people.findEmail(9000000000001);
+console.log(result.status, result.email, result.certainty);
+```
+
+```python Python
+result = client.people.find_email(9000000000001)
+print(result["status"], result.get("email"), result.get("certainty"))
+```
+
+```ruby Ruby
+result = client.people.find_email(9000000000001)
+puts result["status"], result["email"], result["certainty"]
+```
+
+```php PHP
+$result = $client->people->findEmail(9000000000001);
+echo $result['status'], ' ', $result['email'] ?? '', ' ', $result['certainty'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people email 9000000000001
+```
+
+</CodeGroup>
+
+`status` is `found`, `not-found`, `unavailable`, or `pending`. When it is `found`, the response includes `email` and a `certainty` level. See [Email lookup status](/docs/field-values#email-lookup-status).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="People Search API" icon="magnifying-glass" href="/docs/people-search-api">
+    Search methods, pagination, pricing, and limits.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search, expansion, and email lookup costs.
+  </Card>
+</CardGroup>
