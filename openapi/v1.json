@@ -10571,12 +10571,12 @@
       "description": "Endpoints for looking up technologies used in company search filters."
     },
     {
-      "name": "User",
-      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
-    },
-    {
       "name": "Positions",
       "description": "Endpoints for looking up job positions and titles used in people search filters."
+    },
+    {
+      "name": "User",
+      "description": "Endpoints for retrieving information about the authenticated user, including credit balance and account details."
     }
   ]
 }

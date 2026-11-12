@@ -167,6 +167,13 @@
             ]
           },
           {
+            "group": "Company · Search Export",
+            "pages": [
+              "api-reference/v2/post-companies-search-export",
+              "api-reference/v2/get-companies-search-export-id-results"
+            ]
+          },
+          {
             "group": "People · Search",
             "pages": [
               "api-reference/v2/post-people-search",
@@ -175,11 +182,27 @@
             ]
           },
           {
+            "group": "People · Search Export",
+            "pages": [
+              "api-reference/v2/post-people-search-export",
+              "api-reference/v2/get-people-search-export-id-results"
+            ]
+          },
+          {
             "group": "People · Enrichment",
             "pages": [
               "api-reference/v2/get-people-personid",
               "api-reference/v2/post-people-enrich",
               "api-reference/v2/get-people-personid-email"
+            ]
+          },
+          {
+            "group": "Batches",
+            "pages": [
+              "api-reference/v2/get-batches",
+              "api-reference/v2/get-batches-id",
+              "api-reference/v2/post-batches-id-cancel",
+              "api-reference/v2/get-batches-id-results"
             ]
           },
           {
@@ -211,38 +234,15 @@
             ]
           },
           {
-            "group": "User",
-            "pages": [
-              "api-reference/v2/get-me"
-            ]
-          },
-          {
             "group": "Positions",
             "pages": [
               "api-reference/v2/get-positions-autocomplete"
             ]
           },
           {
-            "group": "Company · Search Export",
+            "group": "User",
             "pages": [
-              "api-reference/v2/post-companies-search-export",
-              "api-reference/v2/get-companies-search-export-id-results"
-            ]
-          },
-          {
-            "group": "People · Search Export",
-            "pages": [
-              "api-reference/v2/post-people-search-export",
-              "api-reference/v2/get-people-search-export-id-results"
-            ]
-          },
-          {
-            "group": "Batches",
-            "pages": [
-              "api-reference/v2/get-batches",
-              "api-reference/v2/get-batches-id",
-              "api-reference/v2/post-batches-id-cancel",
-              "api-reference/v2/get-batches-id-results"
+              "api-reference/v2/get-me"
             ]
           }
         ]
@@ -373,15 +373,15 @@
             ]
           },
           {
-            "group": "User",
-            "pages": [
-              "api-reference/v1/get-me"
-            ]
-          },
-          {
             "group": "Positions",
             "pages": [
               "api-reference/v1/get-positions-autocomplete"
+            ]
+          },
+          {
+            "group": "User",
+            "pages": [
+              "api-reference/v1/get-me"
             ]
           }
         ]
