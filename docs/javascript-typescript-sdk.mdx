@@ -44,7 +44,7 @@ const { CompanyEnrich } = require('@companyenrich/sdk');
 | --------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
 | Authentication              | Set the `Authorization` header on each call | Set once on the client                                                      |
 | Rate limits                 | Read the 429 response and schedule a retry  | Waits for the time the API asks for, then retries                           |
-| Transient failures          | Write your own backoff                      | Exponential backoff with jitter, only where a retry can't double charge you |
+| Transient failures          | Write your own backoff                      | Exponential backoff with jitter. Paid POST requests are not repeated after an unclear failure |
 | Pagination                  | Pass `nextCursor` back in a loop            | `for await` over a `*All` method                                            |
 | Bulk jobs                   | Poll the batch, then parse NDJSON           | `waitForCompletion()` and `stream()`                                        |
 | Errors                      | Parse the problem document                  | Typed error classes with `traceId`                                          |
@@ -67,6 +67,8 @@ The constructor throws immediately if no key is found, so a missing key fails at
 * Backoff starts at about 0.5 seconds, doubles on each attempt, and is capped at 8 seconds.
 * On a 429, the SDK waits for the period the API specifies instead of guessing.
 * If the API asks for a wait longer than 60 seconds, the SDK throws `RateLimitError` right away so your process isn't left hanging. Catch it and reschedule the work.
+* GET requests, and POST requests that cost nothing, are retried after a 408, a 5xx, a timeout, or a dropped connection.
+* POST requests that consume credits or start a job are retried only on a 429. They are not repeated after a 5xx, timeout, or dropped connection, because the first attempt may already have been charged.
 * `maxRetries` can be overridden per call, not only on the client. Pass `{ maxRetries: 0 }` as the last argument to turn retries off for a single request.
 
 ### Timeouts and large downloads

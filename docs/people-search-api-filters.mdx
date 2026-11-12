@@ -92,7 +92,7 @@ Past experience filters follow three rules:
 
 * Every value you include must match the same past job.
 * People who still work at a company you include are left out.
-* You can exclude a past company with `notIn`, which removes anyone who ever worked there. The past `position`, `seniority`, and `department` filters do not support exclusions.
+* You can exclude a past company with `notIn`, which removes anyone with a past job there. People who only work there now are not removed. The past `position`, `seniority`, and `department` filters do not support exclusions.
 
 ```json
 {
@@ -160,7 +160,7 @@ The `company` field limits the results to people whose current company matches a
 
 A company query that uses `semantic` or `lookalike`, or the `query`, keyword, technology, funding, workforce, `reportedEmployees`, or `require` filters, matches people at the 1,000 best-matching companies.
 
-In the CLI, put `company-` in front of a company search flag: `--company-country US --company-category saas`, `--company-semantic "AI tools for hospitals"`, or `--company-similar-to stripe.com`.
+In the CLI, put `company-` in front of a company search flag: `--company-country US --company-category saas`, `--company-semantic "AI tools for hospitals"`, or `--company-similar-to stripe.com`. Two flags have no `company-` form: to pick specific companies, use the person filters `--domain` and `--company-id`.
 
 ## Semantic search options
 

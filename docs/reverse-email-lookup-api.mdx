@@ -19,7 +19,7 @@ A lookup costs 5 credits when a person is returned, and nothing when there is no
 
 ## Look up an email
 
-This request finds the person behind an email address. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+This request finds the person behind an email address. The address shown is a placeholder on a reserved domain, so replace it with a real work email address. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
 
 <CodeGroup>
 
@@ -28,7 +28,7 @@ curl -X POST https://api.companyenrich.com/v2/people/enrich \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "jane.doe@stripe.com"
+    "email": "jane.doe@acme-analytics.example"
   }'
 ```
 
@@ -37,7 +37,9 @@ import { CompanyEnrich } from '@companyenrich/sdk';
 
 const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
 
-const person = await client.people.enrich({ email: 'jane.doe@stripe.com' });
+const person = await client.people.enrich({
+  email: 'jane.doe@acme-analytics.example',
+});
 
 console.log(person.name, person.position);
 console.log(person.socials.linkedinUrl);
@@ -48,7 +50,7 @@ from companyenrich import CompanyEnrich
 
 client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
 
-person = client.people.enrich("jane.doe@stripe.com")
+person = client.people.enrich("jane.doe@acme-analytics.example")
 
 print(person.get("name"), person.get("position"))
 print(person["socials"].get("linkedinUrl"))
@@ -59,7 +61,7 @@ require "companyenrich"
 
 client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
 
-person = client.people.enrich("jane.doe@stripe.com")
+person = client.people.enrich("jane.doe@acme-analytics.example")
 
 puts person["name"], person["position"]
 puts person.dig("socials", "linkedinUrl")
@@ -74,14 +76,14 @@ use CompanyEnrich\Client;
 
 $client = new Client(); // reads COMPANYENRICH_API_KEY
 
-$person = $client->people->enrich('jane.doe@stripe.com');
+$person = $client->people->enrich('jane.doe@acme-analytics.example');
 
 echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
 echo $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
 ```
 
 ```bash CLI
-companyenrich people enrich jane.doe@stripe.com
+companyenrich people enrich jane.doe@acme-analytics.example
 ```
 
 </CodeGroup>
@@ -90,7 +92,7 @@ The response is one person record. This example is shortened and shows a fiction
 
 ```json
 {
-  "id": 48291734,
+  "id": 9000000000001,
   "name": "Jane Doe",
   "firstName": "Jane",
   "lastName": "Doe",
@@ -187,11 +189,13 @@ See [Credits](/docs/credits) for every price.
 
 ## Coming from the V1 lookup endpoint
 
-| V1                                                                    | V2                                             |
-| --------------------------------------------------------------------- | ---------------------------------------------- |
-| [`POST /people/lookup`](/api-reference/v1/post-people-lookup)         | `POST /v2/people/enrich`                       |
-| `email` in the request body                                           | `email` in the request body, plus `expand`     |
-| 5 credits per successful call                                         | 5 credits when a person is returned            |
+|             | V1                                                            | V2                                                                 |
+| ----------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Endpoint    | [`POST /people/lookup`](/api-reference/v1/post-people-lookup) | `POST /v2/people/enrich`                                           |
+| Email       | `email` in the request body                                   | `email` in the request body                                        |
+| Expansions  | `expand=education` in the query string                        | `expand` in the request body, with `education`, `company`, or both |
+| Field names | snake_case, such as `first_name`                              | camelCase, such as `firstName`                                     |
+| Price       | 5 credits per successful call                                 | 5 credits when a person is returned                                |
 
 ## Common questions
 

@@ -16,11 +16,11 @@ Both API versions use the same authentication method and base URL: `https://api.
 The current-user endpoint returns your account information, credit balance, and capabilities without consuming credits.
 
 ```bash
-export COMPANYENRICH_API_TOKEN="YOUR_API_TOKEN"
+export COMPANYENRICH_API_KEY="YOUR_API_TOKEN"
 
 curl --request GET \
   --url https://api.companyenrich.com/v2/me \
-  --header "Authorization: Bearer $COMPANYENRICH_API_TOKEN"
+  --header "Authorization: Bearer $COMPANYENRICH_API_KEY"
 ```
 
 ## Use the API playground

@@ -14,7 +14,7 @@ The prices on this page are for the V2 API. [V1 prices](#v1-prices) differ in a 
 | Action                                 | Endpoint                                                                 | Credits                         |
 | -------------------------------------- | ------------------------------------------------------------------------ | ------------------------------- |
 | Enrich a company by domain             | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich)     | 1 per company returned          |
-| Enrich a company by properties         | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)   | 1 per request                   |
+| Enrich a company by properties         | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)   | 1 when a company is returned, or when the properties cannot be resolved |
 | Enrich up to 50 domains in one request | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | 1 per unique company found |
 | Get a company by ID                    | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid) | 1 per company returned      |
 | Search by filters                      | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)   | 1 per company returned          |
@@ -127,9 +127,9 @@ API responses include headers that show what a request cost:
 
 | Header               | Description                                      | Example |
 | -------------------- | ------------------------------------------------ | ------- |
-| `x-credit-balance`   | Total credits available before the request       | 684712  |
+| `x-credit-balance`   | Total credits available before the request       | 1000    |
 | `x-credit-cost`      | Credits consumed by the current request          | 1       |
-| `x-credit-remaining` | Credits left after the current request completes | 684711  |
+| `x-credit-remaining` | Credits left after the current request completes | 999     |
 
 To check your balance without spending anything, call the free current-user endpoint. It returns your credits and the capabilities of your plan.
 

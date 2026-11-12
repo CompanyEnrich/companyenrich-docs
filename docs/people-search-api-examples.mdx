@@ -749,35 +749,37 @@ companyenrich people export --seniority vp --department sales --country US \
 
 Email addresses are not part of a search result. Look one up with the person's `id`. A lookup costs 10 credits only when it finds an email your account has not accessed before.
 
+The ID in this example is a placeholder that belongs to no one. Replace it with the `id` of a person from your own search results.
+
 <CodeGroup>
 
 ```bash cURL
-curl "https://api.companyenrich.com/v2/people/48291734/email" \
+curl "https://api.companyenrich.com/v2/people/9000000000001/email" \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
 ```javascript JavaScript
-const result = await client.people.findEmail(48291734);
+const result = await client.people.findEmail(9000000000001);
 console.log(result.status, result.email, result.certainty);
 ```
 
 ```python Python
-result = client.people.find_email(48291734)
+result = client.people.find_email(9000000000001)
 print(result["status"], result.get("email"), result.get("certainty"))
 ```
 
 ```ruby Ruby
-result = client.people.find_email(48291734)
+result = client.people.find_email(9000000000001)
 puts result["status"], result["email"], result["certainty"]
 ```
 
 ```php PHP
-$result = $client->people->findEmail(48291734);
+$result = $client->people->findEmail(9000000000001);
 echo $result['status'], ' ', $result['email'] ?? '', ' ', $result['certainty'] ?? '', PHP_EOL;
 ```
 
 ```bash CLI
-companyenrich people email 48291734
+companyenrich people email 9000000000001
 ```
 
 </CodeGroup>

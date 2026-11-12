@@ -212,13 +212,14 @@ For example, three years of history for one company costs 3 credits. See [Credit
 
 ## Coming from the V1 workforce endpoint
 
-| V1                                                                               | V2                                                    |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| [`GET /companies/workforce`](/api-reference/v1/get-companies-workforce)          | `GET /v2/companies/workforce`                         |
-| Current headcount, range, and department headcounts                              | The same, plus 12 months of history per page          |
-| 5 credits per successful call                                                    | 1 credit per successful page                          |
+|             | V1                                                                      | V2                                                               |
+| ----------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Endpoint    | [`GET /companies/workforce`](/api-reference/v1/get-companies-workforce) | `GET /v2/companies/workforce`                                    |
+| History     | Returned in one response, with no paging                                | Returned 12 months per page, with `nextCursor` for earlier pages |
+| Field names | snake_case, such as `observed_employee_count`                           | camelCase, such as `observedEmployeeCount`                       |
+| Price       | 5 credits per successful call                                           | 1 credit per successful page                                     |
 
-Both versions take `id` or `domain`.
+Both versions take `id` or `domain`, and both return current headcount, the employee range, department headcounts, and history. Which one costs less depends on how much history you read, because V2 charges for each 12-month page.
 
 ## Common questions
 

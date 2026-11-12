@@ -52,6 +52,10 @@ companyenrich auth login
 
 In the cURL examples, replace `YOUR_API_TOKEN` with your key.
 
+<Note>
+  The email addresses in these examples use a reserved domain and match no one. Replace them with real work email addresses.
+</Note>
+
 ## Find the person behind an email
 
 Send a work email address. The response is the person's record, with their name, current position, and LinkedIn URL. A lookup costs 5 credits when a person is returned.
@@ -63,40 +67,42 @@ curl -X POST https://api.companyenrich.com/v2/people/enrich \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "jane.doe@stripe.com"
+    "email": "jane.doe@acme-analytics.example"
   }'
 ```
 
 ```javascript JavaScript
-const person = await client.people.enrich({ email: 'jane.doe@stripe.com' });
+const person = await client.people.enrich({
+  email: 'jane.doe@acme-analytics.example',
+});
 
 console.log(person.name, person.position);
 console.log(person.socials.linkedinUrl);
 ```
 
 ```python Python
-person = client.people.enrich("jane.doe@stripe.com")
+person = client.people.enrich("jane.doe@acme-analytics.example")
 
 print(person.get("name"), person.get("position"))
 print(person["socials"].get("linkedinUrl"))
 ```
 
 ```ruby Ruby
-person = client.people.enrich("jane.doe@stripe.com")
+person = client.people.enrich("jane.doe@acme-analytics.example")
 
 puts person["name"], person["position"]
 puts person.dig("socials", "linkedinUrl")
 ```
 
 ```php PHP
-$person = $client->people->enrich('jane.doe@stripe.com');
+$person = $client->people->enrich('jane.doe@acme-analytics.example');
 
 echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
 echo $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
 ```
 
 ```bash CLI
-companyenrich people enrich jane.doe@stripe.com
+companyenrich people enrich jane.doe@acme-analytics.example
 ```
 
 </CodeGroup>
@@ -112,14 +118,14 @@ curl -X POST https://api.companyenrich.com/v2/people/enrich \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "jane.doe@stripe.com",
+    "email": "jane.doe@acme-analytics.example",
     "expand": ["company"]
   }'
 ```
 
 ```javascript JavaScript
 const person = await client.people.enrich({
-  email: 'jane.doe@stripe.com',
+  email: 'jane.doe@acme-analytics.example',
   expand: ['company'],
 });
 
@@ -130,7 +136,7 @@ console.log(matched?.company?.domain, matched?.company?.employees, matched?.comp
 
 ```python Python
 person = client.people.enrich(
-    "jane.doe@stripe.com",
+    "jane.doe@acme-analytics.example",
     expand=["company"],
 )
 
@@ -142,7 +148,7 @@ print(company.get("domain"), company.get("employees"), company.get("industry"))
 
 ```ruby Ruby
 person = client.people.enrich(
-  "jane.doe@stripe.com",
+  "jane.doe@acme-analytics.example",
   expand: ["company"]
 )
 
@@ -154,7 +160,7 @@ puts company["domain"], company["employees"], company["industry"]
 
 ```php PHP
 $person = $client->people->enrich(
-    'jane.doe@stripe.com',
+    'jane.doe@acme-analytics.example',
     expand: ['company'],
 );
 
@@ -168,7 +174,7 @@ foreach ($person['experiences'] as $experience) {
 ```
 
 ```bash CLI
-companyenrich people enrich jane.doe@stripe.com --expand company
+companyenrich people enrich jane.doe@acme-analytics.example --expand company
 ```
 
 </CodeGroup>
@@ -247,7 +253,7 @@ The lookup takes one address per request, so loop over your list and treat a `40
 <CodeGroup>
 
 ```bash cURL
-for email in jane.doe@stripe.com john.smith@adyen.com; do
+for email in jane.doe@acme-analytics.example john.smith@acme-analytics.example; do
   curl -X POST https://api.companyenrich.com/v2/people/enrich \
     -H "Authorization: Bearer YOUR_API_TOKEN" \
     -H "Content-Type: application/json" \
@@ -258,7 +264,7 @@ done
 ```javascript JavaScript
 import { NotFoundError } from '@companyenrich/sdk';
 
-const emails = ['jane.doe@stripe.com', 'john.smith@adyen.com'];
+const emails = ['jane.doe@acme-analytics.example', 'john.smith@acme-analytics.example'];
 
 for (const email of emails) {
   try {
@@ -274,7 +280,7 @@ for (const email of emails) {
 ```python Python
 from companyenrich import NotFoundError
 
-emails = ["jane.doe@stripe.com", "john.smith@adyen.com"]
+emails = ["jane.doe@acme-analytics.example", "john.smith@acme-analytics.example"]
 
 for email in emails:
     try:
@@ -285,7 +291,7 @@ for email in emails:
 ```
 
 ```ruby Ruby
-emails = ["jane.doe@stripe.com", "john.smith@adyen.com"]
+emails = ["jane.doe@acme-analytics.example", "john.smith@acme-analytics.example"]
 
 emails.each do |email|
   person = client.people.enrich(email)
@@ -298,7 +304,7 @@ end
 ```php PHP
 use CompanyEnrich\Exception\NotFoundException;
 
-$emails = ['jane.doe@stripe.com', 'john.smith@adyen.com'];
+$emails = ['jane.doe@acme-analytics.example', 'john.smith@acme-analytics.example'];
 
 foreach ($emails as $email) {
     try {
@@ -311,7 +317,7 @@ foreach ($emails as $email) {
 ```
 
 ```bash CLI
-companyenrich people enrich jane.doe@stripe.com john.smith@adyen.com
+companyenrich people enrich jane.doe@acme-analytics.example john.smith@acme-analytics.example
 ```
 
 </CodeGroup>
