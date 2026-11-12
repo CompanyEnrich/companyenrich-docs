@@ -1,0 +1,279 @@
+---
+title: "People Search API"
+sidebarTitle: "Overview"
+description: "Find people by job title, seniority, department, employer, country, education, or a plain-language description. Covers search methods, your first request, pagination, pricing, and limits."
+---
+
+The People Search API finds people in the CompanyEnrich dataset and returns a full [person record](/docs/person-schema) for each match: current position, seniority, department, location, LinkedIn URL, and work history. One endpoint, [`POST /v2/people/search`](/api-reference/v2/post-people-search), takes every kind of query.
+
+A search costs 2 credits per person returned, whichever way you search.
+
+## Ways to search
+
+| Approach        | Request field | Use it to                                                                                   |
+| --------------- | ------------- | ------------------------------------------------------------------------------------------- |
+| Person filters  | `filter`      | Match job title, seniority, department, employer, country, school, or start dates.          |
+| Semantic search | `semantic`    | Describe who you want in plain language, such as `VP of sales at Series A SaaS startups in Germany`. |
+| Company query   | `company`     | Keep only people who work at companies that match a company search: filters, a description, or lookalike seeds. |
+
+You can combine all three in one request.
+
+<CardGroup cols={2}>
+  <Card title="Filters" icon="filter" href="/docs/people-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Examples" icon="code" href="/docs/people-search-api-examples">
+    Ready-to-run queries in cURL, four SDKs, and the CLI.
+  </Card>
+</CardGroup>
+
+## Make your first search
+
+This request finds vice presidents and C-level executives who currently work at Stripe. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"domain": "stripe.com", "seniority": ["vp", "c-suite"]},
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.people.search({
+  filter: { domain: 'stripe.com', seniority: ['vp', 'c-suite'] },
+  pageSize: 10,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.people.search(
+    filter={"domain": "stripe.com", "seniority": ["vp", "c-suite"]},
+    page_size=10,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.people.search(
+  filter: { domain: "stripe.com", seniority: ["vp", "c-suite"] },
+  page_size: 10
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->people->search(
+    filter: ['domain' => 'stripe.com', 'seniority' => ['vp', 'c-suite']],
+    pageSize: 10,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --seniority vp,c-suite --limit 10
+```
+
+</CodeGroup>
+
+The response holds the matching people and a cursor for the next page. This example is shortened and shows a fictional person. See the [person schema](/docs/person-schema) for every field.
+
+```json
+{
+  "items": [
+    {
+      "id": 48291734,
+      "name": "Jane Doe",
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+      },
+      "experiences": [
+        {
+          "startDate": "2021-03-01",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "VP of Sales",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        }
+      ]
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+## Endpoints
+
+| Endpoint                                                                                            | What it does                                                                | Credits              |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------- |
+| [`POST /v2/people/search`](/api-reference/v2/post-people-search)                                    | Returns one page of matching people.                                        | 2 per person         |
+| [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count)                        | Counts the people a query matches.                                          | Free                 |
+| [`POST /v2/people/search/preview`](/api-reference/v2/post-people-search-preview)                    | Returns up to 10 masked person summaries. Needs a plan that includes previews. | Free              |
+| [`POST /v2/people/search/export`](/api-reference/v2/post-people-search-export)                      | Runs a large search in the background and stores the results for download.  | Same price as search |
+| [`GET /v2/people/search/export/{id}/results`](/api-reference/v2/get-people-search-export-id-results) | Downloads an export as JSON, NDJSON, or CSV.                               | —                    |
+| [`GET /v2/people/{personId}`](/api-reference/v2/get-people-personid)                                | Returns one person by CompanyEnrich ID.                                     | 2 per person         |
+
+Search, count, preview, and export take the same `filter`, `semantic`, and `company` fields, so you can count or preview a query before you pay for it.
+
+## Response fields
+
+| Field            | Returned for      | Description                                                                              |
+| ---------------- | ----------------- | ---------------------------------------------------------------------------------------- |
+| `items`          | Every search      | The people on this page. Each one is a full [person record](/docs/person-schema).        |
+| `nextCursor`     | Every search      | The cursor for the next page. Omitted when there are no more results.                    |
+| `interpretation` | Semantic searches | The person filters and company description the API inferred from your query.             |
+
+Each experience in a person record has an `isMatched` flag. It is `true` for the jobs that matched your filters.
+
+## Current and past roles
+
+Filters at the top level of `filter`, such as `domain`, `seniority`, `department`, and `position`, match a person's **current** job.
+
+To find people by a previous job, put the filters inside `filter.pastExperience`. All the values you include there must match the same past job, and people who still work at that company are left out. See [Past experience filters](/docs/people-search-api-filters#past-experience).
+
+## Search by the kind of company
+
+The `company` field takes a company query with the same filters, semantic query, and lookalike seeds as the [Company Search API](/docs/company-search-api). The search then returns only people whose current company matches.
+
+```json
+{
+  "filter": { "seniority": ["c-suite", "vp"] },
+  "company": {
+    "filter": { "country": "US", "categories": "saas", "employees": ["51-200", "201-500"] }
+  }
+}
+```
+
+A company query that uses a semantic or lookalike query, or the `query`, keyword, technology, funding, workforce, `reportedEmployees`, or `require` filters, matches people at the 1,000 best-matching companies.
+
+## Page through results
+
+Search uses cursor pagination. Numbered pages are not supported.
+
+* Omit `cursor` on the first request. To get the next page, send the same query with the `nextCursor` from the previous response.
+* Keep the query unchanged while you page.
+* A cursor expires 24 hours after the first page.
+* `pageSize` accepts 1 to 100.
+
+The SDKs follow cursors for you: `searchAll` in the JavaScript and PHP SDKs, `search_all` in the Python and Ruby SDKs, and `--all` or `--limit` in the CLI. For large result sets, use an export. See [Export a people search to CSV](/docs/people-search-api-examples#export-a-people-search-to-csv).
+
+## Add more data with expand
+
+| Expansion   | Adds                                                                                          | Extra credits                          |
+| ----------- | --------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `education` | The person's education history: schools, degrees, and years.                                  | 1 per person returned                  |
+| `company`   | The standard company profile for each employer in `experiences`, in place of the short summary. | 1 per unique company on the page     |
+
+The `company` expansion is charged once for each unique company on a response page, even when several people share an employer. A page can expand at most 500 unique companies. A page over that limit returns `400` before anything is charged, so reduce `pageSize` or remove `company` from `expand`.
+
+## What a search costs
+
+* 2 credits per person returned, in every mode.
+* 1 more per person for `education`, and 1 per unique company on the page for `company`.
+* You pay for every person on a page you fetch. Set `pageSize` close to the number of results you need.
+* A search that returns no results costs 2 credits.
+* Count and preview requests are free.
+
+For example, a search that returns 25 people with the `education` expansion costs 25 × (2 + 1) = 75 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                                   | Value                                                              |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| Results per page (`pageSize`)           | 1 to 100                                                           |
+| Cursor lifetime                         | 24 hours after the first page                                      |
+| Semantic query length                   | 500 characters                                                     |
+| Name query length (`filter.query`)      | 250 characters per entry                                           |
+| Current company domains (`filter.domain`) | 2,500 per rule                                                   |
+| Companies expanded with `company`       | 500 unique companies per page                                      |
+| Preview size                            | Up to 10 people                                                    |
+| Export size (`limit`)                   | Up to 1,000,000 results, and no more than your plan's search limit |
+
+## Common questions
+
+### Does a people search return email addresses?
+
+No. Email addresses are not part of the person record. Look up a work email for a person with [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), which costs 10 credits when it finds an email your account has not accessed before. See [Get a work email for a person you found](/docs/people-search-api-examples#get-a-work-email-for-a-person-you-found).
+
+### How do I find people who changed jobs recently?
+
+Filter on `currentCompanyStartDate` with an `after` date. See [Find recent hires](/docs/people-search-api-examples#find-recent-hires).
+
+### How do I find former employees of a company?
+
+Put the company's domain in `filter.pastExperience.domain`. People who still work there are left out. See [Find former employees of a company](/docs/people-search-api-examples#find-former-employees-of-a-company).
+
+### How many companies can I search at once?
+
+`filter.domain` accepts up to 2,500 current company domains per rule. To target companies by description, size, or industry instead of by name, use a [company query](#search-by-the-kind-of-company).
+
+### Why was my semantic query rejected?
+
+The API turns a semantic query into person filters and a company description. A query it cannot infer any filters from is rejected, so include something concrete, such as a role, a seniority level, or a country.
+
+### How do I test a query without spending credits?
+
+Send the same query to the [count endpoint](/api-reference/v2/post-people-search-count). If your plan includes previews, the [preview endpoint](/api-reference/v2/post-people-search-preview) also returns up to 10 masked summaries for free.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="People Search API examples" icon="code" href="/docs/people-search-api-examples">
+    Ready-to-run queries for common jobs.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-people-search">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

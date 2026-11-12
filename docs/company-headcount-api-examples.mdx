@@ -1,0 +1,535 @@
+---
+title: "Company Headcount API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run Company Headcount API requests: current headcount by department, 12-month history, older history, headcount with the company profile, and searches for growing, shrinking, and department-heavy companies."
+---
+
+Each example on this page is one [Company Headcount API](/docs/company-headcount-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+## Get current headcount by department
+
+Look up a company by domain. The response has the observed employee count, the estimated size range, and a headcount for each department. This costs 1 credit.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+console.log(workforce.observedEmployeeCount, workforce.employeeCountRange);
+console.log(workforce.departmentHeadcount.engineeringTechnical);
+```
+
+```python Python
+workforce = client.companies.workforce(domain="stripe.com")
+
+print(workforce["observedEmployeeCount"], workforce.get("employeeCountRange"))
+print(workforce["departmentHeadcount"].get("engineeringTechnical"))
+```
+
+```ruby Ruby
+workforce = client.companies.workforce(domain: "stripe.com")
+
+puts workforce["observedEmployeeCount"], workforce["employeeCountRange"]
+puts workforce.dig("departmentHeadcount", "engineeringTechnical")
+```
+
+```php PHP
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+echo $workforce['observedEmployeeCount'], ' ', $workforce['employeeCountRange'] ?? '', PHP_EOL;
+echo $workforce['departmentHeadcount']['engineeringTechnical'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company workforce stripe.com
+```
+
+</CodeGroup>
+
+To look up by CompanyEnrich ID, send `id` in place of `domain`.
+
+## Read the last 12 months of history
+
+The same response includes `history`: the months in the last year where headcount changed, newest first.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+for (const point of workforce.history ?? []) {
+  console.log(point.date, point.observedEmployeeCount);
+}
+```
+
+```python Python
+workforce = client.companies.workforce(domain="stripe.com")
+
+for point in workforce.get("history") or []:
+    print(point["date"], point["observedEmployeeCount"])
+```
+
+```ruby Ruby
+workforce = client.companies.workforce(domain: "stripe.com")
+
+(workforce["history"] || []).each do |point|
+  puts "#{point['date']} #{point['observedEmployeeCount']}"
+end
+```
+
+```php PHP
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+foreach ($workforce['history'] ?? [] as $point) {
+    echo $point['date'], ' ', $point['observedEmployeeCount'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company workforce stripe.com --format csv -o headcount.csv
+```
+
+</CodeGroup>
+
+Each point has the `date` of the first day of its month, an `observedEmployeeCount`, and a `departmentHeadcount`.
+
+## Go back further than 12 months
+
+When older history exists, the response includes `nextCursor`. Send it as `cursor` to get the preceding 12 months. Each earlier page costs 1 credit.
+
+<CodeGroup>
+
+```bash cURL
+# The latest 12 months. The response includes "nextCursor" when older history exists.
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# The 12 months before that
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com&cursor=NEXT_CURSOR" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const latest = await client.companies.workforce({ domain: 'stripe.com' });
+
+if (latest.nextCursor) {
+  const previousYear = await client.companies.workforce({
+    domain: 'stripe.com',
+    cursor: latest.nextCursor,
+  });
+  console.log(previousYear.historyFrom, previousYear.historyTo);
+}
+```
+
+```python Python
+latest = client.companies.workforce(domain="stripe.com")
+
+if latest.get("nextCursor"):
+    previous_year = client.companies.workforce(
+        domain="stripe.com",
+        cursor=latest["nextCursor"],
+    )
+    print(previous_year["historyFrom"], previous_year["historyTo"])
+```
+
+```ruby Ruby
+latest = client.companies.workforce(domain: "stripe.com")
+
+if latest["nextCursor"]
+  previous_year = client.companies.workforce(
+    domain: "stripe.com",
+    cursor: latest["nextCursor"]
+  )
+  puts previous_year["historyFrom"], previous_year["historyTo"]
+end
+```
+
+```php PHP
+$latest = $client->companies->workforce(domain: 'stripe.com');
+
+if (isset($latest['nextCursor'])) {
+    $previousYear = $client->companies->workforce(
+        domain: 'stripe.com',
+        cursor: $latest['nextCursor'],
+    );
+    echo $previousYear['historyFrom'], ' ', $previousYear['historyTo'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company workforce stripe.com --years 2
+```
+
+</CodeGroup>
+
+A cursor expires 30 minutes after the first page. In the CLI, `--years 2` fetches two pages for you.
+
+## Get headcount with the company profile
+
+The `workforce` expansion adds the same headcount data to a company record, so you get the profile and the headcount in one request. This enrichment costs 2 credits: 1 for the company and 1 for the expansion.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=workforce" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({ domain: 'stripe.com', expand: ['workforce'] });
+
+console.log(company.name, company.workforce?.observedEmployeeCount);
+console.log(company.workforce?.departmentHeadcount);
+```
+
+```python Python
+company = client.companies.enrich("stripe.com", expand=["workforce"])
+
+workforce = company.get("workforce") or {}
+print(company.get("name"), workforce.get("observedEmployeeCount"))
+print(workforce.get("departmentHeadcount"))
+```
+
+```ruby Ruby
+company = client.companies.enrich("stripe.com", expand: ["workforce"])
+
+puts company["name"], company.dig("workforce", "observedEmployeeCount")
+p company.dig("workforce", "departmentHeadcount")
+```
+
+```php PHP
+$company = $client->companies->enrich('stripe.com', expand: ['workforce']);
+
+echo $company['name'] ?? '', ' ', $company['workforce']['observedEmployeeCount'] ?? '', PHP_EOL;
+print_r($company['workforce']['departmentHeadcount'] ?? []);
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand workforce
+```
+
+</CodeGroup>
+
+The expansion also works on company search, batch enrichment, and bulk enrichment, at 1 extra credit per company.
+
+## Find companies that are growing
+
+The `workforceGrowth` filter on company search matches headcount change over a period. This search finds SaaS companies in the United States whose headcount grew at least 20% in the last year.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "categories": "saas",
+      "country": "US",
+      "workforceGrowth": {"period": "y1", "min": 0.2}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    categories: 'saas',
+    country: 'US',
+    workforceGrowth: { period: 'y1', min: 0.2 },
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "categories": "saas",
+        "country": "US",
+        "workforceGrowth": {"period": "y1", "min": 0.2},
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    categories: "saas",
+    country: "US",
+    workforceGrowth: { period: "y1", min: 0.2 }
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'categories' => 'saas',
+        'country' => 'US',
+        'workforceGrowth' => ['period' => 'y1', 'min' => 0.2],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --category saas --country US --growth 20%.. --growth-period y1 --limit 25
+```
+
+</CodeGroup>
+
+`period` is `m6`, `y1`, or `y2`, for 6 months, 1 year, or 2 years. A ratio of `0.2` means 20%. The search costs 1 credit per company, with no extra charge for the filter.
+
+## Find companies that are shrinking
+
+A negative growth ratio means headcount fell. This search finds companies with 201 to 1,000 employees whose headcount dropped 10% or more in the last 6 months.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "employees": ["201-500", "501-1K"],
+      "workforceGrowth": {"period": "m6", "max": -0.1}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    employees: ['201-500', '501-1K'],
+    workforceGrowth: { period: 'm6', max: -0.1 },
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "employees": ["201-500", "501-1K"],
+        "workforceGrowth": {"period": "m6", "max": -0.1},
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    employees: ["201-500", "501-1K"],
+    workforceGrowth: { period: "m6", max: -0.1 }
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'employees' => ['201-500', '501-1K'],
+        'workforceGrowth' => ['period' => 'm6', 'max' => -0.1],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --employees 201-500,501-1K --growth ..-10% --growth-period m6 --limit 25
+```
+
+</CodeGroup>
+
+## Find companies by department size
+
+The `workforceSize` filter matches headcount ranges, overall or for one department. This search finds companies in Germany with at least 50 people in engineering.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "country": "DE",
+      "workforceSize": [{"department": "engineering_technical", "min": 50}]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    country: 'DE',
+    workforceSize: [{ department: 'engineering_technical', min: 50 }],
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "country": "DE",
+        "workforceSize": [{"department": "engineering_technical", "min": 50}],
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    country: "DE",
+    workforceSize: [{ department: "engineering_technical", min: 50 }]
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'country' => 'DE',
+        'workforceSize' => [['department' => 'engineering_technical', 'min' => 50]],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --country DE --headcount engineering_technical=50.. --limit 25
+```
+
+</CodeGroup>
+
+Add more entries to `workforceSize` to set several ranges at once. Department names in the workforce filters use underscores, such as `engineering_technical`.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Headcount API" icon="users" href="/docs/company-headcount-api">
+    Response fields, history paging, pricing, and limits.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters#workforce">
+    The headcount and growth filters in full.
+  </Card>
+  <Card title="Company Enrichment API examples" icon="building" href="/docs/company-enrichment-api-examples">
+    Enrich companies with expansions, in batches or in bulk.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>

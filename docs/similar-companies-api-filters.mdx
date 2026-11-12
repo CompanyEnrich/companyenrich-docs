@@ -1,0 +1,134 @@
+---
+title: "Similar Companies API filters"
+sidebarTitle: "Filters"
+description: "How to narrow a lookalike company search with filters: limit lookalikes to a market, exclude seeds and existing customers, choose between a minimum score and a filter, and see which filters you can add."
+---
+
+A [lookalike search](/docs/similar-companies-api) takes the same `filter` object as any other company search. The seed domains decide what the results look like, and filters decide which companies are allowed in. The same `filter` works in count, preview, and export requests.
+
+This page covers what is specific to lookalike search. For the matching rules, accepted values, and CLI flag of each filter, see the full [Company Search API filters](/docs/company-search-api-filters) reference.
+
+## Filters and lookalike options
+
+Two kinds of setting shape a lookalike search. Use the one that matches what you want to change.
+
+| You want to                                         | Use                                                    |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| Keep only lookalikes in a market, size, or stage    | `filter`                                               |
+| Leave out companies you already know                | `filter.domain` with `notIn`                           |
+| Drop lookalikes that are only weakly similar        | `lookalike.minScore`                                   |
+| Change how much similarity counts in the ranking    | `lookalike.weight`                                     |
+
+A lookalike search cannot be combined with a semantic search, so describe your market with filters, not with a description.
+
+## Limit lookalikes to your market
+
+Seeds find similar companies anywhere. Add filters to keep the ones you can sell to.
+
+```json
+{
+  "lookalike": { "domains": ["stripe.com", "adyen.com"] },
+  "filter": {
+    "country": ["US", "CA"],
+    "employees": ["51-200", "201-500"],
+    "type": "private"
+  }
+}
+```
+
+## Exclude seeds and existing customers
+
+Put the domains you do not want back in `filter.domain` with `notIn`. Add your seeds and current customers there if you want to be sure they are left out.
+
+```json
+{
+  "lookalike": { "domains": ["stripe.com", "adyen.com"] },
+  "filter": {
+    "domain": { "notIn": ["stripe.com", "adyen.com", "checkout.com", "mollie.com"] }
+  }
+}
+```
+
+## Require companies you can act on
+
+The `require` filter keeps only companies that have the fields you need, such as a LinkedIn page or a revenue range.
+
+```json
+{
+  "lookalike": { "domains": ["notion.so"] },
+  "filter": { "require": ["linkedin", "revenue"] }
+}
+```
+
+## Minimum score or filter
+
+`lookalike.minScore` and `filter` remove different companies:
+
+* `minScore`, from 0 to 1, drops companies that are not similar enough to the seeds.
+* `filter` drops companies that do not meet an exact criterion, however similar they are.
+
+Use both to get close matches inside your market.
+
+```json
+{
+  "lookalike": { "domains": ["notion.so"], "minScore": 0.7 },
+  "filter": { "country": "US", "employees": ["11-50", "51-200"] }
+}
+```
+
+Filtered results still come back in ranked order. Keep that order, and do not sort by score.
+
+## Filters you can add
+
+Every company search filter works with a lookalike search.
+
+| Purpose                 | Filters                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
+| Market                  | `country`, `region`, `state`, `city`                                       |
+| Size                    | `employees`, `reportedEmployees`, `revenue`, `workforceSize`               |
+| Kind of company         | `type`, `categories`, `naicsCodes`, `keywords`, `technologies`             |
+| Age and stage           | `foundedYear`, `fundingRounds`, `fundingAmount`, `fundingYear`, `workforceGrowth` |
+| Specific companies      | `domain`, `id`, `query`                                                    |
+| Data you need           | `require`                                                                  |
+
+See [Company Search API filters](/docs/company-search-api-filters) for what each one accepts.
+
+## People at lookalike companies
+
+On a [people search](/docs/people-search-api), the same two fields go inside `company`: `company.lookalike` for the seeds and `company.filter` for the company filters.
+
+```json
+{
+  "filter": { "seniority": ["c-suite", "vp"] },
+  "company": {
+    "lookalike": { "domains": ["stripe.com", "adyen.com"] },
+    "filter": { "country": "US" }
+  }
+}
+```
+
+## In the CLI
+
+Add filter flags to `company similar`. Use `--exclude-domain` to leave companies out and `--min-score` to drop weak matches:
+
+```bash
+companyenrich company similar stripe.com adyen.com --country US,CA --employees 51-200,201-500
+companyenrich company similar notion.so --min-score 0.7 --exclude-domain notion.so,coda.io
+```
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    The full reference: every filter, matching rule, and accepted value.
+  </Card>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Ranking, scores, pricing, limits, and V1 mapping.
+  </Card>
+  <Card title="Similar Companies API examples" icon="code" href="/docs/similar-companies-api-examples">
+    Ready-to-run lookalike searches.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every accepted value for ranges, types, and categories.
+  </Card>
+</CardGroup>

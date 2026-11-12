@@ -1,0 +1,237 @@
+---
+title: "Reverse Email Lookup API"
+sidebarTitle: "Overview"
+description: "Turn a work email address into the person behind it: name, job title, seniority, LinkedIn profile, work history, and employer. Covers how the match works, the request, expansions, pricing, and limits."
+---
+
+The Reverse Email Lookup API takes a work email address and returns the person behind it as a full [person record](/docs/person-schema): name, current position, seniority, department, LinkedIn URL, and work history. Send the address to [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich).
+
+A lookup costs 5 credits when a person is returned, and nothing when there is no match.
+
+<CardGroup cols={2}>
+  <Card title="Examples" icon="code" href="/docs/reverse-email-lookup-api-examples">
+    Lookups in cURL, four SDKs, and the CLI.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in the record you get back.
+  </Card>
+</CardGroup>
+
+## Look up an email
+
+This request finds the person behind an email address. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.doe@stripe.com"
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const person = await client.people.enrich({ email: 'jane.doe@stripe.com' });
+
+console.log(person.name, person.position);
+console.log(person.socials.linkedinUrl);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+person = client.people.enrich("jane.doe@stripe.com")
+
+print(person.get("name"), person.get("position"))
+print(person["socials"].get("linkedinUrl"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+person = client.people.enrich("jane.doe@stripe.com")
+
+puts person["name"], person["position"]
+puts person.dig("socials", "linkedinUrl")
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$person = $client->people->enrich('jane.doe@stripe.com');
+
+echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+echo $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people enrich jane.doe@stripe.com
+```
+
+</CodeGroup>
+
+The response is one person record. This example is shortened and shows a fictional person. See the [person schema](/docs/person-schema) for every field.
+
+```json
+{
+  "id": 48291734,
+  "name": "Jane Doe",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "position": "VP of Sales",
+  "seniority": "vp",
+  "department": "sales",
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+  },
+  "experiences": [
+    {
+      "startDate": "2021-03-01",
+      "isCurrent": true,
+      "isMatched": true,
+      "position": "VP of Sales",
+      "company": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example"
+      }
+    }
+  ]
+}
+```
+
+## How the match works
+
+A lookup has two steps:
+
+1. The API resolves the company from the domain of the email address.
+2. It matches a person at that company using common email address patterns, such as `first.last` or `flast`.
+
+The response is the best match. The job at the email's company is marked with `isMatched` set to `true` in `experiences`, so you can tell which employer the address belongs to.
+
+Because the lookup starts from the company behind the domain, it is built for work email addresses.
+
+## Request fields
+
+| Field    | Value            | Description                                                                         |
+| -------- | ---------------- | ----------------------------------------------------------------------------------- |
+| `email`  | string, required | The email address to look up. Up to 320 characters.                                 |
+| `expand` | array of strings | Paid data to add to the person: `education`, `company`, or both.                    |
+
+## Add the employer's profile or education
+
+| Expansion   | Adds                                                                                               | Extra credits                 |
+| ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `company`   | The standard company profile for each employer in `experiences`, in place of the short summary.    | 1 per unique company expanded |
+| `education` | The person's education history: schools, degrees, and years.                                       | 1                             |
+
+The `company` expansion covers every employer in the person's work history, current and past, so it can add several credits to one lookup. A lookup can expand at most 500 unique companies.
+
+Without the expansion, each experience still names the employer with a short summary: `id`, `name`, `domain`, `logoUrl`, and `industry`.
+
+## When there is no match
+
+The API returns `404` when no person matches the email address. A `404` costs nothing.
+
+The SDKs raise a not-found error for this response. See [Handle an email with no match](/docs/reverse-email-lookup-api-examples#handle-an-email-with-no-match).
+
+## Look up many emails
+
+The lookup takes one email address per request. To process a list, send one request per address, and count on some of them returning `404`. The CLI accepts several addresses at once, or a file with one address per line.
+
+See [Look up a list of emails](/docs/reverse-email-lookup-api-examples#look-up-a-list-of-emails).
+
+## What a lookup costs
+
+* 5 credits when a person is returned.
+* 1 more for `education`, and 1 for each unique company expanded with `company`.
+* Nothing when no person matches.
+
+See [Credits](/docs/credits) for every price.
+
+## Related lookups
+
+| You have                     | You want                          | Use                                                                                     |
+| ---------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
+| An email address             | The person behind it              | This API                                                                                |
+| A person from a search       | Their work email address          | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email)        |
+| A domain                     | The company                       | [Company Enrichment API](/docs/company-enrichment-api)                                  |
+| A role, employer, or description | The people who match          | [People Search API](/docs/people-search-api)                                            |
+
+## Limits
+
+| Limit                                 | Value                 |
+| ------------------------------------- | --------------------- |
+| Email addresses per request           | 1                     |
+| Email address length                  | 320 characters        |
+| Companies expanded with `company`     | 500 unique companies  |
+
+## Coming from the V1 lookup endpoint
+
+| V1                                                                    | V2                                             |
+| --------------------------------------------------------------------- | ---------------------------------------------- |
+| [`POST /people/lookup`](/api-reference/v1/post-people-lookup)         | `POST /v2/people/enrich`                       |
+| `email` in the request body                                           | `email` in the request body, plus `expand`     |
+| 5 credits per successful call                                         | 5 credits when a person is returned            |
+
+## Common questions
+
+### Am I charged when no person is found?
+
+No. A lookup with no match returns `404` and costs nothing.
+
+### Can I get the company without the person?
+
+If you only need the company, enrich the email's domain with the [Company Enrichment API](/docs/company-enrichment-api), which costs 1 credit. To get the person and the full company profile together, add the `company` expansion to the lookup.
+
+### How do I know which employer the email belongs to?
+
+Find the entry in `experiences` where `isMatched` is `true`. That is the job at the company behind the email's domain.
+
+### How sure is the match?
+
+The API returns the best match for the address at that company, based on common email address patterns. Check the name and the matched job against what you already know before you rely on it.
+
+### Can I look up several emails in one request?
+
+No. Send one request per email address. The CLI accepts a list and sends the requests for you.
+
+### Can I go the other way, from a person to their email?
+
+Yes. Use the work email lookup, [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email). See [Get a work email for a person you found](/docs/people-search-api-examples#get-a-work-email-for-a-person-you-found).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reverse Email Lookup API examples" icon="code" href="/docs/reverse-email-lookup-api-examples">
+    Ready-to-run lookups.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="People Search API" icon="magnifying-glass" href="/docs/people-search-api">
+    Find people by role, employer, or description.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-people-enrich">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

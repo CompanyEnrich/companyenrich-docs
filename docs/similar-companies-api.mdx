@@ -1,0 +1,255 @@
+---
+title: "Similar Companies API"
+sidebarTitle: "Overview"
+description: "Find lookalike companies from one or more seed domains. Covers the lookalike request, ranking and scores, filters, pricing, limits, and how the V1 similar companies endpoint maps to V2."
+---
+
+The Similar Companies API finds companies that resemble ones you already know. You send up to 10 seed domains, such as your best customers, and get back a ranked list of lookalike companies, each as a full [company record](/docs/company-schema).
+
+In the V2 API, this is the lookalike mode of [company search](/docs/company-search-api): send a `lookalike` object to [`POST /v2/companies/search`](/api-reference/v2/post-companies-search). A lookalike search costs 5 credits per company returned.
+
+<CardGroup cols={2}>
+  <Card title="Filters" icon="filter" href="/docs/similar-companies-api-filters">
+    Narrow lookalikes to a market and exclude companies you know.
+  </Card>
+  <Card title="Examples" icon="code" href="/docs/similar-companies-api-examples">
+    Lookalike searches in cURL, four SDKs, and the CLI.
+  </Card>
+</CardGroup>
+
+## Find companies similar to one you know
+
+This request finds companies similar to Stripe. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"]},
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com'] },
+  pageSize: 10,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com"]},
+    page_size=10,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com"] },
+  page_size: 10
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com']],
+    pageSize: 10,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com --limit 10
+```
+
+</CodeGroup>
+
+The response holds the lookalike companies in ranked order, a score for each one, and a cursor for the next page. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "industry": "Software Publishers",
+      "employees": "201-500",
+      "categories": ["saas", "b2b"]
+    }
+  ],
+  "scores": {
+    "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23": 0.87
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+## Request fields
+
+| Field                | Value                      | Description                                                                               |
+| -------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| `lookalike.domains`  | array of strings, required | 1 to 10 seed company domains.                                                             |
+| `lookalike.weight`   | number from -1 to 1        | How much similarity to the seeds counts in ranking. Larger values favor closer matches.   |
+| `lookalike.minScore` | number from 0 to 1         | The minimum similarity required, before ranking penalties are applied.                    |
+| `filter`             | object                     | Any [company search filter](/docs/company-search-api-filters), to narrow the lookalikes.  |
+| `expand`             | array of strings           | Paid data to add to each company, at 1 extra credit each per company.                     |
+| `pageSize`           | integer from 1 to 100      | The number of companies to return.                                                        |
+| `cursor`             | string                     | The `nextCursor` from the previous response, to get the next page.                        |
+
+A lookalike search cannot be combined with a semantic search in the same request.
+
+## Ranking and scores
+
+Results come back in ranked order, most relevant first.
+
+* The response includes a `scores` object with one ranking score per company, keyed by company ID.
+* Scores are not probabilities. Use them to compare companies within one response, not as a percentage match.
+* Keep the companies in the order returned. The API reranks the first 150 matches with ranking penalties, and later matches keep their original scores and order, so sorting everything by score gives a different list.
+* Set `lookalike.minScore` to drop weaker matches.
+
+## Narrow the results with filters
+
+Add a `filter` object to keep only the lookalikes that fit your market, such as a country or a size range. Every [company search filter](/docs/company-search-api-filters) works.
+
+```json
+{
+  "lookalike": { "domains": ["stripe.com", "adyen.com"] },
+  "filter": {
+    "country": ["US", "CA"],
+    "employees": ["51-200", "201-500"],
+    "domain": { "notIn": ["checkout.com"] }
+  }
+}
+```
+
+Use `domain` with `notIn` to leave out companies you already work with. See [Similar Companies API filters](/docs/similar-companies-api-filters) for more ways to narrow a lookalike search.
+
+## Where lookalike queries work
+
+| Endpoint                                                                                | What a lookalike query does there                                   | Credits              |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------- |
+| [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)                  | Returns one page of lookalike companies with scores.                | 5 per company        |
+| [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count)      | Counts the matches.                                                 | Free                 |
+| [`POST /v2/companies/search/preview`](/api-reference/v2/post-companies-search-preview)  | Returns up to 25 company summaries with scores. Needs a plan that includes previews. | Free |
+| [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export)    | Exports a large lookalike list in the background, with a score per company. | 5 per company |
+| [`POST /v2/people/search`](/api-reference/v2/post-people-search)                        | With `company.lookalike`, finds people at lookalike companies.      | 2 per person         |
+
+## What a lookalike search costs
+
+* 5 credits per company returned, plus 1 for each expansion.
+* A search that returns no results costs 5 credits.
+* Count and preview requests are free.
+
+For example, 25 lookalike companies cost 25 × 5 = 125 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                         | Value                                                              |
+| ----------------------------- | ------------------------------------------------------------------ |
+| Seed domains                  | 1 to 10                                                            |
+| Results per page (`pageSize`) | 1 to 100                                                           |
+| Cursor lifetime               | 24 hours after the first page                                      |
+| Preview size                  | Up to 25 companies                                                 |
+| Export size (`limit`)         | Up to 1,000,000 results, and no more than your plan's search limit |
+
+## Coming from the V1 similar companies endpoint
+
+The V1 API has a separate [`POST /companies/similar`](/api-reference/v1/post-companies-similar) endpoint. In V2, the same search is the `lookalike` mode of company search.
+
+| V1                                         | V2                                                        |
+| ------------------------------------------ | --------------------------------------------------------- |
+| `POST /companies/similar`                  | `POST /v2/companies/search` with `lookalike`              |
+| `POST /companies/similar/count`            | `POST /v2/companies/search/count` with `lookalike`        |
+| `POST /companies/similar/preview`          | `POST /v2/companies/search/preview` with `lookalike`      |
+| `POST /companies/similar/scroll`           | `POST /v2/companies/search`, which always uses cursors    |
+| `domains`                                  | `lookalike.domains`                                       |
+| `similarityWeight`                         | `lookalike.weight`                                        |
+| `minScore`                                 | `lookalike.minScore`                                      |
+| Filters at the top level, such as `countries` | Filters inside `filter`, such as `filter.country`      |
+| `page` and `pageSize`                      | `cursor` and `pageSize`                                   |
+
+Both versions cost 5 credits per company returned.
+
+## Common questions
+
+### How many seed companies can I send?
+
+Between 1 and 10 domains in `lookalike.domains`.
+
+### Can I use it to find competitors?
+
+A lookalike search returns companies that resemble your seeds, which makes it a good starting point for finding potential competitors. Add filters such as `country` or `employees` to focus the list.
+
+### How do I leave out companies I already have?
+
+Add their domains to `filter.domain` with `notIn`. See [Exclude companies you already have](/docs/similar-companies-api-examples#exclude-companies-you-already-have).
+
+### What does the score mean?
+
+It is a ranking score, not a probability. A higher score ranks a company higher within the same response.
+
+### Can I find people at lookalike companies?
+
+Yes. Send the seeds in `company.lookalike` on a people search. See [Find people at companies like your customers](/docs/people-search-api-examples#find-people-at-companies-like-your-customers).
+
+### How do I try a lookalike search for free?
+
+Send the same query to the [count endpoint](/api-reference/v2/post-companies-search-count). If your plan includes previews, the [preview endpoint](/api-reference/v2/post-companies-search-preview) returns up to 25 lookalike summaries for free.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Similar Companies API examples" icon="code" href="/docs/similar-companies-api-examples">
+    Ready-to-run lookalike searches.
+  </Card>
+  <Card title="Similar Companies API filters" icon="filter" href="/docs/similar-companies-api-filters">
+    Narrow lookalikes to a market and exclude companies you know.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-companies-search">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

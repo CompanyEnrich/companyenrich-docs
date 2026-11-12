@@ -1,0 +1,258 @@
+---
+title: "Company Search API"
+sidebarTitle: "Overview"
+description: "Find companies by filters, a plain-language description, or similarity to companies you already know. Covers search modes, your first request, pagination, pricing, and limits."
+---
+
+The Company Search API finds companies in the CompanyEnrich dataset and returns a full [company record](/docs/company-schema) for each match. One endpoint, [`POST /v2/companies/search`](/api-reference/v2/post-companies-search), supports three ways to search.
+
+## Search modes
+
+| Mode             | Request field | Use it to                                                                      | Credits per company |
+| ---------------- | ------------- | ------------------------------------------------------------------------------ | ------------------- |
+| Filter search    | `filter`      | Match exact criteria such as country, size, industry, technology, or funding.  | 1                   |
+| Semantic search  | `semantic`    | Describe the companies you want in plain language.                             | 2                   |
+| Lookalike search | `lookalike`   | Find companies similar to ones you already know.                               | 5                   |
+
+Filters work with both of the other modes. Semantic and lookalike search cannot be used in the same request.
+
+<CardGroup cols={2}>
+  <Card title="Filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Examples" icon="code" href="/docs/company-search-api-examples">
+    Ready-to-run queries in cURL, four SDKs, and the CLI.
+  </Card>
+</CardGroup>
+
+## Make your first search
+
+This request finds SaaS companies in the United States with 51 to 500 employees. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "country": "US",
+      "categories": "saas",
+      "employees": ["51-200", "201-500"]
+    },
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  filter: { country: 'US', categories: 'saas', employees: ['51-200', '201-500'] },
+  pageSize: 10,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    filter={
+        "country": "US",
+        "categories": "saas",
+        "employees": ["51-200", "201-500"],
+    },
+    page_size=10,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  filter: { country: "US", categories: "saas", employees: ["51-200", "201-500"] },
+  page_size: 10
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    filter: [
+        'country' => 'US',
+        'categories' => 'saas',
+        'employees' => ['51-200', '201-500'],
+    ],
+    pageSize: 10,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --country US --category saas --employees 51-200,201-500 --limit 10
+```
+
+</CodeGroup>
+
+The response holds the matching companies and a cursor for the next page. This example is shortened and shows a fictional company. See the [company schema](/docs/company-schema) for every field.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "type": "private",
+      "employees": "201-500",
+      "industry": "Software Publishers",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+## Endpoints
+
+| Endpoint                                                                                                  | What it does                                                                | Credits                       |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------- |
+| [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)                                    | Returns one page of matching companies.                                     | 1, 2, or 5 per company        |
+| [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count)                        | Counts the companies a query matches.                                       | Free                          |
+| [`POST /v2/companies/search/preview`](/api-reference/v2/post-companies-search-preview)                    | Returns up to 25 company summaries. Needs a plan that includes previews.    | Free                          |
+| [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export)                      | Runs a large search in the background and stores the results for download.  | Same price as search          |
+| [`GET /v2/companies/search/export/{id}/results`](/api-reference/v2/get-companies-search-export-id-results) | Downloads an export as JSON, NDJSON, or CSV.                               | —                             |
+
+All of them take the same `filter`, `semantic`, and `lookalike` fields, so you can count or preview a query before you pay for it.
+
+## Response fields
+
+| Field            | Returned for       | Description                                                                                   |
+| ---------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| `items`          | Every search       | The companies on this page. Each one is a full [company record](/docs/company-schema).        |
+| `nextCursor`     | Every search       | The cursor for the next page. Omitted when there are no more results.                         |
+| `scores`         | Lookalike searches | A ranking score for each company, keyed by company ID. Scores are not probabilities.          |
+| `interpretation` | Semantic searches  | The filters and ranking boosts the API inferred from your query.                              |
+
+## Page through results
+
+Search uses cursor pagination. Numbered pages are not supported.
+
+* Omit `cursor` on the first request. To get the next page, send the same query with the `nextCursor` from the previous response.
+* Keep the query unchanged while you page.
+* A cursor expires 24 hours after the first page.
+* `pageSize` accepts 1 to 100.
+
+The SDKs follow cursors for you: `searchAll` in the JavaScript and PHP SDKs, `search_all` in the Python and Ruby SDKs, and `--all` or `--limit` in the CLI. See [Fetch every result](/docs/company-search-api-examples#fetch-every-result).
+
+For large result sets, use an export. It pages through the search in the background and gives you one file to download. See [Export a large search to CSV](/docs/company-search-api-examples#export-a-large-search-to-csv).
+
+## Add more data with expand
+
+A search returns the standard company profile. The `expand` parameter adds paid data to every company on the page.
+
+| Expansion      | Adds                                           | Extra credits per company |
+| -------------- | ---------------------------------------------- | ------------------------- |
+| `financial`    | Funding totals, rounds, and stock details      | 1                         |
+| `keywords`     | Keywords associated with the company           | 1                         |
+| `naicsCodes`   | NAICS industry codes                           | 1                         |
+| `technologies` | Technologies the company uses                  | 1                         |
+| `workforce`    | Headcount by department, with 12 months of history | 1                     |
+
+The [company schema](/docs/company-schema#expansions) lists the fields each expansion returns.
+
+## What a search costs
+
+* You pay per company returned: 1 credit for a filter search, 2 for a semantic search, and 5 for a lookalike search, plus 1 for each expansion.
+* You pay for every company on a page you fetch, even if you only use the first few. Set `pageSize` close to the number of results you need.
+* A search that returns no results costs one result's base price.
+* Count and preview requests are free.
+
+For example, a semantic search that returns 25 companies with the `technologies` expansion costs 25 × (2 + 1) = 75 credits. See [Credits](/docs/credits) for every price.
+
+## Limits
+
+| Limit                                 | Value                                                              |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| Results per page (`pageSize`)         | 1 to 100                                                           |
+| Cursor lifetime                       | 24 hours after the first page                                      |
+| Semantic query length                 | 500 characters                                                     |
+| Lookalike seed domains                | 1 to 10                                                            |
+| Text query length (`filter.query`)    | 250 characters per entry                                           |
+| Preview size                          | Up to 25 companies                                                 |
+| Export size (`limit`)                 | Up to 1,000,000 results, and no more than your plan's search limit |
+
+## Common questions
+
+### How do I test a query without spending credits?
+
+Send the same query to the [count endpoint](/api-reference/v2/post-companies-search-count). It returns how many companies match and costs nothing. If your plan includes previews, the [preview endpoint](/api-reference/v2/post-companies-search-preview) also returns up to 25 company summaries for free.
+
+### Can I combine semantic and lookalike search?
+
+No. A request can contain `semantic` or `lookalike`, not both. Either one can be combined with `filter`.
+
+### Why did my semantic search apply filters I did not send?
+
+By default, a semantic search reads attributes such as location and size from your query and applies them. The response's `interpretation` field shows what it inferred. Set `semantic.autoFilter` to `false` to turn this off. See [Semantic search options](/docs/company-search-api-filters#semantic-search-options).
+
+### How do I get more than 100 companies?
+
+Request the next page with `nextCursor`, or let an SDK's `searchAll` method do it. For thousands of results, use an [export](/docs/company-search-api-examples#export-a-large-search-to-csv).
+
+### Does an empty result cost credits?
+
+Yes. A search that returns nothing costs one result's base price: 1 credit for a filter search, 2 for a semantic search, and 5 for a lookalike search. Count the matches first to avoid this.
+
+### How do I search every company without a filter?
+
+Send an empty object, `{}`, as the request body.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Company Search API examples" icon="code" href="/docs/company-search-api-examples">
+    Ready-to-run queries for common jobs.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-companies-search">
+    The full request and response specification, with a playground.
+  </Card>
+</CardGroup>

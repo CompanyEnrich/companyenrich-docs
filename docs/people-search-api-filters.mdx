@@ -1,0 +1,212 @@
+---
+title: "People Search API filters"
+sidebarTitle: "Filters"
+description: "Every filter the People Search API accepts: job title, seniority, department, current and past employers, start dates, education, the company query, and semantic search options, with CLI flags and examples."
+---
+
+Filters go in the `filter` object of a [people search](/docs/people-search-api) request. The same `filter` object works in count, preview, and export requests.
+
+A person must match every filter you send. You can use filters on their own, or add a semantic query and a company query.
+
+## Write a filter value
+
+Most filters accept a value in three forms:
+
+```json
+{
+  "filter": {
+    "country": "US",
+    "seniority": ["vp", "director"],
+    "department": { "in": ["sales"], "notIn": ["sales/customer-success"] }
+  }
+}
+```
+
+| Form         | Example                                    | Meaning                                              |
+| ------------ | ------------------------------------------ | ---------------------------------------------------- |
+| Single value | `"country": "US"`                          | Match this value.                                    |
+| Array        | `"seniority": ["vp", "director"]`          | Match any of the values.                             |
+| Object       | `"department": { "in": [...], "notIn": [...] }` | Combine values to include and values to exclude. |
+
+The object form supports two rules:
+
+| Rule    | Meaning                                      |
+| ------- | -------------------------------------------- |
+| `in`    | Match at least one of the values.            |
+| `notIn` | Exclude people who match any of the values.  |
+
+## Filter reference
+
+The CLI column shows the matching flag for `companyenrich people search`. Filters on the current role and current company match a person's current job.
+
+### Person
+
+| Filter    | Value                   | CLI flag        | Description                                                  |
+| --------- | ----------------------- | --------------- | ------------------------------------------------------------ |
+| `query`   | string                  | `--query`, `-q` | Matches person names. Up to 250 characters per entry.        |
+| `country` | two-letter country code | `--country`     | The person's country, such as `US` or `GB`.                  |
+
+### Current role
+
+| Filter                     | Value           | CLI flag                                                | Description                                                                                         |
+| -------------------------- | --------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `position`                 | string          | `--position`                                            | Phrases to match in the current job title. Find titles with [position autocomplete](/api-reference/v2/get-positions-autocomplete). |
+| `seniority`                | seniority level | `--seniority`                                           | One of the [seniority levels](/docs/field-values#seniority-levels), such as `vp` or `director`.     |
+| `department`               | department      | `--department`                                          | One of the [departments](/docs/field-values#departments). A department includes its sub-departments. |
+| `currentPositionStartDate` | date range      | `--position-started-after`, `--position-started-before` | When the person started their current position.                                                     |
+
+### Current company
+
+| Filter                    | Value       | CLI flag                            | Description                                                         |
+| ------------------------- | ----------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `domain`                  | string      | `--domain`                          | Domains of the current company. Up to 2,500 per rule.               |
+| `companyId`               | UUID string | `--company-id`                      | CompanyEnrich IDs of the current company.                           |
+| `companyLinkedinHandle`   | string      | `--company-linkedin`                | LinkedIn handles or URLs of the current company.                    |
+| `currentCompanyStartDate` | date range  | `--joined-after`, `--joined-before` | When the person joined their current company.                       |
+
+To target companies by size, industry, or description instead of by name, use the [company query](#company-query).
+
+### Education
+
+| Filter                                | Value  | CLI flag            | Description                                    |
+| ------------------------------------- | ------ | ------------------- | ---------------------------------------------- |
+| `education.institutionName`           | string | `--school`          | Phrases to match in school names.              |
+| `education.institutionLinkedinHandle` | string | `--school-linkedin` | LinkedIn handles or URLs of schools attended.  |
+
+### Past experience
+
+These filters go inside `filter.pastExperience` and match a previous job.
+
+| Filter                                 | Value           | CLI flag                                      | Description                                           |
+| -------------------------------------- | --------------- | --------------------------------------------- | ----------------------------------------------------- |
+| `pastExperience.domain`                | string          | `--past-domain`                               | Domains of a previous employer.                       |
+| `pastExperience.companyId`             | UUID string     | `--past-company-id`                           | CompanyEnrich IDs of a previous employer.             |
+| `pastExperience.companyLinkedinHandle` | string          | `--past-company-linkedin`                     | LinkedIn handles or URLs of a previous employer.      |
+| `pastExperience.position`              | string          | `--past-position`                             | Phrases to match in a previous job title.             |
+| `pastExperience.seniority`             | seniority level | `--past-seniority`                            | The seniority held in a previous role.                |
+| `pastExperience.department`            | department      | `--past-department`                           | The department of a previous role.                    |
+| `pastExperience.startDate`             | date range      | `--past-started-after`, `--past-started-before` | When the previous role started.                     |
+| `pastExperience.endDate`               | date range      | `--past-ended-after`, `--past-ended-before`   | When the previous role ended.                         |
+
+Past experience filters follow three rules:
+
+* Every value you include must match the same past job.
+* People who still work at a company you include are left out.
+* You can exclude a past company with `notIn`, which removes anyone who ever worked there. The past `position`, `seniority`, and `department` filters do not support exclusions.
+
+```json
+{
+  "filter": {
+    "pastExperience": {
+      "domain": "google.com",
+      "department": "engineering-technical",
+      "endDate": { "after": "2024-01-01T00:00:00Z" }
+    }
+  }
+}
+```
+
+## Date ranges
+
+A date range is an object with `after`, `before`, or both. Both ends are inclusive.
+
+```json
+{
+  "filter": {
+    "currentCompanyStartDate": { "after": "2026-01-01T00:00:00Z", "before": "2026-06-30T00:00:00Z" }
+  }
+}
+```
+
+In the CLI, pass a date such as `--joined-after 2026-01-01`, or a relative value such as `--joined-after 90d` for the last 90 days.
+
+## Exclude values
+
+Use `notIn` to remove people from the results. This search returns people at Stripe who are not interns or entry-level, and not in sales:
+
+```json
+{
+  "filter": {
+    "domain": "stripe.com",
+    "seniority": { "notIn": ["intern", "entry"] },
+    "department": { "notIn": ["sales"] }
+  }
+}
+```
+
+An exclusion on a current-role or current-company filter removes a person when any of their current jobs matches it.
+
+In the CLI, put `exclude-` in front of the flag: `--exclude-seniority intern,entry --exclude-department sales`.
+
+## Company query
+
+The `company` field limits the results to people whose current company matches a company search. It takes the same three fields as the [Company Search API](/docs/company-search-api):
+
+| Field               | Description                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `company.filter`    | Any [company search filter](/docs/company-search-api-filters), such as `country`, `categories`, or `employees`. |
+| `company.semantic`  | A plain-language description of the companies.                                                       |
+| `company.lookalike` | Seed domains. The search returns people at similar companies.                                        |
+
+```json
+{
+  "filter": { "seniority": ["c-suite", "vp"] },
+  "company": {
+    "semantic": { "query": "AI tools for hospitals" },
+    "filter": { "country": "US" }
+  }
+}
+```
+
+A company query that uses `semantic` or `lookalike`, or the `query`, keyword, technology, funding, workforce, `reportedEmployees`, or `require` filters, matches people at the 1,000 best-matching companies.
+
+In the CLI, put `company-` in front of a company search flag: `--company-country US --company-category saas`, `--company-semantic "AI tools for hospitals"`, or `--company-similar-to stripe.com`.
+
+## Semantic search options
+
+A semantic search takes a plain-language description in `semantic.query`, up to 500 characters. The API turns it into person filters and a description of the companies those people work at.
+
+For example, `VP of sales at Series A SaaS startups in Germany` filters on VP-level sales people and searches their current companies for `Series A SaaS startups in Germany`.
+
+* **What is inferred:** person names, job titles, seniority levels, departments, countries, current and past companies, schools, and recent start dates.
+* **Locations** are inferred at country level, so a city filters on its country.
+* **Your filters win.** A filter you send replaces the inferred value of the same kind. Exclusions you send apply together with the inferred values.
+* **Your company query wins.** A `company.semantic` or `company.lookalike` query replaces the inferred company description.
+* **A query needs something concrete.** A query from which no filters can be inferred is rejected.
+
+The response's `interpretation` field reports what was inferred:
+
+| Field                         | Description                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `interpretation.filter`       | The person filters inferred from the query.                       |
+| `interpretation.company`      | The inferred company description, with its filters and ranking boosts. |
+| `interpretation.companyNames` | Current employer names and aliases found in the query.            |
+
+## Look up filter values
+
+| Filter                    | Where to find values                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `position`                | [`GET /v2/positions/autocomplete`](/api-reference/v2/get-positions-autocomplete)    |
+| `seniority`               | [Seniority levels](/docs/field-values#seniority-levels)                             |
+| `department`              | [Departments](/docs/field-values#departments)                                       |
+| `country`                 | [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries)                    |
+| `domain`                  | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete)    |
+
+The lookup endpoints are free.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="People Search API" icon="magnifying-glass" href="/docs/people-search-api">
+    Search methods, pagination, pricing, and limits.
+  </Card>
+  <Card title="People Search API examples" icon="code" href="/docs/people-search-api-examples">
+    Ready-to-run queries for common jobs.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every seniority level, department, and sub-department.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    The filters you can use in a company query.
+  </Card>
+</CardGroup>

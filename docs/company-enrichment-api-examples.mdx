@@ -1,0 +1,488 @@
+---
+title: "Company Enrichment API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run Company Enrichment API requests: enrich by domain, by name or LinkedIn URL, in batches of 50, and in bulk jobs of up to 10,000 domains, in cURL, four SDKs, and the CLI."
+---
+
+Each example on this page is one [Company Enrichment API](/docs/company-enrichment-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+## Enrich a company by domain
+
+The domain is the preferred way to identify a company. A successful enrichment costs 1 credit.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({ domain: 'stripe.com' });
+console.log(company.name, company.employees);
+```
+
+```python Python
+company = client.companies.enrich("stripe.com")
+print(company.get("name"), company.get("employees"))
+```
+
+```ruby Ruby
+company = client.companies.enrich("stripe.com")
+puts company["name"], company["employees"]
+```
+
+```php PHP
+$company = $client->companies->enrich('stripe.com');
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com
+```
+
+</CodeGroup>
+
+The response is a full [company record](/docs/company-schema). Fields with no known value are omitted or `null`, so read them defensively.
+
+## Add technologies and headcount
+
+The `expand` parameter adds paid data to the record. Each expansion costs 1 extra credit, so this request costs 3 credits.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=technologies&expand=workforce" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['technologies', 'workforce'],
+});
+
+console.log(company.technologies);
+console.log(company.workforce?.observedEmployeeCount);
+```
+
+```python Python
+company = client.companies.enrich(
+    "stripe.com",
+    expand=["technologies", "workforce"],
+)
+
+print(company.get("technologies"))
+print((company.get("workforce") or {}).get("observedEmployeeCount"))
+```
+
+```ruby Ruby
+company = client.companies.enrich(
+  "stripe.com",
+  expand: ["technologies", "workforce"]
+)
+
+p company["technologies"]
+p company.dig("workforce", "observedEmployeeCount")
+```
+
+```php PHP
+$company = $client->companies->enrich(
+    'stripe.com',
+    expand: ['technologies', 'workforce'],
+);
+
+print_r($company['technologies'] ?? []);
+echo $company['workforce']['observedEmployeeCount'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand technologies,workforce
+```
+
+</CodeGroup>
+
+The five expansions are `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. The [company schema](/docs/company-schema#expansions) lists the fields each one returns.
+
+## Enrich by name and LinkedIn URL
+
+When you do not have a domain, identify the company by its name or a social profile. When you send several properties, all of them must match.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Stripe",
+    "linkedinUrl": "https://www.linkedin.com/company/stripe"
+  }'
+```
+
+```javascript JavaScript
+const company = await client.companies.enrichByProperties({
+  name: 'Stripe',
+  linkedinUrl: 'https://www.linkedin.com/company/stripe',
+});
+console.log(company.name, company.employees);
+```
+
+```python Python
+company = client.companies.enrich_by_properties(
+    name="Stripe",
+    linkedin_url="https://www.linkedin.com/company/stripe",
+)
+print(company.get("name"), company.get("employees"))
+```
+
+```ruby Ruby
+company = client.companies.enrich_by_properties(
+  name: "Stripe",
+  linkedin_url: "https://www.linkedin.com/company/stripe"
+)
+puts company["name"], company["employees"]
+```
+
+```php PHP
+$company = $client->companies->enrichByProperties(
+    name: 'Stripe',
+    linkedinUrl: 'https://www.linkedin.com/company/stripe',
+);
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich --name "Stripe" \
+  --linkedin-url https://www.linkedin.com/company/stripe
+```
+
+</CodeGroup>
+
+You can also send `linkedinId`, `twitterUrl`, `facebookUrl`, `instagramUrl`, or `youtubeUrl`. This method costs 1 credit when a company is returned, and also when the properties cannot be resolved to a company domain.
+
+## Enrich up to 50 domains in one request
+
+A batch returns one item per domain, in the order you sent them. Check each item's `status`: only `found` items include a `company` and cost credits.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.so"]
+  }'
+```
+
+```javascript JavaScript
+const { items } = await client.companies.enrichBatch({
+  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+});
+
+for (const item of items) {
+  console.log(item.domain, item.status, item.company?.name);
+}
+```
+
+```python Python
+batch = client.companies.enrich_batch(
+    ["stripe.com", "adyen.com", "notion.so"],
+)
+
+for item in batch["items"]:
+    company = item.get("company") or {}
+    print(item["domain"], item["status"], company.get("name"))
+```
+
+```ruby Ruby
+batch = client.companies.enrich_batch(
+  ["stripe.com", "adyen.com", "notion.so"]
+)
+
+batch["items"].each do |item|
+  puts "#{item['domain']} #{item['status']} #{item.dig('company', 'name')}"
+end
+```
+
+```php PHP
+$batch = $client->companies->enrichBatch(
+    ['stripe.com', 'adyen.com', 'notion.so'],
+);
+
+foreach ($batch['items'] as $item) {
+    echo $item['domain'], ' ', $item['status'], ' ', $item['company']['name'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com adyen.com notion.so
+```
+
+</CodeGroup>
+
+The other statuses are `not-found`, `invalid-domain`, and `pending`. Duplicate domains are enriched once, and domains that resolve to the same company are charged once.
+
+## Use stored data only
+
+By default, the API enriches a company it has not stored yet and waits for the result. Set `waitForEnrichment` to `false` to get an immediate answer from stored data instead.
+
+A company that is not stored yet returns `404`, costs nothing, and is scheduled for background enrichment when eligible.
+
+<CodeGroup>
+
+```bash cURL
+curl -i "https://api.companyenrich.com/v2/companies/enrich?domain=acme-analytics.example&waitForEnrichment=false" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { NotFoundError } from '@companyenrich/sdk';
+
+try {
+  const company = await client.companies.enrich({
+    domain: 'acme-analytics.example',
+    waitForEnrichment: false,
+  });
+  console.log(company.name);
+} catch (error) {
+  if (!(error instanceof NotFoundError)) throw error;
+  console.log('Not stored yet. No credits were charged.');
+}
+```
+
+```python Python
+from companyenrich import NotFoundError
+
+try:
+    company = client.companies.enrich(
+        "acme-analytics.example",
+        wait_for_enrichment=False,
+    )
+    print(company.get("name"))
+except NotFoundError:
+    print("Not stored yet. No credits were charged.")
+```
+
+```ruby Ruby
+begin
+  company = client.companies.enrich(
+    "acme-analytics.example",
+    wait_for_enrichment: false
+  )
+  puts company["name"]
+rescue CompanyEnrich::NotFoundError
+  puts "Not stored yet. No credits were charged."
+end
+```
+
+```php PHP
+use CompanyEnrich\Exception\NotFoundException;
+
+try {
+    $company = $client->companies->enrich(
+        'acme-analytics.example',
+        waitForEnrichment: false,
+    );
+    echo $company['name'] ?? '', PHP_EOL;
+} catch (NotFoundException) {
+    echo 'Not stored yet. No credits were charged.', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich acme-analytics.example --no-wait-for-enrichment
+```
+
+</CodeGroup>
+
+The SDKs raise a not-found error for a `404`, and the cURL example prints the status line with `-i`. Ask again later to get the company once it has been enriched.
+
+## Get a company by ID
+
+Every company record has an `id`. Store it, and you can fetch the same company later without resolving the domain again. This costs 1 credit, and a missing ID returns `404` at no charge.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.get('3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23');
+console.log(company.name, company.employees);
+```
+
+```python Python
+company = client.companies.get("3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23")
+print(company.get("name"), company.get("employees"))
+```
+
+```ruby Ruby
+company = client.companies.get("3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23")
+puts company["name"], company["employees"]
+```
+
+```php PHP
+$company = $client->companies->get(
+    '3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23',
+);
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company get 3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23
+```
+
+</CodeGroup>
+
+## Enrich thousands of domains in the background
+
+A bulk job enriches up to 10,000 domains in the background. You create the job, wait for it to finish, then read the results.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the job. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.so"]
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o enriched.csv
+```
+
+```javascript JavaScript
+const job = await client.companies.bulkEnrichment.create({
+  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+});
+
+await client.batches.waitForCompletion(job.id);
+
+for await (const record of client.companies.bulkEnrichment.stream(job.id)) {
+  if (record.success) console.log(record.domain, record.company?.name);
+}
+```
+
+```python Python
+job = client.companies.bulk_enrichment.create(
+    ["stripe.com", "adyen.com", "notion.so"],
+)
+
+client.batches.wait_for_completion(job["id"])
+
+for record in client.companies.bulk_enrichment.stream(job["id"]):
+    if record["success"]:
+        print(record["domain"], (record.get("company") or {}).get("name"))
+```
+
+```ruby Ruby
+job = client.companies.bulk_enrichment.create(
+  ["stripe.com", "adyen.com", "notion.so"]
+)
+
+client.batches.wait_for_completion(job["id"])
+
+client.companies.bulk_enrichment.stream(job["id"]) do |record|
+  puts "#{record['domain']} #{record.dig('company', 'name')}" if record["success"]
+end
+```
+
+```php PHP
+$job = $client->companies->bulkEnrichment->create(
+    ['stripe.com', 'adyen.com', 'notion.so'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+foreach ($client->companies->bulkEnrichment->stream($job['id']) as $record) {
+    if ($record['success']) {
+        echo $record['domain'], ' ', $record['company']['name'] ?? '', PHP_EOL;
+    }
+}
+```
+
+```bash CLI
+companyenrich company bulk-enrich stripe.com adyen.com notion.so --wait -o enriched.csv
+```
+
+</CodeGroup>
+
+* The API checks your balance when you create the job and returns `402` unless it covers every domain. Credits are not reserved, and you are charged as results complete.
+* Each result has the input `domain`, a `success` flag, and either the `company` or an `error`.
+* Results download as JSON, NDJSON, or CSV. The SDK `stream` methods read NDJSON one record at a time, which suits large jobs.
+* In the CLI, `-f domains.txt` reads the domains from a file, one per line.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Company Search API examples" icon="magnifying-glass" href="/docs/company-search-api-examples">
+    Find companies when you do not have a list yet.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>

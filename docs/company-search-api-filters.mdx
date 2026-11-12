@@ -1,0 +1,256 @@
+---
+title: "Company Search API filters"
+sidebarTitle: "Filters"
+description: "Every filter, semantic search option, and lookalike option the Company Search API accepts, with matching rules, accepted values, CLI flags, and examples."
+---
+
+Filters go in the `filter` object of a [company search](/docs/company-search-api) request. The same `filter` object works in count, preview, and export requests.
+
+A company must match every filter you send. You can use filters on their own, or add them to a semantic or lookalike search.
+
+## Write a filter value
+
+Most filters accept a value in three forms:
+
+```json
+{
+  "filter": {
+    "country": "TR",
+    "employees": ["51-200", "201-500"],
+    "keywords": { "in": ["fintech", "payments"], "notIn": ["agency"] }
+  }
+}
+```
+
+| Form         | Example                                 | Meaning                                                     |
+| ------------ | --------------------------------------- | ----------------------------------------------------------- |
+| Single value | `"country": "TR"`                       | Match this value.                                           |
+| Array        | `"employees": ["51-200", "201-500"]`    | Match the values using the filter's default rule.           |
+| Object       | `"keywords": { "in": [...], "notIn": [...] }` | Choose the matching rules yourself.                   |
+
+The object form supports these rules:
+
+| Rule    | Meaning                                         | Available on                                                        |
+| ------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| `in`    | Match at least one of the values.               | Every value filter except `require`                                 |
+| `notIn` | Exclude companies that match any of the values. | Every value filter except `require`                                 |
+| `all`   | Match every one of the values.                  | `keywords`, `technologies`, `categories`, `naicsCodes`, `require`   |
+
+The default rule for an array depends on the filter:
+
+* **Any value matches** for `query`, `id`, `domain`, the location filters, `type`, `employees`, `reportedEmployees`, `revenue`, `naicsCodes`, and `fundingRounds`.
+* **Every value must match** for `keywords`, `technologies`, `categories`, and `require`.
+
+## Filter reference
+
+The CLI column shows the matching flag for `companyenrich company search`.
+
+### Identity
+
+| Filter   | Value       | Array rule | CLI flag        | Description                                                                         |
+| -------- | ----------- | ---------- | --------------- | ----------------------------------------------------------------------------------- |
+| `query`  | string      | Any        | `--query`, `-q` | Matches company names, keywords, or domain prefixes. Up to 250 characters per entry. |
+| `id`     | UUID string | Any        | `--id`          | CompanyEnrich company IDs.                                                          |
+| `domain` | string      | Any        | `--domain`      | Company domains, such as `stripe.com`.                                              |
+
+### Location
+
+| Filter    | Value                   | Array rule | CLI flag    | Description                                                                              |
+| --------- | ----------------------- | ---------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `country` | two-letter country code | Any        | `--country` | Countries, such as `US` or `DE`.                                                         |
+| `region`  | region ID (string)      | Any        | `--region`  | Regions, each covering several countries. Get IDs from [`GET /v2/geo/regions`](/api-reference/v2/get-geo-regions). |
+| `state`   | state ID (integer)      | Any        | `--state`   | States. Get IDs from [`POST /v2/geo/states`](/api-reference/v2/post-geo-states).         |
+| `city`    | city ID (integer)       | Any        | `--city`    | Cities. Get IDs from [`POST /v2/geo/cities`](/api-reference/v2/post-geo-cities).         |
+
+### Size, revenue, and type
+
+| Filter              | Value          | Array rule | CLI flag               | Description                                                                         |
+| ------------------- | -------------- | ---------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| `employees`         | employee range | Any        | `--employees`          | One of the [employee ranges](/docs/field-values#employee-ranges), such as `51-200`. |
+| `reportedEmployees` | employee range | Any        | `--reported-employees` | The externally reported employee range. Takes the same values as `employees`.       |
+| `revenue`           | revenue range  | Any        | `--revenue`            | One of the [revenue ranges](/docs/field-values#revenue-ranges), such as `1m-10m`.   |
+| `type`              | company type   | Any        | `--type`               | One of the [company types](/docs/field-values#company-types), such as `private`.    |
+
+### Industry and activity
+
+| Filter         | Value                 | Array rule | CLI flag     | Description                                                                                                   |
+| -------------- | --------------------- | ---------- | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `categories`   | category              | All        | `--category` | One of the [company categories](/docs/field-values#company-categories), such as `saas` or `b2b`.              |
+| `naicsCodes`   | string of 2–6 digits  | Any        | `--naics`    | NAICS codes or code prefixes. Get them from [`GET /v2/industries`](/api-reference/v2/get-industries).         |
+| `keywords`     | string                | All        | `--keyword`  | Keywords that describe the company. Find them with [keyword autocomplete](/api-reference/v2/get-keywords-autocomplete). |
+| `technologies` | string                | All        | `--tech`     | Technologies the company uses. Find them with [technology autocomplete](/api-reference/v2/get-technologies-autocomplete). |
+
+### Age and funding
+
+| Filter          | Value                    | Array rule | CLI flag          | Description                                                                              |
+| --------------- | ------------------------ | ---------- | ----------------- | ---------------------------------------------------------------------------------------- |
+| `foundedYear`   | range of years           | —          | `--founded`       | The year the company was founded.                                                        |
+| `fundingRounds` | funding round            | Any        | `--funding-round` | One of the [funding rounds](/docs/field-values#funding-rounds), such as `series_a`.      |
+| `fundingAmount` | range of amounts in USD  | —          | `--funding`       | The company's funding amount.                                                            |
+| `fundingYear`   | range of years           | —          | `--funding-year`  | The year of the company's latest funding.                                                |
+
+A range is an object with `min`, `max`, or both. Both ends are inclusive.
+
+```json
+{
+  "filter": {
+    "foundedYear": { "min": 2015, "max": 2020 },
+    "fundingAmount": { "min": 10000000 }
+  }
+}
+```
+
+### Workforce
+
+| Filter            | Value            | CLI flag                                             | Description                                         |
+| ----------------- | ---------------- | ---------------------------------------------------- | --------------------------------------------------- |
+| `workforceGrowth` | object           | `--growth`, `--growth-period`, `--growth-department` | Headcount growth over a period, as a ratio range.   |
+| `workforceSize`   | array of objects | `--headcount`                                        | Headcount ranges, overall or for a department.      |
+
+`workforceGrowth` takes these fields:
+
+| Field        | Value                                                                                             | Description                                             |
+| ------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `period`     | `m6`, `y1`, or `y2`                                                                               | Measure growth over 6 months, 1 year, or 2 years.       |
+| `department` | `overall` or a [workforce department](/docs/field-values#workforce-departments), such as `sales`  | The department to measure growth for.                   |
+| `min`, `max` | number                                                                                            | The growth ratio range, inclusive. `0.15` means 15% growth. |
+
+Each `workforceSize` entry takes a `department`, which defaults to `overall`, and an inclusive `min` and `max` headcount.
+
+```json
+{
+  "filter": {
+    "workforceGrowth": { "period": "y1", "department": "engineering_technical", "min": 0.2 },
+    "workforceSize": [
+      { "min": 100 },
+      { "department": "sales", "min": 10, "max": 50 }
+    ]
+  }
+}
+```
+
+Department names in these two filters use underscores, such as `engineering_technical`.
+
+### Required data
+
+| Filter    | Value   | Array rule | CLI flag    | Description                                                                                              |
+| --------- | ------- | ---------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `require` | feature | All        | `--require` | Return only companies that have these fields. One of the [required features](/docs/field-values#required-features), such as `linkedin` or `revenue`. |
+
+## Exclude values
+
+Use `notIn` to remove companies from the results. This search returns e-commerce companies outside the United States that are not agencies:
+
+```json
+{
+  "filter": {
+    "categories": "e-commerce",
+    "country": { "notIn": ["US"] },
+    "keywords": { "notIn": ["agency"] }
+  }
+}
+```
+
+In the CLI, put `exclude-` in front of the flag: `--exclude-country US --exclude-keyword agency`.
+
+## Match any value or every value
+
+`keywords`, `technologies`, and `categories` require every value by default. Use `in` to match at least one:
+
+```json
+{
+  "filter": {
+    "keywords": { "in": ["fintech", "payments"] }
+  }
+}
+```
+
+`naicsCodes` matches any code by default. Use `all` to require every code:
+
+```json
+{
+  "filter": {
+    "naicsCodes": { "all": ["5112", "5182"] }
+  }
+}
+```
+
+In the CLI, these are `--any-keyword fintech,payments` and `--all-naics 5112,5182`.
+
+## Semantic search options
+
+A semantic search takes a plain-language description in `semantic.query`. It costs 2 credits per company returned.
+
+| Field                 | Value                   | Description                                                                       |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| `semantic.query`      | string, required        | The description of the companies you want. Up to 500 characters.                  |
+| `semantic.weight`     | number from 0 to 1      | How much semantic similarity counts in ranking. Larger values count it more.      |
+| `semantic.autoFilter` | boolean, default `true` | Whether to infer company attributes, such as location and size, from the query.   |
+
+With `autoFilter` on, the API reads attributes from your query and applies them:
+
+* Inferred location, employee range, founded year, and funding values **filter** the results.
+* Inferred company names, categories, and revenue **rank** matching companies higher without excluding others. A company the query names ranks first.
+* A filter you send replaces the inferred value of the same kind. Exclusions you send apply together with the inferred values.
+
+The response's `interpretation` field reports what was inferred, in `interpretation.filter` and `interpretation.boost`. For example, `saas companies in Turkey` filters on Turkey and ranks SaaS companies higher.
+
+```json
+{
+  "semantic": { "query": "AI tools for hospitals", "autoFilter": false },
+  "filter": { "country": "US", "employees": ["51-200", "201-500"] }
+}
+```
+
+## Lookalike search options
+
+A lookalike search finds companies similar to the seed companies in `lookalike.domains`. It costs 5 credits per company returned.
+
+| Field                | Value                      | Description                                                                                |
+| -------------------- | -------------------------- | ------------------------------------------------------------------------------------------ |
+| `lookalike.domains`  | array of strings, required | 1 to 10 seed company domains.                                                              |
+| `lookalike.weight`   | number from -1 to 1        | How much similarity to the seeds counts in ranking. Larger values favor closer matches.    |
+| `lookalike.minScore` | number from 0 to 1         | The minimum similarity required, before ranking penalties are applied.                     |
+
+```json
+{
+  "lookalike": { "domains": ["stripe.com", "adyen.com"], "minScore": 0.5 },
+  "filter": { "country": "US" }
+}
+```
+
+The response includes a `scores` object with a ranking score for each company. Scores are not probabilities. Keep the results in the order returned: the API reranks the first 150 matches, so sorting by score gives a different order.
+
+## Look up filter values
+
+These endpoints return the values that filters accept. All of them are free.
+
+| Filter         | Endpoint                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| `country`      | [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries)                            |
+| `region`       | [`GET /v2/geo/regions`](/api-reference/v2/get-geo-regions)                                  |
+| `state`        | [`POST /v2/geo/states`](/api-reference/v2/post-geo-states)                                  |
+| `city`         | [`POST /v2/geo/cities`](/api-reference/v2/post-geo-cities)                                  |
+| `naicsCodes`   | [`GET /v2/industries`](/api-reference/v2/get-industries)                                    |
+| `keywords`     | [`GET /v2/keywords/autocomplete`](/api-reference/v2/get-keywords-autocomplete)              |
+| `technologies` | [`GET /v2/technologies/autocomplete`](/api-reference/v2/get-technologies-autocomplete)      |
+| `domain`       | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete)            |
+
+Filters with a fixed list of values, such as `employees` and `categories`, are listed on the [field values](/docs/field-values) page.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API" icon="magnifying-glass" href="/docs/company-search-api">
+    Search modes, pagination, pricing, and limits.
+  </Card>
+  <Card title="Company Search API examples" icon="code" href="/docs/company-search-api-examples">
+    Ready-to-run queries for common jobs.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every accepted value for ranges, types, and categories.
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/v2/post-companies-search">
+    The full request specification, with a playground.
+  </Card>
+</CardGroup>

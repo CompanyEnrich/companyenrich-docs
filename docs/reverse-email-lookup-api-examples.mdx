@@ -1,0 +1,336 @@
+---
+title: "Reverse Email Lookup API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run reverse email lookups: find the person behind an email, get their employer's company profile, handle an email with no match, and process a list of emails, in cURL, four SDKs, and the CLI."
+---
+
+Each example on this page is a [Reverse Email Lookup API](/docs/reverse-email-lookup-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+## Find the person behind an email
+
+Send a work email address. The response is the person's record, with their name, current position, and LinkedIn URL. A lookup costs 5 credits when a person is returned.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.doe@stripe.com"
+  }'
+```
+
+```javascript JavaScript
+const person = await client.people.enrich({ email: 'jane.doe@stripe.com' });
+
+console.log(person.name, person.position);
+console.log(person.socials.linkedinUrl);
+```
+
+```python Python
+person = client.people.enrich("jane.doe@stripe.com")
+
+print(person.get("name"), person.get("position"))
+print(person["socials"].get("linkedinUrl"))
+```
+
+```ruby Ruby
+person = client.people.enrich("jane.doe@stripe.com")
+
+puts person["name"], person["position"]
+puts person.dig("socials", "linkedinUrl")
+```
+
+```php PHP
+$person = $client->people->enrich('jane.doe@stripe.com');
+
+echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+echo $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people enrich jane.doe@stripe.com
+```
+
+</CodeGroup>
+
+## Get the person with their company profile
+
+Add the `company` expansion to replace the short company summary in `experiences` with the standard company profile. The job at the email's company is the one where `isMatched` is `true`.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.doe@stripe.com",
+    "expand": ["company"]
+  }'
+```
+
+```javascript JavaScript
+const person = await client.people.enrich({
+  email: 'jane.doe@stripe.com',
+  expand: ['company'],
+});
+
+const matched = person.experiences.find((experience) => experience.isMatched);
+console.log(person.name, matched?.position);
+console.log(matched?.company?.domain, matched?.company?.employees, matched?.company?.industry);
+```
+
+```python Python
+person = client.people.enrich(
+    "jane.doe@stripe.com",
+    expand=["company"],
+)
+
+matched = next((e for e in person["experiences"] if e["isMatched"]), {})
+company = matched.get("company") or {}
+print(person.get("name"), matched.get("position"))
+print(company.get("domain"), company.get("employees"), company.get("industry"))
+```
+
+```ruby Ruby
+person = client.people.enrich(
+  "jane.doe@stripe.com",
+  expand: ["company"]
+)
+
+matched = person["experiences"].find { |experience| experience["isMatched"] } || {}
+company = matched["company"] || {}
+puts person["name"], matched["position"]
+puts company["domain"], company["employees"], company["industry"]
+```
+
+```php PHP
+$person = $client->people->enrich(
+    'jane.doe@stripe.com',
+    expand: ['company'],
+);
+
+foreach ($person['experiences'] as $experience) {
+    if ($experience['isMatched']) {
+        $company = $experience['company'] ?? [];
+        echo $person['name'] ?? '', ' ', $experience['position'] ?? '', PHP_EOL;
+        echo $company['domain'] ?? '', ' ', $company['employees'] ?? '', ' ', $company['industry'] ?? '', PHP_EOL;
+    }
+}
+```
+
+```bash CLI
+companyenrich people enrich jane.doe@stripe.com --expand company
+```
+
+</CodeGroup>
+
+The expansion costs 1 credit for each unique company in the person's work history, current and past. Add `education` to `expand` for the person's schools and degrees, at 1 more credit.
+
+## Handle an email with no match
+
+When no person matches the address, the API returns `404` and charges nothing. The SDKs raise a not-found error, and the cURL example prints the status line with `-i`.
+
+<CodeGroup>
+
+```bash cURL
+curl -i -X POST https://api.companyenrich.com/v2/people/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "nobody@acme-analytics.example"
+  }'
+```
+
+```javascript JavaScript
+import { NotFoundError } from '@companyenrich/sdk';
+
+try {
+  const person = await client.people.enrich({
+  email: 'nobody@acme-analytics.example',
+});
+  console.log(person.name);
+} catch (error) {
+  if (!(error instanceof NotFoundError)) throw error;
+  console.log('No match. No credits were charged.');
+}
+```
+
+```python Python
+from companyenrich import NotFoundError
+
+try:
+    person = client.people.enrich("nobody@acme-analytics.example")
+    print(person.get("name"))
+except NotFoundError:
+    print("No match. No credits were charged.")
+```
+
+```ruby Ruby
+begin
+  person = client.people.enrich("nobody@acme-analytics.example")
+  puts person["name"]
+rescue CompanyEnrich::NotFoundError
+  puts "No match. No credits were charged."
+end
+```
+
+```php PHP
+use CompanyEnrich\Exception\NotFoundException;
+
+try {
+    $person = $client->people->enrich('nobody@acme-analytics.example');
+    echo $person['name'] ?? '', PHP_EOL;
+} catch (NotFoundException) {
+    echo 'No match. No credits were charged.', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people enrich nobody@acme-analytics.example
+```
+
+</CodeGroup>
+
+## Look up a list of emails
+
+The lookup takes one address per request, so loop over your list and treat a `404` as "no match". The CLI takes several addresses in one command.
+
+<CodeGroup>
+
+```bash cURL
+for email in jane.doe@stripe.com john.smith@adyen.com; do
+  curl -X POST https://api.companyenrich.com/v2/people/enrich \
+    -H "Authorization: Bearer YOUR_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\": \"$email\"}"
+done
+```
+
+```javascript JavaScript
+import { NotFoundError } from '@companyenrich/sdk';
+
+const emails = ['jane.doe@stripe.com', 'john.smith@adyen.com'];
+
+for (const email of emails) {
+  try {
+    const person = await client.people.enrich({ email });
+    console.log(email, person.name, person.position);
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error;
+    console.log(email, 'no match');
+  }
+}
+```
+
+```python Python
+from companyenrich import NotFoundError
+
+emails = ["jane.doe@stripe.com", "john.smith@adyen.com"]
+
+for email in emails:
+    try:
+        person = client.people.enrich(email)
+        print(email, person.get("name"), person.get("position"))
+    except NotFoundError:
+        print(email, "no match")
+```
+
+```ruby Ruby
+emails = ["jane.doe@stripe.com", "john.smith@adyen.com"]
+
+emails.each do |email|
+  person = client.people.enrich(email)
+  puts "#{email} #{person['name']} #{person['position']}"
+rescue CompanyEnrich::NotFoundError
+  puts "#{email} no match"
+end
+```
+
+```php PHP
+use CompanyEnrich\Exception\NotFoundException;
+
+$emails = ['jane.doe@stripe.com', 'john.smith@adyen.com'];
+
+foreach ($emails as $email) {
+    try {
+        $person = $client->people->enrich($email);
+        echo $email, ' ', $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+    } catch (NotFoundException) {
+        echo $email, ' no match', PHP_EOL;
+    }
+}
+```
+
+```bash CLI
+companyenrich people enrich jane.doe@stripe.com john.smith@adyen.com
+```
+
+</CodeGroup>
+
+In the CLI, `-f emails.txt` reads the addresses from a file, one per line. Add `--format csv -o people.csv` to save the results.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reverse Email Lookup API" icon="at" href="/docs/reverse-email-lookup-api">
+    How the match works, expansions, pricing, and limits.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="People Search API examples" icon="magnifying-glass" href="/docs/people-search-api-examples">
+    Find people by role, employer, or description.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>

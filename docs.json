@@ -47,7 +47,61 @@
             "group": "Using the API",
             "pages": [
               "docs/credits",
-              "docs/rate-limit"
+              "docs/rate-limit",
+              "docs/bulk-jobs-and-exports"
+            ]
+          },
+          {
+            "group": "Company Enrichment API",
+            "pages": [
+              "docs/company-enrichment-api",
+              "docs/company-enrichment-api-examples"
+            ]
+          },
+          {
+            "group": "Company Search API",
+            "pages": [
+              "docs/company-search-api",
+              "docs/company-search-api-filters",
+              "docs/company-search-api-examples"
+            ]
+          },
+          {
+            "group": "Semantic Company Search API",
+            "pages": [
+              "docs/semantic-company-search-api",
+              "docs/semantic-company-search-api-filters",
+              "docs/semantic-company-search-api-examples"
+            ]
+          },
+          {
+            "group": "Similar Companies API",
+            "pages": [
+              "docs/similar-companies-api",
+              "docs/similar-companies-api-filters",
+              "docs/similar-companies-api-examples"
+            ]
+          },
+          {
+            "group": "Company Headcount API",
+            "pages": [
+              "docs/company-headcount-api",
+              "docs/company-headcount-api-examples"
+            ]
+          },
+          {
+            "group": "People Search API",
+            "pages": [
+              "docs/people-search-api",
+              "docs/people-search-api-filters",
+              "docs/people-search-api-examples"
+            ]
+          },
+          {
+            "group": "Reverse Email Lookup API",
+            "pages": [
+              "docs/reverse-email-lookup-api",
+              "docs/reverse-email-lookup-api-examples"
             ]
           },
           {

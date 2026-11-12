@@ -1,0 +1,501 @@
+---
+title: "Similar Companies API examples"
+sidebarTitle: "Examples"
+description: "Ready-to-run lookalike company searches: one seed, several seeds with filters, a minimum similarity score, excluding existing customers, free counts, and CSV exports, in cURL, four SDKs, and the CLI."
+---
+
+Each example on this page is one [Similar Companies API](/docs/similar-companies-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+## Before you start
+
+Create an API key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys). The SDK examples assume a `client` created like this, with the key in the `COMPANYENRICH_API_KEY` environment variable:
+
+<CodeGroup>
+
+```javascript JavaScript
+// npm install @companyenrich/sdk
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich();
+```
+
+```python Python
+# pip install companyenrich
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()
+```
+
+```ruby Ruby
+# gem install companyenrich
+require "companyenrich"
+
+client = CompanyEnrich::Client.new
+```
+
+```php PHP
+<?php
+// composer require companyenrich/sdk
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client();
+```
+
+```bash CLI
+npm install -g @companyenrich/cli
+companyenrich auth login
+```
+
+</CodeGroup>
+
+In the cURL examples, replace `YOUR_API_TOKEN` with your key.
+
+<Note>
+  A lookalike search costs 5 credits for every company returned. To check a query for free first, see [Count lookalikes for free](#count-lookalikes-for-free).
+</Note>
+
+## Find companies similar to one company
+
+Send one seed domain. The response lists similar companies in ranked order, with a score for each.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"]},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com'] },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com"]},
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com"] },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com']],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com --limit 25
+```
+
+</CodeGroup>
+
+Scores are not probabilities. Keep the companies in the order returned.
+
+## Use several seeds and filter by market
+
+Send up to 10 seeds to describe the kind of company you want, then narrow the lookalikes with filters. This search finds companies like Stripe and Adyen in the United States and Canada with 51 to 200 employees.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com"]},
+    "filter": {"country": ["US", "CA"], "employees": "51-200"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com', 'adyen.com'] },
+  filter: { country: ['US', 'CA'], employees: '51-200' },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com", "adyen.com"]},
+    filter={"country": ["US", "CA"], "employees": "51-200"},
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com", "adyen.com"] },
+  filter: { country: ["US", "CA"], employees: "51-200" },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com', 'adyen.com']],
+    filter: ['country' => ['US', 'CA'], 'employees' => '51-200'],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com --country US,CA --employees 51-200 --limit 25
+```
+
+</CodeGroup>
+
+Every [company search filter](/docs/company-search-api-filters) works with a lookalike search.
+
+## Require a minimum similarity
+
+Set `minScore`, from 0 to 1, to drop weaker matches.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["notion.so"], "minScore": 0.7},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['notion.so'], minScore: 0.7 },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["notion.so"], "minScore": 0.7},
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["notion.so"], minScore: 0.7 },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['notion.so'], 'minScore' => 0.7],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar notion.so --min-score 0.7 --limit 25
+```
+
+</CodeGroup>
+
+## Exclude companies you already have
+
+Use the `domain` filter with `notIn` to leave out companies you already work with.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com"]},
+    "filter": {"domain": {"notIn": ["checkout.com", "mollie.com"]}},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com', 'adyen.com'] },
+  filter: { domain: { notIn: ['checkout.com', 'mollie.com'] } },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com", "adyen.com"]},
+    filter={"domain": {"notIn": ["checkout.com", "mollie.com"]}},
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com", "adyen.com"] },
+  filter: { domain: { notIn: ["checkout.com", "mollie.com"] } },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com', 'adyen.com']],
+    filter: ['domain' => ['notIn' => ['checkout.com', 'mollie.com']]],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com --exclude-domain checkout.com,mollie.com --limit 25
+```
+
+</CodeGroup>
+
+## Count lookalikes for free
+
+The count endpoint takes the same `lookalike` and `filter` fields as a search and costs nothing.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"]},
+    "filter": {"country": "US"}
+  }'
+```
+
+```javascript JavaScript
+const { count, total } = await client.companies.count({
+  lookalike: { domains: ['stripe.com'] },
+  filter: { country: 'US' },
+});
+console.log(count, total);
+```
+
+```python Python
+result = client.companies.count(
+    lookalike={"domains": ["stripe.com"]},
+    filter={"country": "US"},
+)
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+result = client.companies.count(
+  lookalike: { domains: ["stripe.com"] },
+  filter: { country: "US" }
+)
+puts result["count"], result["total"]
+```
+
+```php PHP
+$result = $client->companies->count(
+    lookalike: ['domains' => ['stripe.com']],
+    filter: ['country' => 'US'],
+);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --similar-to stripe.com --country US
+```
+
+</CodeGroup>
+
+`count` is the number of companies your plan can access. For a lookalike query, `total` describes the pool of candidates the similarity search draws from.
+
+## Export lookalikes to CSV
+
+An export runs the lookalike search in the background and stores the results as one file. It costs the same per company as the search itself. The CSV has a `score` column next to the company columns.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the export. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/search/export \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 1000,
+    "lookalike": {"domains": ["stripe.com"]},
+    "filter": {"country": "US"}
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/search/export/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o lookalikes.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.companies.searchExport.create({
+  limit: 1000,
+  lookalike: { domains: ['stripe.com'] },
+  filter: { country: 'US' },
+});
+
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.companies.searchExport.csv(job.id);
+await writeFile('lookalikes.csv', await response.text());
+```
+
+```python Python
+job = client.companies.search_export.create(
+    1000,
+    lookalike={"domains": ["stripe.com"]},
+    filter={"country": "US"},
+)
+
+client.batches.wait_for_completion(job["id"])
+
+with open("lookalikes.csv", "w", encoding="utf-8") as file:
+    file.write(client.companies.search_export.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.companies.search_export.create(
+  1000,
+  lookalike: { domains: ["stripe.com"] },
+  filter: { country: "US" }
+)
+
+client.batches.wait_for_completion(job["id"])
+
+File.write("lookalikes.csv", client.companies.search_export.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->companies->searchExport->create(
+    1000,
+    lookalike: ['domains' => ['stripe.com']],
+    filter: ['country' => 'US'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('lookalikes.csv', $client->companies->searchExport->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company export --similar-to stripe.com --country US --limit 1000 --wait -o lookalikes.csv
+```
+
+</CodeGroup>
+
+## Find people at lookalike companies
+
+To get people instead of companies, send the same seeds in `company.lookalike` on a people search. See [Find people at companies like your customers](/docs/people-search-api-examples#find-people-at-companies-like-your-customers).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Ranking, scores, pricing, limits, and V1 mapping.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter you can add to a lookalike search.
+  </Card>
+  <Card title="Company Search API examples" icon="magnifying-glass" href="/docs/company-search-api-examples">
+    Filter and semantic searches.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

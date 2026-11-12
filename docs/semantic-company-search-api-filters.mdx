@@ -1,0 +1,124 @@
+---
+title: "Semantic Company Search API filters"
+sidebarTitle: "Filters"
+description: "How filters work with a semantic company search: what the API infers from your description, what needs a filter, how the two combine, and which filters you can add."
+---
+
+A [semantic company search](/docs/semantic-company-search-api) takes the same `filter` object as any other company search. Your description says what the companies do, and filters set the exact criteria around it. The same `filter` works in count, preview, and export requests.
+
+This page covers what is specific to semantic search. For the matching rules, accepted values, and CLI flag of each filter, see the full [Company Search API filters](/docs/company-search-api-filters) reference.
+
+## What your description already covers
+
+By default, the API reads some company attributes from your description, so you do not need a filter for them. Some of these attributes filter the results, and others only change the ranking.
+
+| Attribute            | Matching filters                                | From your description                                 |
+| -------------------- | ----------------------------------------------- | ----------------------------------------------------- |
+| Location             | `country`, `region`, `state`, `city`            | Inferred. Filters the results.                        |
+| Company size         | `employees`                                     | Inferred. Filters the results.                        |
+| Founded year         | `foundedYear`                                   | Inferred. Filters the results.                        |
+| Funding              | `fundingRounds`, `fundingAmount`, `fundingYear` | Inferred. Filters the results.                        |
+| Business model       | `categories`                                    | Inferred. Ranks matching companies higher.            |
+| Revenue              | `revenue`                                       | Inferred. Ranks matching companies higher.            |
+| A named company      | `query`, `domain`, `id`                         | Inferred. Ranks that company first.                   |
+| Technology           | `technologies`                                  | Send a filter.                                        |
+| Keywords and industry codes | `keywords`, `naicsCodes`                 | Send a filter.                                        |
+| Company type         | `type`                                          | Send a filter.                                        |
+| Headcount and growth | `workforceSize`, `workforceGrowth`, `reportedEmployees` | Send a filter.                                |
+| Required data        | `require`                                       | Send a filter.                                        |
+
+The API documents inference only for the first seven rows. For anything else, send a filter. The `interpretation` field in the response shows what was inferred from your description, so you can check before you rely on it.
+
+## When to add a filter
+
+### To turn a ranking hint into a requirement
+
+An inferred category or revenue range ranks matching companies higher but does not remove the others. Send the filter yourself to require it.
+
+```json
+{
+  "semantic": { "query": "saas companies in Turkey" },
+  "filter": { "categories": "saas" }
+}
+```
+
+Without the filter, this description returns companies in Turkey and ranks SaaS companies higher. With it, every result is categorized as SaaS.
+
+### To set criteria the description does not mention
+
+Add technology, company type, headcount, or any other filter next to the description.
+
+```json
+{
+  "semantic": { "query": "online stores selling outdoor gear" },
+  "filter": {
+    "technologies": "Shopify",
+    "type": "private",
+    "require": ["linkedin"]
+  }
+}
+```
+
+### To override what was inferred
+
+A filter you send takes precedence over an inferred value of the same kind. Here the description mentions Germany, but the results come from Austria and Switzerland, because `filter.country` is used in its place.
+
+```json
+{
+  "semantic": { "query": "logistics software companies in Germany" },
+  "filter": { "country": ["AT", "CH"] }
+}
+```
+
+### To exclude companies
+
+An exclusion you send applies together with the inferred values. This search keeps what was inferred from the description and removes agencies and two companies you already know.
+
+```json
+{
+  "semantic": { "query": "payment companies for online marketplaces" },
+  "filter": {
+    "keywords": { "notIn": ["agency"] },
+    "domain": { "notIn": ["stripe.com", "adyen.com"] }
+  }
+}
+```
+
+## Use only your own filters
+
+Set `semantic.autoFilter` to `false` to stop the API from inferring anything. The description is then used for semantic matching only, and the results are limited by the filters you send and nothing else.
+
+```json
+{
+  "semantic": { "query": "AI tools for hospitals", "autoFilter": false },
+  "filter": { "country": "US", "employees": ["51-200", "201-500"] }
+}
+```
+
+Use this when your description contains a place or a size that you do not want treated as a filter.
+
+## In the CLI
+
+Add filter flags next to `--semantic`, and pass `--no-auto-filter` to turn inference off:
+
+```bash
+companyenrich company search --semantic "online stores selling outdoor gear" --tech Shopify --type private
+companyenrich company search --semantic "AI tools for hospitals" --no-auto-filter --country US
+```
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    The full reference: every filter, matching rule, and accepted value.
+  </Card>
+  <Card title="Semantic Company Search API" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Query interpretation, ranking weight, pricing, and limits.
+  </Card>
+  <Card title="Semantic Company Search API examples" icon="code" href="/docs/semantic-company-search-api-examples">
+    Ready-to-run semantic searches.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Every accepted value for ranges, types, and categories.
+  </Card>
+</CardGroup>
