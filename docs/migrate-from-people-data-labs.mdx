@@ -1,0 +1,646 @@
+---
+title: "Migrate from People Data Labs (v5) to CompanyEnrich"
+sidebarTitle: "Overview"
+description: "Move People Data Labs v5 enrichment and search calls to the CompanyEnrich V2 API: endpoint mapping, request and response differences, a Python adapter, and a parity check on your own data."
+---
+
+{/* Tables between "generated" markers come from migrations/people-data-labs.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This guide is for engineers who call the People Data Labs (PDL) v5 API and are moving some or all of those calls to the CompanyEnrich V2 API. It maps each PDL endpoint, lists the behavior that changes in your code, and shows how to check the result on your own data before you switch traffic.
+
+<Note>
+  PDL behavior on these pages was checked against PDL's public v5 documentation on November 13, 2026. CompanyEnrich behavior comes from the [V2 API reference](/api-reference/v2/overview). The full mapping is also available as JSON at [/migrations/people-data-labs.json](https://docs.companyenrich.com/migrations/people-data-labs.json).
+</Note>
+
+<CardGroup cols={3}>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-people-data-labs-field-mapping">
+    Every PDL company and person field, with its CompanyEnrich counterpart.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-people-data-labs-search">
+    Translate Elasticsearch and SQL queries into filters.
+  </Card>
+  <Card title="With a coding agent" icon="robot" href="/docs/migrate-from-people-data-labs-agent">
+    Instructions a coding agent follows to migrate your codebase.
+  </Card>
+</CardGroup>
+
+## Check the fit first
+
+| Workload | Status | Start here |
+| --- | --- | --- |
+| Company enrichment by website | Moves directly | [Switch company enrichment](#switch-company-enrichment-in-five-minutes) |
+| Company enrichment by name or social profile | Moves, without a likelihood score | [Match confidence](#match-confidence) |
+| Bulk company enrichment by website | Moves, in batches of 50 or as a background job | [Endpoint mapping](#endpoint-mapping) |
+| Company search | Rewrite each query as a filter | [Search queries](/docs/migrate-from-people-data-labs-search) |
+| Person enrichment by work email | Moves | [Endpoint mapping](#people) |
+| Person search | Rewrite each query as a filter | [Search queries](/docs/migrate-from-people-data-labs-search#people-search-patterns) |
+| Person enrichment by LinkedIn URL, phone, email hash, or name | No equivalent | [When to keep PDL](#when-to-keep-pdl) |
+| Identify, IP enrichment, job titles, job postings, cleaners, changelog | No equivalent | [When to keep PDL](#when-to-keep-pdl) |
+
+## Switch company enrichment in five minutes
+
+This is the shortest path: one enrichment call by website, moved to the V2 API with the Python SDK.
+
+<Steps>
+  <Step title="Get an API key">
+    Create a key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys) and export it as `COMPANYENRICH_API_KEY`. Check it with [`GET /v2/me`](/api-reference/v2/get-me), which is free:
+
+    ```bash
+    curl https://api.companyenrich.com/v2/me \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+  </Step>
+  <Step title="Install the SDK">
+    ```bash
+    pip install companyenrich
+    ```
+
+    The [Python SDK](/docs/python-sdk) needs Python 3.10 or later. There are also SDKs for [JavaScript](/docs/javascript-typescript-sdk), [Ruby](/docs/ruby-sdk), and [PHP](/docs/php-sdk).
+  </Step>
+  <Step title="Replace the call">
+    <CodeGroup>
+
+    ```python Before (PDL)
+    from peopledatalabs import PDLPY
+
+    client = PDLPY(api_key="YOUR_PDL_API_KEY")
+
+    response = client.company.enrichment(website="stripe.com")
+    if response.status_code == 200:
+        company = response.json()
+        print(company["display_name"], company["size"], company["linkedin_url"])
+    ```
+
+    ```python After (CompanyEnrich)
+    from companyenrich import CompanyEnrich, NotFoundError
+
+    client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+    try:
+        company = client.companies.enrich("stripe.com")
+        socials = company.get("socials") or {}
+        print(company.get("name"), company.get("employees"), socials.get("linkedinUrl"))
+    except NotFoundError:
+        company = None  # no match, not charged
+    ```
+
+    ```bash cURL
+    curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Update the fields you read">
+    | PDL field | CompanyEnrich field | Change |
+    | --- | --- | --- |
+    | `display_name` | `name` | Renamed |
+    | `website` | `domain` | Renamed. CompanyEnrich `website` is a full URL. |
+    | `founded` | `foundedYear` | Renamed |
+    | `size` | `employees` | Different labels above 500, such as `1K-5K`. Calculated, not self-reported. |
+    | `location.country` | `location.country.name` or `location.country.code` | Name in source casing, or an ISO code |
+    | `linkedin_url` | `socials.linkedinUrl` | Full URL with `https://` |
+
+    The [field mapping](/docs/migrate-from-people-data-labs-field-mapping) covers every other field.
+  </Step>
+  <Step title="Handle no match">
+    PDLPY returns a response with status `404`. The CompanyEnrich SDK raises `NotFoundError`. Neither API charges for it.
+  </Step>
+</Steps>
+
+## What takes longer
+
+| Workload | Why | Guide |
+| --- | --- | --- |
+| Search queries | PDL accepts Elasticsearch and SQL. CompanyEnrich takes a `filter` object in which every filter must match. OR across filters and wildcards need a redesign. | [Search queries](/docs/migrate-from-people-data-labs-search) |
+| Person lookups | CompanyEnrich enriches a person by work email only. | [People](#people) |
+| Stored records | IDs do not carry over, and names, casing, and enum values change. | [Field mapping](/docs/migrate-from-people-data-labs-field-mapping) |
+| Bulk enrichment | A synchronous batch takes 50 domains. Larger lists run as a background job. | [Bulk jobs and exports](/docs/bulk-jobs-and-exports) |
+| Match controls | There is no `likelihood`, `min_likelihood`, or `required`. | [Match confidence](#match-confidence) |
+
+## Migrate with a coding agent
+
+A coding agent can do the inventory, the rewrite, and the tests. Give it this prompt in your repository:
+
+```text
+Migrate this codebase from People Data Labs to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-people-data-labs-agent.md and use the mapping at https://docs.companyenrich.com/migrations/people-data-labs.json. Show me the migration report before changing any code.
+```
+
+See [Migrate with a coding agent](/docs/migrate-from-people-data-labs-agent) for what the agent does and the rules it follows.
+
+## Endpoint mapping
+
+### Company
+
+{/* generated: people-data-labs endpoints:company */}
+
+| People Data Labs | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `/v5/company/enrich` with `website` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `website` → `domain`. Send the host only, such as `stripe.com`. PDL keeps paths for hosted sites such as `etsy.com/shop`; those have no domain to send. |
+| `/v5/company/enrich` with `name`, `profile` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `name` → `name`; `profile` → `linkedinUrl` or `twitterUrl` or `facebookUrl` or `instagramUrl` or `youtubeUrl`. Every property you send must match. When several companies match, the highest-ranked one is returned, with no likelihood score. No match returns `404` and is not charged. |
+| `/v5/company/enrich` with `ticker`, `pdl_id`, `location`, `street_address`, `locality`, `region`, `country`, `postal_code` | None | No equivalent inputs. Resolve a domain first, for example from the `website` in records you already stored. |
+| `/v5/company/enrich/bulk` | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | `requests[].params.website` → `domains[]`. Up to 50 domains per request, against 100 parameter objects in PDL. Domains only. Items come back in request order with a `status` of `found`, `not-found`, `invalid-domain`, or `pending`. |
+| `/v5/company/enrich/bulk`, more than 50 domains | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk) | Background job for up to 10,000 domains. Poll the batch, then download JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports). |
+| `/v5/company/search` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `query` → `filter`; `sql` → `filter`; `size` → `pageSize`; `scroll_token` → `cursor`. Rewrite each query as a `filter` object. See [Translate search queries](/docs/migrate-from-people-data-labs-search). |
+| `/v5/company/search`, `total` in the response | [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count) | Search responses carry no total. Send the same filter to the count endpoint, which is free. |
+
+{/* end generated */}
+
+### People
+
+{/* generated: people-data-labs endpoints:people */}
+
+| People Data Labs | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `/v5/person/enrich` with `email` | [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich) | `email` → `email`. Work emails only. The API resolves the company from the email domain, then matches the person by common address patterns. The person is the response body; PDL nests it under `data`. |
+| `/v5/person/enrich` with `profile`, `lid`, `phone`, `email_hash`, `pdl_id`, `name` | None | No equivalent. `name` here means a name with a company, school, or location. People search by `query` and `domain` returns candidates without a confidence score. |
+| `/v5/person/bulk` | None | No bulk person enrichment in V2. Call `POST /v2/people/enrich` per work email within your rate limit. |
+| `/v5/person/search` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `query` → `filter` or `company`; `sql` → `filter` or `company`; `size` → `pageSize`; `scroll_token` → `cursor`. Rewrite each query as a `filter` object, plus a `company` query for employer attributes. The `dataset` parameter has no equivalent. |
+| `/v5/person/identify` | None | No ranked identity candidates. People search returns matches without a score. |
+| Person Retrieve API | [`GET /v2/people/{personId}`](/api-reference/v2/get-people-personid) | Takes a CompanyEnrich person ID. PDL IDs do not carry over. |
+| `work_email` on a person record | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) | A separate call that returns `status`, `email`, and `certainty`. Costs 10 credits only when it finds an email your account has not accessed before. |
+
+{/* end generated */}
+
+### Supporting APIs
+
+{/* generated: people-data-labs endpoints:supporting */}
+
+| People Data Labs | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `/v5/autocomplete` | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete) | Free. For `field=title`, `industry`, `country`, or `region`, use position autocomplete, the industry list, or the geo endpoints. There is no school, major, or skill lookup. |
+| `/v5/company/clean` | None | No name or URL cleaner. Company autocomplete suggests domains for a partial name. |
+| `/v5/location/clean` | None | No address parser. The free geo endpoints find country, state, and city IDs by name. |
+| `/v5/school/clean` | None | No equivalent. |
+| `/v5/ip/enrich` | None | No IP-to-company lookup. |
+| `/v5/job_title/enrich` | None | No title classifier. Position autocomplete suggests titles. |
+| `/v5/job_posting/search` | None | No job posting data in V2. Workforce history is headcount, not postings. |
+| `/v5/person/changelog` | None | No change feed. Every record has an `updatedAt` timestamp. |
+| Sandbox APIs | None | No sandbox. Test with mocked HTTP and the free endpoints: `GET /v2/me`, counts, and lookups. |
+
+{/* end generated */}
+
+## Request and response differences
+
+### Authentication
+
+| | PDL | CompanyEnrich |
+| --- | --- | --- |
+| Header | `X-Api-Key: YOUR_PDL_API_KEY`, or the `api_key` query parameter | `Authorization: Bearer YOUR_API_TOKEN`. There is no query parameter. |
+| SDK | `PDLPY(api_key=...)` | `CompanyEnrich()` reads `COMPANYENRICH_API_KEY`, or takes the key as its first argument |
+
+### Response shape
+
+| Call | PDL | CompanyEnrich |
+| --- | --- | --- |
+| Company enrichment | Company fields at the top level, plus `status` and `likelihood` | The company record is the body. No `status` or `likelihood`. |
+| Person enrichment | The person under `data`, plus `status` and `likelihood` | The person record is the body |
+| Search | `data`, `total`, and `scroll_token` | `items` and `nextCursor`. Get totals from the free count endpoint. |
+| Bulk company enrichment | A JSON array with one response per request | `items`, each with `domain`, `status`, and `company` when `status` is `found` |
+| Errors | `status` and `error` with `type` and `message` | A problem document with `type`, `title`, `status`, and `detail`. The `x-trace-id` header identifies the request. |
+
+### Match confidence
+
+PDL scores every enrichment match with a `likelihood` from 1 to 10 and drops matches below `min_likelihood`, which defaults to 2. With `required`, a response counts as a match only when it contains the fields you list, and you are not charged otherwise.
+
+CompanyEnrich has no score:
+
+* Enrichment by domain looks up that domain.
+* Enrichment by properties requires every property you send to match. If several companies match, it returns the highest-ranked one.
+* Enrichment has no `required`. In a search, the `require` filter keeps only companies that have a given feature, such as a LinkedIn profile or a revenue range.
+
+Remove `likelihood` checks from your code. Where you relied on `min_likelihood` for name lookups, send a domain, or add a social profile such as `linkedinUrl` to the name.
+
+### Status codes
+
+| Status | PDL | CompanyEnrich |
+| --- | --- | --- |
+| `200` | A match, or a search that ran, including one with no results | A match, or a search that ran |
+| `400` | Missing or invalid parameters | Malformed request |
+| `401` | Missing or invalid key | Missing or invalid key |
+| `402` | Out of credits | Out of credits, or the plan does not include the request |
+| `403` | Not documented | The key may not perform this request |
+| `404` | No match. Not charged. | No match. Not charged. |
+| `422` | Not documented | Validation failed. `errors` lists the messages per field. |
+| `429` | Rate limit hit | Rate limit hit. Wait for the time the response gives. |
+| `5xx` | Server error | Server error |
+
+In Python, PDLPY returns a response for every status. The CompanyEnrich SDK raises a typed exception for each non-2xx status, such as `NotFoundError`, `PaymentRequiredError`, and `RateLimitError`.
+
+### Billing behavior that affects your code
+
+These differences change how you write retries, guards, and tests. Prices for each endpoint are in [Credits](/docs/credits).
+
+* **No match is free on both APIs.** Enrichment that finds nothing returns `404` and is not charged.
+* **An empty search is charged.** PDL charges per record returned, so a search with no results costs nothing. CompanyEnrich charges one result's base price, such as 1 credit for a filter search. Check a new query with the free [count endpoint](/api-reference/v2/post-companies-search-count) first.
+* **Extra company fields are expansions.** The base record excludes `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. Each one you request adds 1 credit per company returned, so request only the ones your code reads.
+* **There is no charge guard like `required`.** A returned record is charged even when a field you need is empty.
+* **Work emails are a separate call.** [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) costs 10 credits only when it finds an email your account has not accessed before.
+* **Responses report their cost.** Read `x-credit-cost` and `x-credit-remaining` from the response headers.
+
+### Pagination
+
+| | PDL | CompanyEnrich |
+| --- | --- | --- |
+| Page size | `size`, 1 to 100, default 1 | `pageSize`, 1 to 100 |
+| Next page | Send the `scroll_token` from the last response | Send the `nextCursor` from the last response as `cursor` |
+
+On CompanyEnrich, `nextCursor` is omitted on the last page, and a cursor expires 24 hours after the first page. The Python SDK pages for you with `search_all()`. A cursor or scroll token from one API does not work in the other, so restart any paging job from the first page.
+
+### Rate limits
+
+PDL limits each key per endpoint. CompanyEnrich applies a global limit of 500 requests per minute per IP address and a per-route limit from your plan, reported in `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-window`. The SDKs wait and retry on `429`. See [Rate limits](/docs/rate-limit).
+
+### Text, URLs, and dates
+
+| | PDL | CompanyEnrich |
+| --- | --- | --- |
+| Text casing | Lowercase unless you send `titlecase=true` | Source casing |
+| Social URLs | No scheme, such as `linkedin.com/company/stripe` | Full URL, such as `https://www.linkedin.com/company/stripe` |
+| Countries | Lowercase name, such as `united states` | `code` (ISO 3166-1 alpha-2) and `name` |
+| Dates | Can be partial, such as `2015-03` | Full dates, or date-times for funding data |
+
+### IDs
+
+PDL IDs and CompanyEnrich IDs are separate. Company IDs are UUIDs, and person IDs are 64-bit integers. During the migration, store the CompanyEnrich ID next to the PDL ID and re-key company data on its domain.
+
+## Keep your PDL call sites: Python adapter
+
+The adapter below runs PDLPY-style calls against CompanyEnrich, so you can test CompanyEnrich without rewriting call sites first. It covers `company.enrichment`, `company.bulk`, and `person.enrichment`. Treat it as a bridge: once your code works, move each call to the SDK and remove the adapter.
+
+```python
+from pdl_compat import PDLCompat
+
+client = PDLCompat()  # was: PDLPY(api_key="YOUR_PDL_API_KEY")
+
+response = client.company.enrichment(website="stripe.com")
+if response.ok:
+    print(response.json()["display_name"])
+```
+
+What it does:
+
+* **Returns a PDLPY-style response.** It has `.ok`, `.status_code`, `.json()`, and `.text`. `.native` holds the CompanyEnrich record unchanged.
+* **Returns only mapped fields.** Reading a PDL field that has no CompanyEnrich source, such as `likelihood` or `id`, raises `KeyError`. Read the CompanyEnrich ID from `response.native["id"]`.
+* **Rejects inputs it cannot map, before any request.** `ticker`, `pdl_id`, location inputs, `min_likelihood`, `required`, `data_include`, person `profile`, `phone`, `lid`, and `email_hash` raise `UnsupportedInput`. So does a `website` with a path, or a `website` sent together with `name` or `profile`.
+* **Ignores `pretty` and `titlecase`.** Text keeps its source casing.
+* **Picks one current job.** Person `job_*` fields come from the current experience at the email's company, the one with `isMatched` set. If no current experience matched, the adapter uses the first one.
+* **Batches bulk requests.** `company.bulk` accepts website-only requests, sends them in batches of 50, and returns one result per request in order, with your `metadata`.
+* **Adds paid fields only when you ask.** `PDLCompat(expand=["financial"])` fills `ticker` and `total_funding_raised`. `keywords` fills `tags`, `naicsCodes` fills `naics`, and `workforce` fills `employee_count`. Each expansion adds 1 credit per company.
+* **Leaves retries to the SDK**, which does not repeat a paid request after an unclear failure.
+
+<Accordion title="pdl_compat.py" icon="code">
+
+```python pdl_compat.py
+"""pdl_compat.py: run People Data Labs v5 enrichment call sites against CompanyEnrich V2.
+
+Covers company.enrichment, company.bulk, and person.enrichment. Inputs that have no
+CompanyEnrich equivalent raise UnsupportedInput before any request is sent.
+"""
+
+import json
+from urllib.parse import urlsplit
+
+from companyenrich import APIError, CompanyEnrich
+
+IGNORED = {"pretty", "titlecase"}  # formatting only; CompanyEnrich keeps source casing
+PROFILE_HOSTS = {
+    "linkedin.com": "linkedin_url",
+    "twitter.com": "twitter_url",
+    "x.com": "twitter_url",
+    "facebook.com": "facebook_url",
+    "instagram.com": "instagram_url",
+    "youtube.com": "youtube_url",
+}
+SIZES = {"501-1K": "501-1000", "1K-5K": "1001-5000", "5K-10K": "5001-10000", "over-10K": "10001+"}
+LEVELS = {"c-suite": "cxo", "owner": "owner", "partner": "partner", "vp": "vp", "director": "director",
+          "manager": "manager", "senior": "senior", "entry": "entry"}
+ERROR_TYPES = {400: "invalid_request_error", 401: "authentication_error", 402: "payment_required",
+               404: "not_found", 429: "rate_limit_error"}
+BATCH_STATUS = {"found": 200, "not-found": 404, "invalid-domain": 400, "pending": 404}
+
+
+class UnsupportedInput(ValueError):
+    """A PDL input with no CompanyEnrich equivalent. Raised before any request is sent."""
+
+
+class Response:
+    """The parts of requests.Response that PDLPY call sites read."""
+
+    def __init__(self, status_code, body, native=None):
+        self.status_code = status_code
+        self.ok = status_code < 400
+        self.native = native  # the unmodified CompanyEnrich record
+        self._body = body
+
+    def json(self):
+        return self._body
+
+    @property
+    def text(self):
+        return json.dumps(self._body)
+
+
+def _check(params, allowed):
+    unsupported = sorted(set(params) - allowed - IGNORED)
+    if unsupported:
+        raise UnsupportedInput("no CompanyEnrich equivalent for: " + ", ".join(unsupported))
+
+
+def _error(status, message):
+    return {"status": status, "error": {"type": ERROR_TYPES.get(status, "api_error"), "message": message}}
+
+
+def _bare(url):
+    """https://www.linkedin.com/company/x -> linkedin.com/company/x, the format PDL returns."""
+    if not url:
+        return url
+    parts = urlsplit(url if "//" in url else "//" + url)
+    return ((parts.hostname or "").removeprefix("www.") + parts.path).rstrip("/")
+
+
+def _domain(website):
+    parts = urlsplit(website if "//" in website else "//" + website)
+    if parts.path.strip("/") or parts.query:
+        raise UnsupportedInput(f"website must be a bare domain, got {website!r}")
+    return (parts.hostname or "").removeprefix("www.")
+
+
+def _company(c):
+    """A PDL-shaped subset. Fields without a CompanyEnrich source are left out on purpose."""
+    loc, social, fin = c.get("location") or {}, c.get("socials") or {}, c.get("financial") or {}
+    return {
+        "name": c.get("name"),
+        "display_name": c.get("name"),
+        "website": c.get("domain"),
+        "summary": c.get("description"),
+        "founded": c.get("foundedYear"),
+        "size": SIZES.get(c.get("employees"), c.get("employees")),  # calculated, not self-reported
+        "type": c.get("type"),
+        "industry": c.get("industry"),  # different taxonomy from PDL industry
+        "location": {
+            "country": (loc.get("country") or {}).get("name"),
+            "region": (loc.get("state") or {}).get("name"),
+            "locality": (loc.get("city") or {}).get("name"),
+            "street_address": loc.get("address"),
+            "postal_code": loc.get("postalCode"),
+        },
+        "linkedin_url": _bare(social.get("linkedinUrl")),
+        "linkedin_id": social.get("linkedinId"),
+        "facebook_url": _bare(social.get("facebookUrl")),
+        "twitter_url": _bare(social.get("twitterUrl")),
+        "ticker": fin.get("stockSymbol"),  # needs expand=["financial"]
+        "total_funding_raised": fin.get("totalFunding"),  # needs expand=["financial"]
+        "tags": c.get("keywords"),  # needs expand=["keywords"]
+        "naics": [{"naics_code": code} for code in c.get("naicsCodes") or []],  # needs expand=["naicsCodes"]
+        "employee_count": (c.get("workforce") or {}).get("observedEmployeeCount"),  # needs expand=["workforce"]
+    }
+
+
+def _person(p):
+    jobs = [e for e in p.get("experiences") or [] if e.get("isCurrent")]
+    job = next((e for e in jobs if e.get("isMatched")), jobs[0] if jobs else {})
+    company = job.get("company") or {}
+    level = LEVELS.get(p.get("seniority"))
+    return {
+        "full_name": p.get("name"),
+        "first_name": p.get("firstName"),
+        "last_name": p.get("lastName"),
+        "job_title": p.get("position"),
+        "job_title_levels": [level] if level else [],
+        "job_company_name": company.get("name") or job.get("companyName"),
+        "job_company_website": company.get("domain"),
+        "job_start_date": job.get("startDate"),
+        "linkedin_url": _bare((p.get("socials") or {}).get("linkedinUrl")),
+        "location_country": ((p.get("location") or {}).get("country") or {}).get("name"),
+        "location_name": (p.get("location") or {}).get("address"),
+    }
+
+
+class _Company:
+    def __init__(self, client, expand):
+        self._client, self._expand = client, expand
+
+    def enrichment(self, **params):
+        _check(params, {"website", "name", "profile"})
+        if params.get("website") and (params.get("name") or params.get("profile")):
+            raise UnsupportedInput("send website alone, or name and profile without website")
+        try:
+            if params.get("website"):
+                record = self._client.companies.enrich(_domain(params["website"]), expand=self._expand or None)
+            else:
+                properties = {"name": params.get("name")}
+                if params.get("profile"):
+                    host = (urlsplit("//" + params["profile"].split("//")[-1]).hostname or "").removeprefix("www.")
+                    if host not in PROFILE_HOSTS:
+                        raise UnsupportedInput(f"profile host {host!r} is not supported")
+                    properties[PROFILE_HOSTS[host]] = params["profile"]
+                record = self._client.companies.enrich_by_properties(**properties, expand=self._expand or None)
+        except APIError as err:
+            return Response(err.status, _error(err.status, err.detail or str(err)))
+        return Response(200, {"status": 200, **_company(record)}, native=record)
+
+    def bulk(self, requests, **params):
+        _check(params, set())
+        for item in requests:
+            _check(item.get("params", {}), {"website"})
+        domains = [_domain(item["params"]["website"]) for item in requests]
+        results = []
+        for start in range(0, len(domains), 50):
+            try:
+                batch = self._client.companies.enrich_batch(domains[start:start + 50], expand=self._expand or None)
+            except APIError as err:
+                return Response(err.status, _error(err.status, err.detail or str(err)))
+            for request, item in zip(requests[start:start + 50], batch["items"], strict=True):
+                status = BATCH_STATUS[item["status"]]
+                body = {"status": 200, **_company(item["company"])} if status == 200 else _error(status, item["status"])
+                if "metadata" in request:
+                    body["metadata"] = request["metadata"]
+                results.append(body)
+        return Response(200, results, native=None)
+
+
+class _Person:
+    def __init__(self, client):
+        self._client = client
+
+    def enrichment(self, **params):
+        _check(params, {"email"})
+        if not params.get("email"):
+            raise UnsupportedInput("CompanyEnrich enriches a person by work email only")
+        try:
+            record = self._client.people.enrich(params["email"])
+        except APIError as err:
+            return Response(err.status, _error(err.status, err.detail or str(err)))
+        return Response(200, {"status": 200, "data": _person(record)}, native=record)
+
+
+class PDLCompat:
+    """Drop-in for PDLPY(api_key=...). Pass expand=[...] to pay for extra company fields."""
+
+    def __init__(self, api_key=None, expand=(), client=None):
+        self._client = client or CompanyEnrich(api_key)  # reads COMPANYENRICH_API_KEY when None
+        self.company = _Company(self._client, list(expand))
+        self.person = _Person(self._client)
+```
+
+</Accordion>
+
+Written for `companyenrich` 1.0.1 and Python 3.10 or later.
+
+## Verify parity on your own data
+
+Before you move production traffic, measure CompanyEnrich on records you already have. This publishes nothing and makes no PDL requests.
+
+<Steps>
+  <Step title="Check your key and plan">
+    Call [`GET /v2/me`](/api-reference/v2/get-me). It is free and returns your balance and plan capabilities.
+  </Step>
+  <Step title="Size your searches for free">
+    Send each translated query to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint and compare `total` with PDL's `total`.
+  </Step>
+  <Step title="Pick a sample">
+    Take 100 to 200 company responses you already stored from PDL. Using stored responses means you spend no PDL credits. CompanyEnrich charges 1 credit per company found, plus any expansions.
+  </Step>
+  <Step title="Compare the fields you read">
+    Run the script below on the sample. It enriches the domains in batches of 50 and sorts each field into `equal`, `differ`, `only PDL`, `only CompanyEnrich`, or `both empty`. Fields marked `lossy` in the [field mapping](/docs/migrate-from-people-data-labs-field-mapping) differ by definition, so leave them out or compare them by hand.
+  </Step>
+  <Step title="Check searches and people">
+    For each translated search, run the count, then a [preview](/api-reference/v2/post-companies-search-preview) if your plan includes it, then one page. For person lookups, test work emails you already know.
+  </Step>
+</Steps>
+
+<Accordion title="compare.py" icon="code">
+
+```python compare.py
+"""compare.py: compare stored PDL company records with CompanyEnrich on the same domains.
+
+Usage: python compare.py pdl_companies.jsonl   (one stored PDL company response per line)
+Costs 1 CompanyEnrich credit per company found. Makes no PDL requests.
+"""
+
+import json
+import sys
+from collections import Counter
+
+from companyenrich import CompanyEnrich
+
+# PDL field -> how to read the comparable CompanyEnrich value
+FIELDS = {
+    "display_name": lambda c: c.get("name"),
+    "website": lambda c: c.get("domain"),
+    "founded": lambda c: c.get("foundedYear"),
+    "location.country": lambda c: ((c.get("location") or {}).get("country") or {}).get("name"),
+    "location.locality": lambda c: ((c.get("location") or {}).get("city") or {}).get("name"),
+    "linkedin_url": lambda c: (c.get("socials") or {}).get("linkedinUrl"),
+}
+
+
+def pdl_value(record, path):
+    for key in path.split("."):
+        record = (record or {}).get(key)
+    return record
+
+
+def normalize(value):
+    if isinstance(value, str):
+        value = value.lower().removeprefix("https://").removeprefix("www.").rstrip("/")
+    return value or None
+
+
+def outcome(pdl, ce):
+    if pdl is None and ce is None:
+        return "both empty"
+    if ce is None:
+        return "only PDL"
+    if pdl is None:
+        return "only CompanyEnrich"
+    return "equal" if pdl == ce else "differ"
+
+
+def main(path, client=None):
+    records = [json.loads(line) for line in open(path) if line.strip()]
+    client = client or CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+    results = Counter()
+    for start in range(0, len(records), 50):
+        chunk = records[start:start + 50]
+        batch = client.companies.enrich_batch([record["website"] for record in chunk])
+        for record, item in zip(chunk, batch["items"], strict=True):
+            if item["status"] != "found":
+                results[f"lookup: {item['status']}"] += 1
+                continue
+            for field, read in FIELDS.items():
+                results[f"{field}: {outcome(normalize(pdl_value(record, field)), normalize(read(item['company'])))}"] += 1
+    for key, count in sorted(results.items()):
+        print(f"{key:40} {count}")
+    return results
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
+```
+
+</Accordion>
+
+## Cut over
+
+* Put the CompanyEnrich path behind a feature flag and keep PDL as the fallback until the parity results meet the thresholds you set.
+* Store CompanyEnrich IDs next to PDL IDs.
+* Log `x-credit-cost` per call while both paths run.
+* Move reads first, then writes to stored records, then remove the adapter and the PDL client.
+
+## When to keep PDL
+
+Keep PDL, or another source, for these workloads:
+
+* Person enrichment by LinkedIn URL, phone, email hash, or name with a company or location, and the Identify API.
+* Personal emails and phone numbers.
+* Bulk person enrichment in one request.
+* Match controls: `likelihood`, `min_likelihood`, and `required`.
+* Queries that need OR across different fields, wildcards, `exists` on any field, or person locations below country level.
+* Corporate hierarchy, SIC codes, skills, certifications, job postings, IP enrichment, the cleaner APIs, the changelog, and flat-file data.
+
+You can run both APIs side by side and route each call by the [endpoint mapping](#endpoint-mapping).
+
+## What you can add after migrating
+
+<CardGroup cols={2}>
+  <Card title="Semantic company search" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Search companies with a plain-language description instead of a query.
+  </Card>
+  <Card title="Similar companies" icon="clone" href="/docs/similar-companies-api">
+    Find lookalikes of up to 10 seed domains.
+  </Card>
+  <Card title="Company headcount" icon="chart-line" href="/docs/company-headcount-api">
+    Headcount by department, with monthly history.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Give AI agents access to the same data.
+  </Card>
+</CardGroup>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="Can I keep using my PDL IDs?">
+    No. Store the CompanyEnrich ID alongside the PDL ID, and re-key company data on its domain.
+  </Accordion>
+  <Accordion title="Can I enrich a person by LinkedIn URL?">
+    No. CompanyEnrich enriches a person by work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich). Keep PDL for LinkedIn, phone, and hash lookups.
+  </Accordion>
+  <Accordion title="Does CompanyEnrich accept Elasticsearch or SQL queries?">
+    No. Searches take a `filter` object. See [Translate People Data Labs search queries](/docs/migrate-from-people-data-labs-search).
+  </Accordion>
+  <Accordion title="Is there a likelihood score?">
+    No. See [Match confidence](#match-confidence).
+  </Accordion>
+  <Accordion title="How do I get the total number of results?">
+    Send the same filter to the free count endpoint. Search responses do not include a total.
+  </Accordion>
+  <Accordion title="Do batch and bulk enrichment need a specific plan?">
+    No. Batch and bulk enrichment work on every plan.
+  </Accordion>
+  <Accordion title="Why is the text in a different case?">
+    PDL lowercases text unless you send `titlecase=true`. CompanyEnrich returns the source casing. Lowercase values yourself if your code compares strings.
+  </Accordion>
+</AccordionGroup>

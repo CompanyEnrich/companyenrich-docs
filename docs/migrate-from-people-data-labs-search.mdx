@@ -1,0 +1,185 @@
+---
+title: "Translate People Data Labs search queries"
+sidebarTitle: "Search queries"
+description: "Rewrite People Data Labs v5 Elasticsearch and SQL search queries as CompanyEnrich V2 filters, with a pattern table for company and people search, the queries that do not translate, and free ways to check the result."
+---
+
+{/* Tables between "generated" markers come from migrations/people-data-labs.json. Edit the JSON, then run npm run sync:migrations. */}
+
+People Data Labs (PDL) v5 search takes an Elasticsearch query or a SQL statement. CompanyEnrich V2 search takes a `filter` object. This page shows how to rewrite common PDL queries and which ones have no equivalent.
+
+There is no automatic translator. A query language allows combinations that a filter object cannot express, and a translation that silently drops part of a query would return, and charge for, the wrong records. Rewrite each query by hand and check it with the free count endpoint.
+
+## How the two search models differ
+
+| | PDL | CompanyEnrich |
+| --- | --- | --- |
+| Query | Elasticsearch (`term`, `terms`, `exists`, `bool`, `match`, `range`, `match_phrase`, `wildcard`, `prefix`, `match_all`) or SQL that translates to it | A `filter` object. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
+| Combining conditions | Any `bool` logic: `must`, `should`, `must_not` | Every filter must match. Within one filter, an array or `in` matches any value and `notIn` excludes values. |
+| Field names | PDL schema fields, such as `location.country` | Filter names, such as `country`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
+| Values | Lowercase canonical values | Exact values from [field values](/docs/field-values), ISO country codes, and IDs from the free lookup endpoints |
+| Array limit | 100 values | Depends on the filter. People search `domain` takes up to 2,500 per rule. |
+| Endpoints | [`/v5/company/search`](https://docs.peopledatalabs.com/docs/reference-company-search-api), [`/v5/person/search`](https://docs.peopledatalabs.com/docs/reference-person-search-api) | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search), [`POST /v2/people/search`](/api-reference/v2/post-people-search) |
+| Result order | By profile completeness | By CompanyEnrich ranking. The same filter can return a different first page. |
+
+## Translate a query in four steps
+
+<Steps>
+  <Step title="Split the query into conditions">
+    List each `term`, `terms`, `range`, and `exists` clause, or each condition in the SQL `WHERE`. Note any `should` or `OR`: an OR across different fields needs one search per branch.
+  </Step>
+  <Step title="Map each condition">
+    Find the pattern in the tables below. Convert values with the [value translations](/docs/migrate-from-people-data-labs-field-mapping#value-translations), and look up IDs and codes with the free [geo](/api-reference/v2/post-geo-states), [industry](/api-reference/v2/get-industries), [keyword](/api-reference/v2/get-keywords-autocomplete), and [position](/api-reference/v2/get-positions-autocomplete) endpoints.
+  </Step>
+  <Step title="Count it for free">
+    Send the filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint. Compare `total` with PDL's `total` for the original query. A large gap usually means a condition was dropped or a value was not converted.
+  </Step>
+  <Step title="Fetch one page">
+    Run the search with a small `pageSize` and check the records against what you expect. An empty search still costs one result's base price.
+  </Step>
+</Steps>
+
+For example, this PDL query:
+
+```sql
+SELECT * FROM company
+WHERE location.country = 'united states'
+  AND size IN ('51-200', '201-500')
+  AND founded >= 2015
+  AND linkedin_url IS NOT NULL
+```
+
+becomes this CompanyEnrich search:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer $COMPANYENRICH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pageSize": 25,
+    "filter": {
+      "country": "US",
+      "reportedEmployees": ["51-200", "201-500"],
+      "foundedYear": { "min": 2015 },
+      "require": "linkedin"
+    }
+  }'
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+query = {
+    "country": "US",
+    "reportedEmployees": ["51-200", "201-500"],
+    "foundedYear": {"min": 2015},
+    "require": "linkedin",
+}
+
+print(client.companies.count(filter=query)["total"])  # free
+page = client.companies.search(filter=query, page_size=25)
+for company in page["items"]:
+    print(company["domain"], company.get("employees"))
+```
+
+</CodeGroup>
+
+## Company search patterns
+
+{/* generated: people-data-labs search:company */}
+
+| People Data Labs query | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"term": {"website": "stripe.com"}}` | `{"filter": {"domain": "stripe.com"}}` | renamed |   |
+| `SELECT * FROM company WHERE website IN ('stripe.com', 'adyen.com')` | `{"filter": {"domain": ["stripe.com", "adyen.com"]}}` | renamed | An array matches any value. |
+| `{"term": {"location.country": "united states"}}` | `{"filter": {"country": "US"}}` | transformed | ISO 3166-1 alpha-2 codes. Look up codes with `POST /v2/geo/countries`. |
+| `{"term": {"location.region": "california"}}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. |
+| `{"term": {"location.locality": "austin"}}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. |
+| `{"terms": {"size": ["51-200", "201-500"]}}` | `{"filter": {"reportedEmployees": ["51-200", "201-500"]}}` | renamed | Both are self-reported. Translate labels with the company size table. |
+| `{"range": {"employee_count": {"gte": 100, "lte": 500}}}` | `{"filter": {"workforceSize": [{"min": 100, "max": 500}]}}` | renamed | Exact headcount from people data. For ranges, `employees` takes the calculated range values. |
+| `{"range": {"founded": {"gte": 2015}}}` | `{"filter": {"foundedYear": {"min": 2015}}}` | renamed | Both ends of a range are inclusive. |
+| `{"term": {"type": "private"}}` | `{"filter": {"type": "private"}}` | same |   |
+| `{"terms": {"inferred_revenue": ["$10M-$25M", "$25M-$50M"]}}` | `{"filter": {"revenue": "10m-50m"}}` | lossy | Translate with the revenue table. Some PDL ranges map to a wider range. |
+| `{"term": {"industry": "computer software"}}` | `{"filter": {"naicsCodes": ["5112"]}}` | lossy | There is no industry filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search. |
+| `{"term": {"tags": "payments"}}` | `{"filter": {"keywords": "payments"}}` | lossy | Check the keyword with `GET /v2/keywords/autocomplete`. An array of keywords requires every value; use `{"in": [...]}` to match any. |
+| `{"range": {"last_funding_date": {"gte": "2024-01-01"}}}` | `{"filter": {"fundingYear": {"min": 2024}}}` | lossy | Year of the latest funding, not a date. |
+| `{"exists": {"field": "linkedin_url"}}` | `{"filter": {"require": "linkedin"}}` | renamed | `require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`. |
+| `{"bool": {"must_not": [{"term": {"location.country": "china"}}]}}` | `{"filter": {"country": {"notIn": ["CN"]}}}` | transformed | `notIn` works on every value filter except `require`. |
+| `{"match": {"summary": "payment infrastructure for platforms"}}` | `{"semantic": {"query": "payment infrastructure for platforms"}}` | lossy | Semantic search ranks by meaning. It costs 2 credits per company instead of 1. |
+| `SELECT * FROM company WHERE name LIKE 'acme%'` | `{"filter": {"query": "acme"}}` | lossy | `query` matches names, keywords, and domain prefixes. |
+| `{"bool": {"should": [{"term": {"type": "public"}}, {"range": {"founded": {"lte": 1990}}}]}}` | None | none | OR across different filters is not expressible. Run one search per branch and deduplicate by `id`. |
+| `{"wildcard": {"website": "*.io"}}` | None | none | No wildcard or suffix matching. |
+
+{/* end generated */}
+
+## People search patterns
+
+Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size or industry, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters).
+
+{/* generated: people-data-labs search:person */}
+
+| People Data Labs query | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"term": {"job_company_website": "stripe.com"}}` | `{"filter": {"domain": "stripe.com"}}` | renamed | Matches current employers. Up to 2,500 domains per rule; PDL caps arrays at 100. |
+| `{"term": {"job_title_levels": "vp"}}` | `{"filter": {"seniority": "vp"}}` | renamed | Translate values with the seniority table. |
+| `{"term": {"job_title_role": "engineering"}}` | `{"filter": {"department": "engineering-technical"}}` | lossy | Translate values with the department table. A department includes its sub-departments. |
+| `{"match": {"job_title": "account executive"}}` | `{"filter": {"position": "account executive"}}` | lossy | Phrase matching on the current title. |
+| `{"term": {"location_country": "germany"}}` | `{"filter": {"country": "DE"}}` | transformed |   |
+| `{"term": {"location_locality": "berlin"}}` | None | none | People are filtered by country only. |
+| `{"term": {"experience.company.website": "google.com"}}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | lossy | Past employers only. People who still work there are left out; add `domain` to match current employees. |
+| `{"range": {"job_start_date": {"gte": "2026-01"}}}` | `{"filter": {"currentPositionStartDate": {"after": "2026-01-01T00:00:00Z"}}}` | transformed | Use `currentCompanyStartDate` for the date the person joined the company. |
+| `{"term": {"education.school.name": "stanford university"}}` | `{"filter": {"education": {"institutionName": "stanford"}}}` | lossy | Phrase match on the school name. Matches schools in the person's history. |
+| `{"terms": {"job_company_size": ["51-200", "201-500"]}}` | `{"company": {"filter": {"reportedEmployees": ["51-200", "201-500"]}}}` | renamed | A company query with `reportedEmployees` matches people at the 1,000 best-matching companies. `employees` has no such limit. |
+| `{"term": {"job_company_industry": "computer software"}}` | `{"company": {"filter": {"naicsCodes": ["5112"]}}}` | lossy | Pick NAICS codes from `GET /v2/industries`. |
+| `{"exists": {"field": "work_email"}}` | None | none | Emails are not on person records. Look them up per person with `GET /v2/people/{personId}/email`. |
+| `{"term": {"skills": "python"}}` | None | none | No skills data. |
+
+{/* end generated */}
+
+## Queries that do not translate
+
+* **OR across different fields.** Run one search per branch and deduplicate the results by `id`. Each search is charged separately.
+* **Wildcards, prefixes, and suffixes** on fields other than names and domains. `query` matches company names, keywords, and domain prefixes.
+* **`exists` on any field.** The `require` filter covers 13 [company features](/docs/field-values#required-features). People search has no `require`.
+* **Person locations below country level**, and any filter on emails, phones, skills, or salary.
+* **The PDL `dataset` parameter.**
+
+## Totals and pagination
+
+Search responses do not include a total. The free count endpoints return `total`, the number of matching records, and `count`, the number your plan lets you retrieve.
+
+Pages hold 1 to 100 results, set with `pageSize`. Pass the `nextCursor` of one page as `cursor` to get the next, until `nextCursor` is omitted. A cursor expires 24 hours after the first page. PDL scroll tokens do not carry over.
+
+## When a description works better than filters
+
+A PDL `match` query on `summary` or `tags` searches text. In CompanyEnrich, describe the companies in a [semantic search](/docs/semantic-company-search-api) instead:
+
+```json
+{
+  "semantic": { "query": "payment infrastructure for software platforms" },
+  "filter": { "country": "US" }
+}
+```
+
+Semantic search ranks results by meaning and reports the filters it inferred in `interpretation`. It costs 2 credits per company returned instead of 1. To find companies like ones you already know, use a [lookalike search](/docs/similar-companies-api), which costs 5 per company.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-people-data-labs">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-people-data-labs-field-mapping">
+    Every field, with value translations.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every company filter and its matching rules.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every people filter and the company query.
+  </Card>
+</CardGroup>

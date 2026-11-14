@@ -11,7 +11,7 @@ The Company Enrichment API takes something you know about a company, such as its
 | Method        | Endpoint                                                                             | Use it when                                                      | Credits                                                        |
 | ------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------- |
 | By domain     | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich)                 | You have the company's domain. This is the preferred method.     | 1 per company returned                                         |
-| By properties | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)               | You have a name or a social profile, not a domain.               | 1 per company returned, or when the properties cannot be resolved to a domain |
+| By properties | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)               | You have a name or a social profile, not a domain.               | 1 per company returned                                         |
 | Batch         | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch)   | You have up to 50 domains and want the results in one response.  | 1 per unique company found                                     |
 | Bulk          | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk)     | You have up to 10,000 domains and can run a background job.      | 1 per company found                                            |
 | By ID         | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid)         | You stored a CompanyEnrich ID from an earlier result.            | 1 per company returned                                         |
@@ -24,6 +24,10 @@ The Company Enrichment API takes something you know about a company, such as its
     Every field in the record you get back.
   </Card>
 </CardGroup>
+
+<Tip>
+  Moving from People Data Labs? See [Migrate from People Data Labs](/docs/migrate-from-people-data-labs) for the endpoint and field mapping.
+</Tip>
 
 ## Enrich your first company
 
@@ -143,7 +147,7 @@ Ask again later to get the company once it has been enriched.
 
 A lookup that finds nothing is not charged:
 
-* Enrichment by domain and by ID return `404`.
+* Enrichment by domain, by properties, and by ID return `404`.
 * A batch returns one item per domain with a `status`. Only `found` items include a `company` and cost credits.
 
 | Batch item status | Meaning                                                                                  |
@@ -152,10 +156,6 @@ A lookup that finds nothing is not charged:
 | `not-found`       | No company was found for the domain.                                                     |
 | `invalid-domain`  | The value is not a valid domain.                                                         |
 | `pending`         | The company is not stored yet. Returned when `waitForEnrichment` is `false`.             |
-
-<Warning>
-  Enrichment by properties is the exception. It costs 1 credit when a company is returned, and also when the properties you sent cannot be resolved to a company domain.
-</Warning>
 
 ## Enrich a list of companies
 
@@ -190,7 +190,7 @@ Expansions are charged only for companies that are returned. The [company schema
 ## What enrichment costs
 
 * 1 credit for each company returned, plus 1 for each expansion.
-* Nothing when no company is found, except for enrichment by properties.
+* Nothing when no company is found.
 * In a batch, several domains that resolve to the same company are charged once.
 
 For example, enriching `stripe.com` with `technologies` and `workforce` costs 1 + 2 = 3 credits. See [Credits](/docs/credits) for every price.
@@ -217,7 +217,7 @@ Yes. Send `linkedinUrl` or `linkedinId` to the same endpoint. Twitter/X, Faceboo
 
 ### Am I charged when no company is found?
 
-No, with one exception. Enrichment by properties costs 1 credit when the properties you sent cannot be resolved to a company domain.
+No. Enrichment that finds no company returns `404` and costs nothing, whether you enrich by domain, by properties, or by ID. In a batch, only `found` items are charged.
 
 ### What happens when a company is not in your dataset yet?
 

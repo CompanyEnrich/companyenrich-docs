@@ -57,6 +57,20 @@
             ]
           },
           {
+            "group": "Migration guides",
+            "pages": [
+              {
+                "group": "From People Data Labs",
+                "pages": [
+                  "docs/migrate-from-people-data-labs",
+                  "docs/migrate-from-people-data-labs-field-mapping",
+                  "docs/migrate-from-people-data-labs-search",
+                  "docs/migrate-from-people-data-labs-agent"
+                ]
+              }
+            ]
+          },
+          {
             "group": "Company Enrichment API",
             "pages": [
               "docs/company-enrichment-api",
