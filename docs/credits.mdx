@@ -14,7 +14,7 @@ The prices on this page are for the V2 API. [V1 prices](#v1-prices) differ in a 
 | Action                                 | Endpoint                                                                 | Credits                         |
 | -------------------------------------- | ------------------------------------------------------------------------ | ------------------------------- |
 | Enrich a company by domain             | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich)     | 1 per company returned          |
-| Enrich a company by properties         | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)   | 1 when a company is returned, or when the properties cannot be resolved |
+| Enrich a company by properties         | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich)   | 1 per company returned          |
 | Enrich up to 50 domains in one request | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | 1 per unique company found |
 | Get a company by ID                    | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid) | 1 per company returned      |
 | Search by filters                      | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search)   | 1 per company returned          |
@@ -70,12 +70,10 @@ Details worth knowing:
 | Work email your account has already accessed                       | None                                     |
 | Invalid cursor, or a workforce history page that does not exist    | None                                     |
 
-There are two exceptions to "no result, no charge":
+There is one exception to "no result, no charge":
 
 <Warning>
   A search that returns no results costs one result's base price: 1 credit for a filter search, 2 for a semantic search, 5 for a lookalike search, and 2 for a people search. Use the free count endpoints to check a query first.
-
-  `POST /v2/companies/enrich` costs 1 credit when a company is returned and also when the properties you sent cannot be resolved to a company domain.
 </Warning>
 
 ## Worked examples
