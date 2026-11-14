@@ -18,7 +18,7 @@ Migrate this codebase from People Data Labs to CompanyEnrich. Follow https://doc
 
 The URL ends in `.md`, which serves this page as plain Markdown for the agent to read.
 
-If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/people-data-labs.json) into the repository and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then ask it to follow them.
+If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/people-data-labs.json) and the [API specification](https://docs.companyenrich.com/openapi/v2.json) into the repository, and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then tell it where the files are and ask it to follow the instructions.
 
 ## What the agent does
 
@@ -37,7 +37,7 @@ If your agent cannot open URLs, download the [mapping file](https://docs.company
 The instructions tell the agent to:
 
 * **Stop for review.** No code changes before you approve the report.
-* **Spend nothing.** No paid CompanyEnrich requests and no PDL requests. Tests use mocked HTTP. With your key, the agent may call only the free `GET /v2/me` and count endpoints.
+* **Spend nothing.** No paid CompanyEnrich requests and no PDL requests. Tests use mocked HTTP. With your key, the agent may call only free endpoints: `GET /v2/me`, the counts, and the lookups for filter values.
 * **Keep PDL working.** The PDL path stays behind the flag until you remove it.
 * **Not guess.** Any field, input, or query without an entry in the mapping file stays on PDL with a TODO.
 * **Protect keys.** Keys come from environment variables and are never printed or committed.
@@ -71,7 +71,7 @@ If you cannot read the mapping file, stop and ask the user to add it to the repo
 
 1. Use only the mappings in the mapping file and the endpoints in the API specification. If a PDL field, input, or query has no entry, do not guess: leave the PDL code in place and add a `TODO(companyenrich-migration)` comment that names it.
 2. Do not change code until the user approves the migration report from step 2.
-3. Do not make PDL requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, and `POST /v2/people/search/count`, which are free. Any other live call needs the user's explicit approval and a credit budget.
+3. Do not make PDL requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, `POST /v2/people/search/count`, and the lookups for filter values (autocomplete, the industry list, and the `geo` endpoints), which are free. Any other live call needs the user's explicit approval and a credit budget.
 4. Read the CompanyEnrich key from the `COMPANYENRICH_API_KEY` environment variable. Never hardcode, print, log, or commit an API key.
 5. Keep the PDL integration and its configuration. Put each CompanyEnrich path behind a feature flag or configuration switch, using the project's existing convention if there is one.
 6. Request only the expansions for fields the code reads. Each expansion adds credits per record.
@@ -95,9 +95,11 @@ Find every use of PDL:
 Write `pdl-migration-report.md` at the repository root, unless the user names another place. Include:
 
 1. A table of call sites with: file and line, PDL endpoint and inputs, fields read, classification, CompanyEnrich replacement, expansions needed, and notes. Classify each call site as:
-   - **moves**: the endpoint entry has status `mapped` or `partial`, and every input and field the code reads has a mapping other than `none`.
-   - **needs redesign**: a search query with conditions that do not translate, code that depends on a `lossy` field, or logic built on `likelihood`, `min_likelihood`, or `required`.
-   - **keep PDL**: the endpoint or an input has no equivalent, or the code needs a field whose fidelity is `none`.
+   - **moves**: the endpoint entry has status `mapped` or `partial`, every input the call sends has a mapping, every field the code reads has a mapping other than `none`, and every search condition has a pattern. `lossy` and `transformed` mappings still move. List them in the notes.
+   - **needs redesign**: the call can move, but behavior the code relies on changes. For example, the code branches on `likelihood`, relies on `required`, or compares, scores, or stores values whose labels or definitions change, such as size ranges. A search query with a condition that has no pattern also needs redesign, and stays on PDL until the user decides.
+   - **keep PDL**: the endpoint or an input the call sends has no equivalent, or the code needs a field whose fidelity is `none`.
+
+   A domain lookup that passes `min_likelihood` but never reads the score still moves. CompanyEnrich looks the company up by its domain, so there is no score to set. Note the dropped parameter.
 2. Billing behavior that changes for each call: empty searches are charged one result's base price, each expansion adds credits, and work emails are a separate call.
 3. Stored data that changes, and the ID plan: add CompanyEnrich ID columns next to PDL IDs and re-key company data on its domain.
 4. Open questions, such as which current job to use when a person has several, and the feature flag name.
@@ -109,6 +111,7 @@ Stop and ask the user to approve, change, or exclude call sites.
 - Replace each call with the CompanyEnrich endpoint from `endpoints`, and map its inputs with `inputs`.
 - Convert field reads with `fields`. A row with `in: workEmail` comes from `GET /v2/people/{personId}/email`, a separate call. A row with `expand` needs that expansion in the request.
 - Convert enum values with `values`.
+- A person can have several current experiences, marked with `isCurrent`. Use the one with `isMatched` set: after an email lookup, that is the job at the email's company. If none or several qualify, follow the policy the user approved. Do not silently take the first one.
 - CompanyEnrich returns the record as the response body, with no `status`, `likelihood`, or `data` wrapper.
 - No match returns `404` and is not charged. The SDKs raise a not-found error. `402` can mean no credits or a plan without the feature, so do not retry it.
 - Remove `likelihood`, `min_likelihood`, and `required` logic. Where behavior depended on it, add a TODO and list it in the report.
@@ -118,15 +121,15 @@ Stop and ask the user to approve, change, or exclude call sites.
 
 ## Step 4: Translate searches
 
-For each PDL query, split it into conditions and map each one with the `search` patterns. If any condition has no pattern, or its pattern maps to `null`, keep the PDL query and add a TODO. An OR across different fields becomes separate searches only if the user approves, because each search is charged. Add a test that asserts the exact filter your code builds.
+For each PDL query, split it into conditions and map each one with the `search` patterns. If any condition has no pattern, or its pattern maps to `null`, keep the PDL query and add a TODO. Patterns with `STATE_ID` or `CITY_ID` need an ID from the free `geo` endpoints. Without a key, leave a TODO that names the place to look up. An OR across different fields becomes separate searches only if the user approves, because each search is charged. Add a test that asserts the exact filter your code builds.
 
 ## Step 5: Stored data
 
-Write, but do not run, migrations that add CompanyEnrich ID columns, rename fields, and convert values with `values`. Keep the original PDL values. Do not backfill records through the API without approval.
+Write, but do not run, migrations that add columns for CompanyEnrich IDs and values next to the PDL columns. Keep the original PDL values, and do not overwrite PDL columns with CompanyEnrich data. A stored PDL value converted with `values` has a CompanyEnrich label but is still PDL data. Keep it apart from values the API returns, or record where each value came from. Do not backfill records through the API without approval.
 
 ## Step 6: Tests
 
-- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Use the records under `fixtures` in the mapping file.
+- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Start from the records under `fixtures` in the mapping file, and build other responses from the response schemas in the API specification.
 - Cover a match, `404`, `402`, `429`, an empty search, and a call site that stays on PDL.
 - Run the project's test suite. Tests must not call live APIs.
 

@@ -284,6 +284,7 @@ What it does:
 * **Returns only mapped fields.** Reading a PDL field that has no CompanyEnrich source, such as `likelihood` or `id`, raises `KeyError`. Read the CompanyEnrich ID from `response.native["id"]`.
 * **Rejects inputs it cannot map, before any request.** `ticker`, `pdl_id`, location inputs, `min_likelihood`, `required`, `data_include`, person `profile`, `phone`, `lid`, and `email_hash` raise `UnsupportedInput`. So does a `website` with a path, or a `website` sent together with `name` or `profile`.
 * **Ignores `pretty` and `titlecase`.** Text keeps its source casing.
+* **Picks one current job.** Person `job_*` fields come from the current experience at the email's company, the one with `isMatched` set. If no current experience matched, the adapter uses the first one.
 * **Batches bulk requests.** `company.bulk` accepts website-only requests, sends them in batches of 50, and returns one result per request in order, with your `metadata`.
 * **Adds paid fields only when you ask.** `PDLCompat(expand=["financial"])` fills `ticker` and `total_funding_raised`. `keywords` fills `tags`, `naicsCodes` fills `naics`, and `workforce` fills `employee_count`. Each expansion adds 1 credit per company.
 * **Leaves retries to the SDK**, which does not repeat a paid request after an unclear failure.
