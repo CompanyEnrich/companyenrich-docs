@@ -1,0 +1,159 @@
+---
+title: "Migrate from People Data Labs with a coding agent"
+sidebarTitle: "With a coding agent"
+description: "Instructions a coding agent such as Claude Code, Codex, or Cursor follows to migrate a codebase from the People Data Labs v5 API to the CompanyEnrich V2 API, using the published mapping file."
+---
+
+A coding agent can find every People Data Labs (PDL) call in your codebase, rewrite the ones CompanyEnrich supports to the official SDK, and leave the rest in place with a note. This page holds the instructions it follows. The agent reads them together with the [mapping file](https://docs.companyenrich.com/migrations/people-data-labs.json), the same data behind the [field mapping](/docs/migrate-from-people-data-labs-field-mapping) and [search query](/docs/migrate-from-people-data-labs-search) tables.
+
+The instructions work in any language, not only Python, and the agent writes native SDK calls rather than a compatibility layer.
+
+## Start the migration
+
+Open your agent in the repository and give it this prompt:
+
+```text
+Migrate this codebase from People Data Labs to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-people-data-labs-agent.md and use the mapping at https://docs.companyenrich.com/migrations/people-data-labs.json. Show me the migration report before changing any code.
+```
+
+The URL ends in `.md`, which serves this page as plain Markdown for the agent to read.
+
+If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/people-data-labs.json) into the repository and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then ask it to follow them.
+
+## What the agent does
+
+| Step | The agent | You |
+| --- | --- | --- |
+| 1. Inventory | Finds PDL clients, HTTP calls, keys, field reads, stored PDL data, and tests | Nothing |
+| 2. Report | Writes `pdl-migration-report.md`, classifying each call site as moves, needs redesign, or keep PDL. Then it stops. | Approve, change, or exclude call sites |
+| 3. Rewrite | Replaces approved calls with SDK calls behind a feature flag | Name the flag, if you have a convention |
+| 4. Searches | Translates queries whose conditions all map, and leaves the rest with a TODO | Decide on queries that need a redesign |
+| 5. Stored data | Writes migration files for new ID columns and converted values, without running them | Review and run them |
+| 6. Tests | Adds tests with mocked HTTP and runs your suite | Review the diff |
+| 7. Final report | Lists what moved, what stays on PDL, open TODOs, and the expansions each call requests | Run the [parity check](/docs/migrate-from-people-data-labs#verify-parity-on-your-own-data) |
+
+## Guardrails
+
+The instructions tell the agent to:
+
+* **Stop for review.** No code changes before you approve the report.
+* **Spend nothing.** No paid CompanyEnrich requests and no PDL requests. Tests use mocked HTTP. With your key, the agent may call only the free `GET /v2/me` and count endpoints.
+* **Keep PDL working.** The PDL path stays behind the flag until you remove it.
+* **Not guess.** Any field, input, or query without an entry in the mapping file stays on PDL with a TODO.
+* **Protect keys.** Keys come from environment variables and are never printed or committed.
+
+Review the diff as you would any other change. Pay most attention to the `lossy` fields your code depends on and to the queries the agent marked for redesign.
+
+## Instructions
+
+Copy this block if you want to keep the instructions in your repository.
+
+````markdown
+# Migrate from People Data Labs v5 to CompanyEnrich V2
+
+You are migrating this codebase from the People Data Labs (PDL) v5 API to the CompanyEnrich V2 API.
+
+## Sources
+
+Read the mapping file first. It is authoritative for endpoints, inputs, fields, values, and search patterns.
+
+- Mapping: https://docs.companyenrich.com/migrations/people-data-labs.json
+- Guide: https://docs.companyenrich.com/docs/migrate-from-people-data-labs.md
+- Field mapping: https://docs.companyenrich.com/docs/migrate-from-people-data-labs-field-mapping.md
+- Search translation: https://docs.companyenrich.com/docs/migrate-from-people-data-labs-search.md
+- Credits: https://docs.companyenrich.com/docs/credits.md
+- API specification: https://docs.companyenrich.com/openapi/v2.json
+- SDKs: https://docs.companyenrich.com/docs/python-sdk.md, https://docs.companyenrich.com/docs/javascript-typescript-sdk.md, https://docs.companyenrich.com/docs/ruby-sdk.md, https://docs.companyenrich.com/docs/php-sdk.md
+
+If you cannot read the mapping file, stop and ask the user to add it to the repository.
+
+## Rules
+
+1. Use only the mappings in the mapping file and the endpoints in the API specification. If a PDL field, input, or query has no entry, do not guess: leave the PDL code in place and add a `TODO(companyenrich-migration)` comment that names it.
+2. Do not change code until the user approves the migration report from step 2.
+3. Do not make PDL requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, and `POST /v2/people/search/count`, which are free. Any other live call needs the user's explicit approval and a credit budget.
+4. Read the CompanyEnrich key from the `COMPANYENRICH_API_KEY` environment variable. Never hardcode, print, log, or commit an API key.
+5. Keep the PDL integration and its configuration. Put each CompanyEnrich path behind a feature flag or configuration switch, using the project's existing convention if there is one.
+6. Request only the expansions for fields the code reads. Each expansion adds credits per record.
+7. Translate a search query only when every condition has a pattern. Never drop a condition, and never replace filters with a semantic query.
+8. Use the official CompanyEnrich SDK for the repository's language. Use HTTP only when no SDK exists for it.
+9. Do not run database migrations or backfills. Write migration files for the user to review.
+
+## Step 1: Inventory
+
+Find every use of PDL:
+
+- SDK clients: Python `peopledatalabs` (`PDLPY`), JavaScript `peopledatalabs` (`PDLJS`), and PDL clients in other languages.
+- HTTP requests to `api.peopledatalabs.com/v5`.
+- Configuration: PDL API keys, environment variables, and settings.
+- Reads of PDL response fields: every `pdl` name in the mapping file's `fields`, plus `status`, `likelihood`, `data`, `total`, and `scroll_token`.
+- Stored PDL data: models, columns, and serializers with PDL field names, PDL IDs, or PDL enum values such as sizes, revenue ranges, and job levels.
+- Tests, fixtures, and mocks for PDL.
+
+## Step 2: Write the migration report, then stop
+
+Write `pdl-migration-report.md` at the repository root, unless the user names another place. Include:
+
+1. A table of call sites with: file and line, PDL endpoint and inputs, fields read, classification, CompanyEnrich replacement, expansions needed, and notes. Classify each call site as:
+   - **moves**: the endpoint entry has status `mapped` or `partial`, and every input and field the code reads has a mapping other than `none`.
+   - **needs redesign**: a search query with conditions that do not translate, code that depends on a `lossy` field, or logic built on `likelihood`, `min_likelihood`, or `required`.
+   - **keep PDL**: the endpoint or an input has no equivalent, or the code needs a field whose fidelity is `none`.
+2. Billing behavior that changes for each call: empty searches are charged one result's base price, each expansion adds credits, and work emails are a separate call.
+3. Stored data that changes, and the ID plan: add CompanyEnrich ID columns next to PDL IDs and re-key company data on its domain.
+4. Open questions, such as which current job to use when a person has several, and the feature flag name.
+
+Stop and ask the user to approve, change, or exclude call sites.
+
+## Step 3: Rewrite approved call sites
+
+- Replace each call with the CompanyEnrich endpoint from `endpoints`, and map its inputs with `inputs`.
+- Convert field reads with `fields`. A row with `in: workEmail` comes from `GET /v2/people/{personId}/email`, a separate call. A row with `expand` needs that expansion in the request.
+- Convert enum values with `values`.
+- CompanyEnrich returns the record as the response body, with no `status`, `likelihood`, or `data` wrapper.
+- No match returns `404` and is not charged. The SDKs raise a not-found error. `402` can mean no credits or a plan without the feature, so do not retry it.
+- Remove `likelihood`, `min_likelihood`, and `required` logic. Where behavior depended on it, add a TODO and list it in the report.
+- Enrich lists of domains with `POST /v2/companies/enrich/batch`, 50 per request, or a bulk job for up to 10,000.
+- Page searches with `pageSize` (1 to 100) and `cursor`, taken from `nextCursor`.
+- CompanyEnrich returns text in source casing and social URLs with `https://`. Normalize explicitly where the code compares strings.
+
+## Step 4: Translate searches
+
+For each PDL query, split it into conditions and map each one with the `search` patterns. If any condition has no pattern, or its pattern maps to `null`, keep the PDL query and add a TODO. An OR across different fields becomes separate searches only if the user approves, because each search is charged. Add a test that asserts the exact filter your code builds.
+
+## Step 5: Stored data
+
+Write, but do not run, migrations that add CompanyEnrich ID columns, rename fields, and convert values with `values`. Keep the original PDL values. Do not backfill records through the API without approval.
+
+## Step 6: Tests
+
+- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Use the records under `fixtures` in the mapping file.
+- Cover a match, `404`, `402`, `429`, an empty search, and a call site that stays on PDL.
+- Run the project's test suite. Tests must not call live APIs.
+
+## Step 7: Final report
+
+Update `pdl-migration-report.md` with the files changed, the call sites that moved, the ones that stay on PDL and why, the remaining TODOs, the expansions each call requests, how to switch the feature flag, and a link to the parity check: https://docs.companyenrich.com/docs/migrate-from-people-data-labs.md#verify-parity-on-your-own-data
+````
+
+## Limitations
+
+* The mapping covers PDL v5 as documented on November 13, 2026. Check the `checkedAt` date in the mapping file.
+* The agent cannot decide whether a `lossy` field is good enough for your product. The report lists those fields for you.
+* Search translations change results by design, because the two APIs rank and match differently. Compare totals with the free count endpoints before you switch.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-people-data-labs">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-people-data-labs-field-mapping">
+    The human-readable version of the mapping file.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-people-data-labs-search">
+    How PDL queries become filters.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Give agents live access to CompanyEnrich data.
+  </Card>
+</CardGroup>
