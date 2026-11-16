@@ -53,7 +53,7 @@ for (const { version, file, text, spec } of inputs) {
       const page = `${directory}/${slug}`;
       if (pages.has(page)) throw new Error(`Duplicate endpoint page: ${page}`);
       pages.set(page, `---\ntitle: ${JSON.stringify(operation.summary || `${method.toUpperCase()} ${path}`)}\nopenapi: ${JSON.stringify(`/${file} ${method.toUpperCase()} ${path}`)}\n---\n\n${generatedMarker}\n`);
-      const tag = (operation.tags?.[0] ?? 'Endpoints').replace(' / ', ' · ');
+      const tag = operation.tags?.[0] ?? 'Endpoints';
       if (!groups.has(tag)) groups.set(tag, []);
       groups.get(tag).push(page);
       const sources = [`/reference/${oldSlug}`];
@@ -71,9 +71,15 @@ for (const { version, file, text, spec } of inputs) {
   }
   const tab = config.navigation.tabs.find((entry) => entry.tab === `API ${version.toUpperCase()}`);
   if (!tab) throw new Error(`Missing API ${version.toUpperCase()} tab in docs.json`);
+  // Groups follow the specification's top-level tag list. A tag missing from that list goes
+  // after the listed ones, in the order its first endpoint appears.
+  const tagOrder = (spec.tags ?? []).map((entry) => entry.name);
+  const rank = (tag) => (tagOrder.includes(tag) ? tagOrder.indexOf(tag) : tagOrder.length);
   const navigation = [
     { group: 'Overview', pages: [`${directory}/overview`] },
-    ...Array.from(groups, ([group, pages]) => ({ group, pages })),
+    ...Array.from(groups)
+      .sort(([a], [b]) => rank(a) - rank(b))
+      .map(([tag, pages]) => ({ group: tag.replace(' / ', ' · '), pages })),
   ];
   if (check) {
     if (JSON.stringify(tab.groups) !== JSON.stringify(navigation)) {
