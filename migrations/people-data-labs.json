@@ -3,6 +3,7 @@
   "version": 1,
   "checkedAt": "2026-11-13",
   "vendor": {
+    "key": "pdl",
     "name": "People Data Labs",
     "slug": "people-data-labs",
     "api": "v5",
