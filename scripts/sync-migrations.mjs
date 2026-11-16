@@ -81,6 +81,7 @@ const roots = {
   company: responseSchema('get', '/v2/companies/enrich'),
   person: responseSchema('get', '/v2/people/{personId}'),
   workEmail: responseSchema('get', '/v2/people/{personId}/email'),
+  account: responseSchema('get', '/v2/me'),
 };
 const searchRequests = {
   company: requestSchema('post', '/v2/companies/search'),
@@ -251,7 +252,9 @@ const renderers = {
       else if (input) from += `, ${text(input)}`;
       const inputs = Object.entries(endpoint.inputs ?? {})
         .map(([from, to]) => `${code(from)} → ${codes(to, ' or ')}`);
-      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', text(endpoint.note ?? '')].filter(Boolean).join(' ');
+      const drops = Object.entries(endpoint.drop ?? {}).map(([from, why]) => `Drop ${code(from)}: ${text(why)}`);
+      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', ...drops, text(endpoint.note ?? '')]
+        .filter(Boolean).join(' ');
       return [from, endpoint.companyEnrich ? reference(endpoint.companyEnrich) : 'None', notes || ' '];
     }),
   ),

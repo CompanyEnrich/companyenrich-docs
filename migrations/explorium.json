@@ -69,7 +69,7 @@
       "explorium": ["POST /v2/businesses/firmographics/enrich", "POST /v1/businesses/firmographics/enrich"],
       "companyEnrich": "GET /v2/companies/enrich",
       "status": "mapped",
-      "inputs": { "business_ids": ["domain"], "businesses_to_match": ["domain"] },
+      "inputs": { "business_id": ["domain"], "business_ids": ["domain"], "businesses_to_match": ["domain"] },
       "note": "Firmographics are the base company record. One request per domain."
     },
     {
@@ -77,7 +77,7 @@
       "explorium": ["POST /v2/businesses/firmographics/job", "POST /v1/businesses/firmographics/bulk_enrich"],
       "companyEnrich": "POST /v2/companies/enrich/batch",
       "status": "partial",
-      "inputs": { "business_ids": ["domains[]"] },
+      "inputs": { "business_ids": ["domains[]"], "businesses_to_match": ["domains[]"] },
       "note": "Up to 50 domains per request, returned in request order with a `status` of `found`, `not-found`, `invalid-domain`, or `pending`. For up to 10,000 domains in the background, use `POST /v2/companies/enrich/bulk`."
     },
     {
@@ -85,6 +85,7 @@
       "explorium": ["POST /v2/businesses/technographics/enrich", "POST /v2/businesses/webstack/enrich", "POST /v1/businesses/technographics/enrich", "POST /v1/businesses/webstack/enrich"],
       "companyEnrich": "GET /v2/companies/enrich",
       "status": "partial",
+      "inputs": { "business_id": ["domain"], "business_ids": ["domain"], "businesses_to_match": ["domain"] },
       "note": "Request `expand=technologies`. It returns a flat list of technologies, with no categories and no website spend or traffic fields."
     },
     {
@@ -92,6 +93,7 @@
       "explorium": ["POST /v2/businesses/workforce_trends/enrich", "POST /v1/businesses/workforce_trends/enrich"],
       "companyEnrich": "GET /v2/companies/workforce",
       "status": "partial",
+      "inputs": { "business_id": ["domain"], "business_ids": ["domain"], "businesses_to_match": ["domain"] },
       "note": "Returns headcount by department and its history, as counts instead of percentages. To get the current breakdown with the company record, request `expand=workforce` on enrichment."
     },
     {
@@ -99,6 +101,7 @@
       "explorium": ["POST /v2/businesses/funding_and_acquisition/enrich", "POST /v1/businesses/funding_and_acquisition/enrich"],
       "companyEnrich": "GET /v2/companies/enrich",
       "status": "partial",
+      "inputs": { "business_id": ["domain"], "business_ids": ["domain"], "businesses_to_match": ["domain"] },
       "note": "Request `expand=financial` for funding rounds, total funding, and the stock symbol. Acquisitions, advisors, and IPO details have no equivalent."
     },
     {
@@ -106,7 +109,7 @@
       "explorium": ["POST /v2/businesses/lookalikes/enrich", "POST /v1/businesses/lookalikes/enrich"],
       "companyEnrich": "POST /v2/companies/search",
       "status": "partial",
-      "inputs": { "business_ids": ["lookalike.domains"] },
+      "inputs": { "business_id": ["lookalike.domains"], "business_ids": ["lookalike.domains"], "businesses_to_match": ["lookalike.domains"] },
       "note": "Send a `lookalike` query with 1 to 10 seed domains, plus optional filters. Results are company records ranked by similarity, without a `similarity_score`."
     },
     {
@@ -115,7 +118,8 @@
       "companyEnrich": "POST /v2/companies/search",
       "status": "partial",
       "inputs": { "filters": ["filter"], "page_size": ["pageSize"], "next_cursor": ["cursor"] },
-      "note": "Rewrite each filter. See [Translate search filters](/docs/migrate-from-explorium-search). Results are full company records, so no enrichment call is needed afterwards for firmographic fields."
+      "drop": { "mode": "results are always full records." },
+      "note": "Rewrite each filter. See [Translate search filters](/docs/migrate-from-explorium-search). Results are full company records, so no enrichment call is needed afterwards for firmographic fields. Numbered `page` requests have no equivalent; page with the cursor."
     },
     {
       "group": "company",
@@ -233,7 +237,8 @@
       "companyEnrich": "POST /v2/people/search",
       "status": "partial",
       "inputs": { "filters": ["filter", "company"], "page_size": ["pageSize"], "next_cursor": ["cursor"] },
-      "note": "Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-explorium-search)."
+      "drop": { "mode": "results are always full records." },
+      "note": "Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-explorium-search). Numbered `page` requests have no equivalent; page with the cursor."
     },
     {
       "group": "people",
@@ -247,7 +252,7 @@
       "explorium": ["POST /v2/prospects/profiles/enrich", "POST /v1/prospects/profiles/enrich"],
       "companyEnrich": "GET /v2/people/{personId}",
       "status": "partial",
-      "inputs": { "prospect_ids": ["personId"] },
+      "inputs": { "prospect_id": ["personId"], "prospect_ids": ["personId"] },
       "note": "Takes a CompanyEnrich person ID from search or email enrichment. Explorium prospect IDs do not carry over."
     },
     {
@@ -255,7 +260,7 @@
       "explorium": ["POST /v2/prospects/contact_information/enrich", "POST /v1/prospects/contacts_information/enrich"],
       "companyEnrich": "GET /v2/people/{personId}/email",
       "status": "partial",
-      "inputs": { "prospect_ids": ["personId"] },
+      "inputs": { "prospect_id": ["personId"], "prospect_ids": ["personId"] },
       "note": "Work email only, with a `status` and `certainty`. No phone numbers, personal emails, or hashed emails. Costs 10 credits only when it finds an email your account has not accessed before."
     },
     {
@@ -291,7 +296,7 @@
       "explorium": ["GET /v2/credits", "GET /v1/credits"],
       "companyEnrich": "GET /v2/me",
       "status": "partial",
-      "note": "Free. Returns your credit balance and plan capabilities. Each response also carries `x-credit-cost` and `x-credit-remaining` headers."
+      "note": "Free. Returns your credit totals and plan capabilities. See [Account fields](/docs/migrate-from-explorium-field-mapping#account-fields). Each paid response also carries `x-credit-cost` and `x-credit-remaining` headers."
     },
     {
       "group": "supporting",
@@ -310,7 +315,7 @@
   ],
   "mcp": [
     { "explorium": "match-business", "ce": ["enrich_company", "enrich_company_by_properties"], "note": "Returns the full record in one step, by domain or by name or social profile." },
-    { "explorium": "enrich-business", "ce": ["enrich_company", "get_company_workforce"], "note": "Firmographics come back with the company. Use `get_company_workforce` for headcount by department." },
+    { "explorium": "enrich-business", "ce": ["enrich_company", "get_company_workforce"], "note": "The company record includes technologies, keywords, and funding. For headcount by department, set `includeWorkforce` or use `get_company_workforce`." },
     { "explorium": "fetch-businesses", "ce": ["search_companies"], "note": "Takes filters or a plain-language description." },
     { "explorium": "fetch-businesses-statistics", "ce": null, "note": "No statistics tool. Your agent can call the free count endpoint through the API." },
     { "explorium": "fetch-businesses-events", "ce": null, "note": "No events." },
@@ -386,6 +391,11 @@
       { "group": "Contact", "explorium": "professional_email_status", "ce": "certainty", "in": "workEmail", "fidelity": "lossy" },
       { "group": "Contact", "explorium": ["phone_numbers", "mobile_phone"], "ce": null, "fidelity": "none" },
       { "group": "Contact", "explorium": ["emails", "hashed_personal_emails", "hashed_professional_emails", "professional_email_hashed"], "ce": null, "fidelity": "none" }
+    ],
+    "account": [
+      { "group": "Credits", "explorium": "remaining_credits", "ce": "credits.total", "fidelity": "transformed", "note": "Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional." },
+      { "group": "Credits", "explorium": "allocated_credits", "ce": "credits.total", "fidelity": "renamed", "note": "The total allowance. It can be fractional." },
+      { "group": "Credits", "explorium": "account_type", "ce": "capabilities", "fidelity": "lossy", "note": "The features and limits of your plan, such as `previews` and `companySearchLimit`." }
     ]
   },
   "ceOnly": {
@@ -506,8 +516,8 @@
       { "explorium": { "company_size": { "values": ["51-200", "201-500"] } }, "ce": { "filter": { "employees": ["51-200", "201-500"] } }, "fidelity": "lossy", "note": "Calculated ranges. Use `reportedEmployees` for the range on the company's LinkedIn page." },
       { "explorium": { "company_revenue": { "values": ["10M-25M", "25M-75M"] } }, "ce": { "filter": { "revenue": ["10m-50m", "50m-100m"] } }, "fidelity": "lossy", "note": "See the revenue values table." },
       { "explorium": { "company_age": { "values": ["0-3"] } }, "ce": { "filter": { "foundedYear": { "min": 2023 } } }, "fidelity": "transformed", "note": "Convert ages to founding years from the current year. `0-3` in 2026 is a minimum of 2023." },
-      { "explorium": { "naics_category": { "values": ["5112"] } }, "ce": { "filter": { "naicsCodes": ["5112"] } }, "fidelity": "renamed", "note": "Codes have 2 to 6 digits." },
-      { "explorium": { "linkedin_category": { "values": ["software development"] } }, "ce": { "filter": { "naicsCodes": ["5132"] } }, "fidelity": "lossy", "note": "No LinkedIn industry filter. Pick NAICS codes, or describe the industry in a semantic query." },
+      { "explorium": { "naics_category": { "values": ["5112"] } }, "ce": { "filter": { "naicsCodes": ["5112"] } }, "fidelity": "renamed", "note": "Codes have 2 to 6 digits. Some codes changed between NAICS editions, such as software publishers, so check yours against `GET /v2/industries`." },
+      { "explorium": { "linkedin_category": { "values": ["software development"] } }, "ce": { "filter": { "naicsCodes": ["5112"] } }, "fidelity": "lossy", "note": "No LinkedIn industry filter. Pick NAICS codes from `GET /v2/industries`, or describe the industry in a semantic query." },
       { "explorium": { "google_category": { "values": ["coffee shop"] } }, "ce": { "semantic": { "query": "coffee shops" } }, "fidelity": "lossy", "note": "No Google category filter. A semantic search finds companies from a description." },
       { "explorium": { "company_tech_stack_tech": { "values": ["Salesforce"] } }, "ce": { "filter": { "technologies": ["salesforce"] } }, "fidelity": "lossy", "note": "Look up names with `GET /v2/technologies/autocomplete`." },
       { "explorium": { "website_keywords": { "values": ["payments"] } }, "ce": { "filter": { "keywords": "payments" } }, "fidelity": "lossy", "note": "Keywords that describe the company, not text on its website." },
@@ -551,7 +561,7 @@
         "region_name": "california",
         "city_name": "san francisco",
         "zip_code": "94105",
-        "naics": "513210",
+        "naics": "511210",
         "naics_description": "software publishers",
         "number_of_employees_range": "201-500",
         "yearly_revenue_range": "10M-25M",

@@ -177,6 +177,22 @@ Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-refe
 
 {/* end generated */}
 
+## Account fields
+
+These come from [`GET /v2/me`](/api-reference/v2/get-me), which replaces Explorium's credits endpoint and is free.
+
+{/* generated: explorium fields:account */}
+
+### Credits
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `remaining_credits` | `credits.total` |   | transformed | Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional. |
+| `allocated_credits` | `credits.total` |   | renamed | The total allowance. It can be fractional. |
+| `account_type` | `capabilities` |   | lossy | The features and limits of your plan, such as `previews` and `companySearchLimit`. |
+
+{/* end generated */}
+
 ## Value translations
 
 These tables translate fixed values. Values not listed have no counterpart. Use them to convert stored values and search filters, and keep the original Explorium value when you store converted data.

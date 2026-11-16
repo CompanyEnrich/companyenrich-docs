@@ -109,8 +109,8 @@ The revenue range is wider than Explorium's `10M-25M`, so the search can return 
 | `{"company_size": {"values": ["51-200", "201-500"]}}` | `{"filter": {"employees": ["51-200", "201-500"]}}` | lossy | Calculated ranges. Use `reportedEmployees` for the range on the company's LinkedIn page. |
 | `{"company_revenue": {"values": ["10M-25M", "25M-75M"]}}` | `{"filter": {"revenue": ["10m-50m", "50m-100m"]}}` | lossy | See the revenue values table. |
 | `{"company_age": {"values": ["0-3"]}}` | `{"filter": {"foundedYear": {"min": 2023}}}` | transformed | Convert ages to founding years from the current year. `0-3` in 2026 is a minimum of 2023. |
-| `{"naics_category": {"values": ["5112"]}}` | `{"filter": {"naicsCodes": ["5112"]}}` | renamed | Codes have 2 to 6 digits. |
-| `{"linkedin_category": {"values": ["software development"]}}` | `{"filter": {"naicsCodes": ["5132"]}}` | lossy | No LinkedIn industry filter. Pick NAICS codes, or describe the industry in a semantic query. |
+| `{"naics_category": {"values": ["5112"]}}` | `{"filter": {"naicsCodes": ["5112"]}}` | renamed | Codes have 2 to 6 digits. Some codes changed between NAICS editions, such as software publishers, so check yours against `GET /v2/industries`. |
+| `{"linkedin_category": {"values": ["software development"]}}` | `{"filter": {"naicsCodes": ["5112"]}}` | lossy | No LinkedIn industry filter. Pick NAICS codes from `GET /v2/industries`, or describe the industry in a semantic query. |
 | `{"google_category": {"values": ["coffee shop"]}}` | `{"semantic": {"query": "coffee shops"}}` | lossy | No Google category filter. A semantic search finds companies from a description. |
 | `{"company_tech_stack_tech": {"values": ["Salesforce"]}}` | `{"filter": {"technologies": ["salesforce"]}}` | lossy | Look up names with `GET /v2/technologies/autocomplete`. |
 | `{"website_keywords": {"values": ["payments"]}}` | `{"filter": {"keywords": "payments"}}` | lossy | Keywords that describe the company, not text on its website. |
