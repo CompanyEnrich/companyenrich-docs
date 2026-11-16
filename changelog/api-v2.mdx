@@ -1,0 +1,41 @@
+---
+title: "API V2"
+description: "API V2, released November 16, 2026."
+---
+
+**November 16, 2026**
+
+API V2 is live at `https://api.companyenrich.com/v2`. It covers company and people enrichment, search, bulk jobs, and exports, with the same conventions on every endpoint. V1 keeps working.
+
+## What's new
+
+* **One company search.** Filters, semantic search, and lookalikes now share [`POST /v2/companies/search`](/api-reference/v2/post-companies-search). Send `filter`, plus a `semantic` query or `lookalike` seed domains if you want them.
+* **Cursor pagination.** Searches return `nextCursor`. Send it back as `cursor` to get the next page. There are no separate scroll endpoints, and a cursor lasts 24 hours.
+* **Pay for the fields you use.** The base company record costs 1 credit. Ask for technologies, keywords, NAICS codes, funding, or workforce data with `expand`. Each one adds 1 credit per company returned.
+* **Cheaper headcount data.** [Workforce data](/api-reference/v2/get-companies-workforce) costs 1 credit per 12 months of history, down from 5 credits per call in V1.
+* **People by ID.** Enrich a person from a work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich), get them again with [`GET /v2/people/{personId}`](/api-reference/v2/get-people-personid), and find their work email with [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email). Education is an expansion on the person record.
+* **Employer filters in people search.** Add a `company` query to [people search](/api-reference/v2/post-people-search) to filter people by their employer's size, industry, location, or any other company filter. People search also takes a plain-language `semantic` query.
+* **One place for async work.** Bulk enrichment and company and people search exports all run as [batches](/api-reference/v2/get-batches). List them, check progress, cancel what's left, and download results as JSON, NDJSON, or CSV.
+
+## SDKs and CLI
+
+The official SDKs for [Python](/docs/python-sdk), [JavaScript and TypeScript](/docs/javascript-typescript-sdk), [Ruby](/docs/ruby-sdk), and [PHP](/docs/php-sdk) cover every V2 endpoint. So does the [CLI](/docs/cli), which also estimates the credit cost before a call.
+
+The full specification is at [/openapi/v2.json](/openapi/v2.json), and the [API V2 reference](/api-reference/v2/overview) has every endpoint with a playground.
+
+## Moving from V1
+
+V1 keeps working, and its reference stays in the [API V1 tab](/api-reference/v1/overview). Saved company lists, list-based exports, and filtering by saved-list IDs are V1 only.
+
+| V1 | V2 |
+| --- | --- |
+| `/companies/search`, `/companies/similar`, and their scroll endpoints | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) with `filter`, `semantic`, or `lookalike`, and a cursor |
+| Technologies, keywords, funding, and NAICS codes in every company record | Request them with `expand` |
+| `GET /companies/workforce`, 5 credits per call | [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce), 1 credit per page, or the `workforce` expansion |
+| `GET /companies` | [`GET /v2/companies/{companyId}`](/api-reference/v2/get-companies-companyid) |
+| `POST /people/lookup` | [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich) |
+| `GET /people/email` | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |
+| `GET /people/education` | The `education` expansion |
+| Separate job endpoints for bulk enrichment and async searches | [Batches](/api-reference/v2/get-batches), plus one results endpoint per workflow |
+
+Paths start with `/v2`, and authentication is the same `Authorization: Bearer` header. Check the [credits page](/docs/credits) for the price of each V2 endpoint before you switch.
