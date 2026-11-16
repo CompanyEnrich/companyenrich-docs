@@ -1,0 +1,197 @@
+---
+title: "Translate Explorium search filters"
+sidebarTitle: "Search filters"
+description: "Rewrite Explorium AgentSource fetch filters for businesses and prospects as CompanyEnrich V2 search filters, with a pattern table, the filters that do not translate, and free ways to check the result."
+---
+
+{/* Tables between "generated" markers come from migrations/explorium.json. Edit the JSON, then run npm run sync:migrations. */}
+
+Explorium fetches businesses and prospects with a `filters` object. CompanyEnrich V2 search also takes a `filter` object, so most conditions translate one to one. The names, value formats, and a few filters differ. This page shows each pattern and the filters that have no equivalent.
+
+A translation that silently drops a condition returns, and charges for, the wrong records. Translate each filter, and check the result with the free count endpoint.
+
+## How the two search models differ
+
+| | Explorium | CompanyEnrich |
+| --- | --- | --- |
+| Request | `filters`, where each filter has `values` or `value`, plus `negate` to exclude | `filter`, where each filter takes a value, an array, or `in` and `notIn` rules. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
+| Combining conditions | Filters are combined with AND. Most filters match any of their values; `website_keywords` and `job_title` can require all of them with `operator`. | Every filter must match. Within a filter, an array or `in` matches any value. |
+| Field names | Snake case, such as `country_code` and `company_size` | Camel case filter names, such as `country` and `employees`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
+| Values | Lowercase codes and labels, and values from Explorium autocomplete | Exact values from [field values](/docs/field-values), uppercase ISO country codes, and IDs from the free lookup endpoints |
+| Endpoints | `POST /v2/businesses` and `POST /v2/prospects`, or the `/v1` paths | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search), [`POST /v2/people/search`](/api-reference/v2/post-people-search) |
+| Totals | `total_results` on the fetch response, and the stats endpoints | The free [company](/api-reference/v2/post-companies-search-count) and [people](/api-reference/v2/post-people-search-count) count endpoints |
+
+## Translate a filter in four steps
+
+<Steps>
+  <Step title="List the filters">
+    Write down each key in `filters`, with its values and whether it uses `negate`.
+  </Step>
+  <Step title="Map each filter">
+    Find the pattern in the tables below. Convert values with the [value translations](/docs/migrate-from-explorium-field-mapping#value-translations), and look up IDs and names with the free [geo](/api-reference/v2/post-geo-states), [industry](/api-reference/v2/get-industries), [keyword](/api-reference/v2/get-keywords-autocomplete), [technology](/api-reference/v2/get-technologies-autocomplete), and [position](/api-reference/v2/get-positions-autocomplete) endpoints.
+  </Step>
+  <Step title="Count it for free">
+    Send the filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint. Compare `total` with the `total_results` you recorded from Explorium. A large gap usually means a filter was dropped or a value was not converted.
+  </Step>
+  <Step title="Fetch one page">
+    Run the search with a small `pageSize` and check the records against what you expect. An empty search still costs one result's base price.
+  </Step>
+</Steps>
+
+For example, this Explorium fetch:
+
+```json
+{
+  "mode": "full",
+  "page_size": 100,
+  "filters": {
+    "country_code": { "values": ["us"] },
+    "company_size": { "values": ["51-200", "201-500"] },
+    "company_age": { "values": ["0-3", "3-6"] },
+    "company_revenue": { "values": ["10M-25M"] }
+  }
+}
+```
+
+becomes this CompanyEnrich search:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer $COMPANYENRICH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pageSize": 100,
+    "filter": {
+      "country": "US",
+      "employees": ["51-200", "201-500"],
+      "foundedYear": { "min": 2020 },
+      "revenue": "10m-50m"
+    }
+  }'
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+query = {
+    "country": "US",
+    "employees": ["51-200", "201-500"],
+    "foundedYear": {"min": 2020},  # ages 0 to 6 in 2026
+    "revenue": "10m-50m",
+}
+
+print(client.companies.count(filter=query)["total"])  # free
+page = client.companies.search(filter=query, page_size=100)
+for company in page["items"]:
+    print(company["domain"], company.get("employees"))
+```
+
+</CodeGroup>
+
+The revenue range is wider than Explorium's `10M-25M`, so the search can return more companies. Filter `revenue` in your code if you need the narrower range.
+
+## Business search patterns
+
+{/* generated: explorium search:company */}
+
+| Explorium filter | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"business_id": {"values": ["BUSINESS_ID"]}}` | `{"filter": {"domain": ["acme.example"]}}` | transformed | Explorium IDs do not carry over. Search by the companies' domains. |
+| `{"company_name": {"values": ["acme"]}}` | `{"filter": {"query": "acme"}}` | lossy | Matches company names, keywords, or domain prefixes. |
+| `{"country_code": {"values": ["us", "ca"]}}` | `{"filter": {"country": ["US", "CA"]}}` | transformed | Uppercase the ISO codes. |
+| `{"country_code": {"values": ["cn"], "negate": true}}` | `{"filter": {"country": {"notIn": ["CN"]}}}` | transformed |   |
+| `{"region_country_code": {"values": ["us-ca"]}}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. |
+| `{"city_region_country": {"values": ["austin, tx, us"]}}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. |
+| `{"company_size": {"values": ["51-200", "201-500"]}}` | `{"filter": {"employees": ["51-200", "201-500"]}}` | lossy | Calculated ranges. Use `reportedEmployees` for the range on the company's LinkedIn page. |
+| `{"company_revenue": {"values": ["10M-25M", "25M-75M"]}}` | `{"filter": {"revenue": ["10m-50m", "50m-100m"]}}` | lossy | See the revenue values table. |
+| `{"company_age": {"values": ["0-3"]}}` | `{"filter": {"foundedYear": {"min": 2023}}}` | transformed | Convert ages to founding years from the current year. `0-3` in 2026 is a minimum of 2023. |
+| `{"naics_category": {"values": ["5112"]}}` | `{"filter": {"naicsCodes": ["5112"]}}` | renamed | Codes have 2 to 6 digits. |
+| `{"linkedin_category": {"values": ["software development"]}}` | `{"filter": {"naicsCodes": ["5132"]}}` | lossy | No LinkedIn industry filter. Pick NAICS codes, or describe the industry in a semantic query. |
+| `{"google_category": {"values": ["coffee shop"]}}` | `{"semantic": {"query": "coffee shops"}}` | lossy | No Google category filter. A semantic search finds companies from a description. |
+| `{"company_tech_stack_tech": {"values": ["Salesforce"]}}` | `{"filter": {"technologies": ["salesforce"]}}` | lossy | Look up names with `GET /v2/technologies/autocomplete`. |
+| `{"website_keywords": {"values": ["payments"]}}` | `{"filter": {"keywords": "payments"}}` | lossy | Keywords that describe the company, not text on its website. |
+| `{"is_public_company": {"value": true}}` | `{"filter": {"type": "public"}}` | renamed |   |
+| `{"has_website": {"value": true}}` | `{"filter": {}}` | same | Every CompanyEnrich company has a domain and website, so drop the condition. |
+| `{"company_tech_stack_category": {"values": ["crm"]}}` | None | none | No technology category filter. List the technologies instead. |
+| `{"number_of_locations": {"values": ["2-5"]}}` | None | none |   |
+| `{"business_intent_topics": {"values": ["TOPIC"]}}` | None | none |   |
+| `{"events": {"values": ["new_funding_round"]}}` | `{"filter": {"fundingYear": {"min": 2026}}}` | lossy | No event filter. For recent funding, filter on `fundingYear`. Other events have no filter. |
+
+{/* end generated */}
+
+## Prospect search patterns
+
+Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size or industry, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters).
+
+{/* generated: explorium search:person */}
+
+| Explorium filter | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"job_level": {"values": ["vice president", "director"]}}` | `{"filter": {"seniority": ["vp", "director"]}}` | renamed | See the seniority values table. |
+| `{"job_department": {"values": ["engineering"]}}` | `{"filter": {"department": "engineering-technical"}}` | renamed | See the department values table. |
+| `{"job_title": {"values": ["account executive"]}}` | `{"filter": {"position": "account executive"}}` | lossy | `include_related_job_titles` has no equivalent. List the titles you want. |
+| `{"country_code": {"values": ["de"]}}` | `{"filter": {"country": "DE"}}` | transformed | Uppercase the ISO code. |
+| `{"business_id": {"values": ["BUSINESS_ID"]}}` | `{"filter": {"domain": ["acme.example"]}}` | transformed | Search by the employers' domains. |
+| `{"company_name": {"values": ["acme"]}}` | `{"company": {"filter": {"query": "acme"}}}` | lossy |   |
+| `{"company_size": {"values": ["51-200"]}}` | `{"company": {"filter": {"employees": ["51-200"]}}}` | lossy |   |
+| `{"company_revenue": {"values": ["10M-25M"]}}` | `{"company": {"filter": {"revenue": ["10m-50m"]}}}` | lossy |   |
+| `{"company_country_code": {"values": ["us"]}}` | `{"company": {"filter": {"country": ["US"]}}}` | transformed | The employer's country, not the person's. |
+| `{"naics_category": {"values": ["5112"]}}` | `{"company": {"filter": {"naicsCodes": ["5112"]}}}` | renamed |   |
+| `{"current_role_months": {"lte": 6}}` | `{"filter": {"currentPositionStartDate": {"after": "2026-05-16T00:00:00Z"}}}` | transformed | Convert months to a date from today. |
+| `{"region_country_code": {"values": ["us-ca"]}}` | None | none | People search filters by country only. |
+| `{"city_region_country": {"values": ["berlin, be, de"]}}` | None | none | People search filters by country only. |
+| `{"has_contact_details": {"value": "email"}}` | None | none | No contact availability filter. Find work emails per person with `GET /v2/people/{personId}/email`. |
+| `{"total_experience_months": {"gte": 60}}` | None | none |   |
+| `{"skills": {"values": ["python"]}}` | None | none |   |
+| `{"interests": {"values": ["TOPIC"]}}` | None | none |   |
+| `{"prospect_id": {"values": ["PROSPECT_ID"]}}` | None | none | Explorium IDs do not carry over. |
+
+{/* end generated */}
+
+## Filters that do not translate
+
+* **Person location below country level.** People search filters by country. Filter cities and regions in your code.
+* **Contact availability**, skills, interests, and total experience.
+* **Technology categories, Google categories, number of locations, intent topics, and events.** For Google categories, try a semantic search.
+* **`include_related_job_titles`.** List the related titles yourself, or look them up with position autocomplete.
+* **`negate` on filters without a `notIn` rule.** Check the filter's matching rules in the [filter reference](/docs/company-search-api-filters).
+
+## Totals and pagination
+
+Search responses do not include a total. The free count endpoints return `total`, the number of matching records, and `count`, the number your plan lets you retrieve. Neither breaks the total down by segment, so run one count per segment.
+
+Pages hold 1 to 100 results, set with `pageSize`, against up to 500 on Explorium. Pass the `nextCursor` of one page as `cursor` to get the next, until `nextCursor` is omitted. A cursor expires 24 hours after the first page. There are no numbered pages.
+
+## When a description works better than filters
+
+If your agent turned a request into Explorium filters, it can send the request itself to a [semantic search](/docs/semantic-company-search-api) instead:
+
+```json
+{
+  "semantic": { "query": "payment infrastructure for software platforms" },
+  "filter": { "country": "US" }
+}
+```
+
+Semantic search ranks results by meaning and reports the filters it inferred in `interpretation`. It costs 2 credits per company returned instead of 1. To replace the lookalikes enrichment, use a [lookalike search](/docs/similar-companies-api), which takes up to 10 seed domains and costs 5 per company.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-explorium">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-explorium-field-mapping">
+    Every field, with value translations.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every company filter and its matching rules.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every people filter and the company query.
+  </Card>
+</CardGroup>

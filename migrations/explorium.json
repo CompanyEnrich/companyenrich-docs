@@ -1,0 +1,592 @@
+{
+  "$comment": "Explorium AgentSource to CompanyEnrich V2 migration mapping. Source of truth for the tables in docs/migrate-from-explorium*.mdx. Validated against openapi/v2.json by scripts/sync-migrations.mjs. Explorium names come from its public developer documentation as checked on checkedAt.",
+  "version": 1,
+  "checkedAt": "2026-11-16",
+  "vendor": {
+    "key": "explorium",
+    "name": "Explorium",
+    "searchLabel": "filter",
+    "slug": "explorium",
+    "api": "AgentSource v1 and v2",
+    "baseUrl": "https://api.explorium.ai",
+    "docs": "https://developers.explorium.ai",
+    "auth": "API_KEY header",
+    "mcp": ["https://mcp.explorium.ai", "https://mcp-v2.explorium.ai/mcp"],
+    "shutdown": {
+      "date": "2026-12-02",
+      "notice": "https://www.explorium.ai/blog/news-and-updates/farewell-from-explorium-with-gratitude/",
+      "summary": "Explorium says AgentSource will be discontinued on December 2, 2026."
+    }
+  },
+  "companyEnrich": {
+    "api": "v2",
+    "baseUrl": "https://api.companyenrich.com",
+    "spec": "https://docs.companyenrich.com/openapi/v2.json",
+    "auth": "Authorization: Bearer YOUR_API_TOKEN",
+    "apiKeyEnv": "COMPANYENRICH_API_KEY",
+    "mcp": "https://mcp.companyenrich.com/mcp",
+    "guides": {
+      "overview": "https://docs.companyenrich.com/docs/migrate-from-explorium",
+      "fieldMapping": "https://docs.companyenrich.com/docs/migrate-from-explorium-field-mapping",
+      "search": "https://docs.companyenrich.com/docs/migrate-from-explorium-search",
+      "agent": "https://docs.companyenrich.com/docs/migrate-from-explorium-agent"
+    },
+    "sdks": {
+      "python": "https://docs.companyenrich.com/docs/python-sdk",
+      "javascript": "https://docs.companyenrich.com/docs/javascript-typescript-sdk",
+      "ruby": "https://docs.companyenrich.com/docs/ruby-sdk",
+      "php": "https://docs.companyenrich.com/docs/php-sdk"
+    }
+  },
+  "fidelity": {
+    "same": "Same meaning and format.",
+    "renamed": "Same meaning and values under a different name or label.",
+    "transformed": "Same information in a different format, casing, or structure. Convert it in code.",
+    "lossy": "Related but not equivalent. Values can differ, so check the fields your code depends on.",
+    "none": "No CompanyEnrich equivalent."
+  },
+  "endpoints": [
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/match", "POST /v1/businesses/match"],
+      "exploriumInput": ["domain", "url"],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "inputs": { "businesses_to_match[].domain": ["domain"], "businesses_to_match[].url": ["domain"] },
+      "note": "There is no separate match step. The enrich call returns the company record, or `404` when there is none. Send the host only, such as `stripe.com`. Store the domain, or the CompanyEnrich `id`, instead of `business_id`."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/match", "POST /v1/businesses/match"],
+      "exploriumInput": ["name", "linkedin_url"],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": { "businesses_to_match[].name": ["name"], "businesses_to_match[].linkedin_url": ["linkedinUrl"] },
+      "note": "Every property you send must match. When several companies match, the highest-ranked one is returned. No match returns `404` and is not charged."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/firmographics/enrich", "POST /v1/businesses/firmographics/enrich"],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "mapped",
+      "inputs": { "business_ids": ["domain"], "businesses_to_match": ["domain"] },
+      "note": "Firmographics are the base company record. One request per domain."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/firmographics/job", "POST /v1/businesses/firmographics/bulk_enrich"],
+      "companyEnrich": "POST /v2/companies/enrich/batch",
+      "status": "partial",
+      "inputs": { "business_ids": ["domains[]"] },
+      "note": "Up to 50 domains per request, returned in request order with a `status` of `found`, `not-found`, `invalid-domain`, or `pending`. For up to 10,000 domains in the background, use `POST /v2/companies/enrich/bulk`."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/technographics/enrich", "POST /v2/businesses/webstack/enrich", "POST /v1/businesses/technographics/enrich", "POST /v1/businesses/webstack/enrich"],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "note": "Request `expand=technologies`. It returns a flat list of technologies, with no categories and no website spend or traffic fields."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/workforce_trends/enrich", "POST /v1/businesses/workforce_trends/enrich"],
+      "companyEnrich": "GET /v2/companies/workforce",
+      "status": "partial",
+      "note": "Returns headcount by department and its history, as counts instead of percentages. To get the current breakdown with the company record, request `expand=workforce` on enrichment."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/funding_and_acquisition/enrich", "POST /v1/businesses/funding_and_acquisition/enrich"],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "note": "Request `expand=financial` for funding rounds, total funding, and the stock symbol. Acquisitions, advisors, and IPO details have no equivalent."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/lookalikes/enrich", "POST /v1/businesses/lookalikes/enrich"],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": { "business_ids": ["lookalike.domains"] },
+      "note": "Send a `lookalike` query with 1 to 10 seed domains, plus optional filters. Results are company records ranked by similarity, without a `similarity_score`."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses", "POST /v1/businesses"],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": { "filters": ["filter"], "page_size": ["pageSize"], "next_cursor": ["cursor"] },
+      "note": "Rewrite each filter. See [Translate search filters](/docs/migrate-from-explorium-search). Results are full company records, so no enrichment call is needed afterwards for firmographic fields."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/stats", "POST /v1/businesses/stats"],
+      "companyEnrich": "POST /v2/companies/search/count",
+      "status": "partial",
+      "note": "Free. Returns the total only, with no breakdown by industry, revenue, size, or region. Run one count per segment you need."
+    },
+    {
+      "group": "company",
+      "explorium": ["GET /v2/autocomplete", "GET /v1/businesses/autocomplete"],
+      "companyEnrich": "GET /v2/companies/autocomplete",
+      "status": "partial",
+      "note": "Free. Company autocomplete suggests companies by name. For filter values, use technology, keyword, or position autocomplete, the industry list, or the geo endpoints."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/financial_indicators/enrich", "POST /v1/businesses/financial_indicators/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No public-company financial metrics such as EBITDA or ratios. `expand=financial` returns the stock symbol and exchange."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/company_hierarchies/enrich", "POST /v1/businesses/company_hierarchies/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No parent or subsidiary data."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/linkedin_posts/enrich", "POST /v1/businesses/linkedin_posts/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No social posts."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/website_changes/enrich", "POST /v1/businesses/website_changes/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No website change history. Every record has an `updatedAt` timestamp."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/company_website_keywords/enrich", "POST /v1/businesses/company_website_keywords/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No full-text search of website pages. The `keywords` search filter and expansion use keywords that describe the company, not page text."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/company_ratings_by_employees/enrich", "POST /v1/businesses/company_ratings_by_employees/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No employee ratings."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/bombora_intent/enrich", "POST /v1/businesses/bombora_intent/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No intent data."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/pc_strategy_10k/enrich", "POST /v2/businesses/pc_competitive_landscape_10k/enrich", "POST /v2/businesses/pc_business_challenges_10k/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No analysis of annual reports. The same applies to the v1 routes."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/research/enrich", "POST /v2/businesses/research/job"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No custom AI research endpoint. Semantic search finds companies from a description, and the MCP server lets your own agent combine CompanyEnrich data with other tools."
+    },
+    {
+      "group": "company",
+      "explorium": ["POST /v2/businesses/events", "POST /v2/businesses/events/enrollments", "POST /v1/businesses/events"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No event feed, enrollments, or webhooks. To watch for changes, re-enrich the companies you track on a schedule and compare `updatedAt`, headcount, or funding."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/match", "POST /v1/prospects/match"],
+      "exploriumInput": ["email"],
+      "companyEnrich": "POST /v2/people/enrich",
+      "status": "partial",
+      "inputs": { "prospects_to_match[].email": ["email"] },
+      "note": "Work emails only. The API resolves the company from the email domain, then matches the person. The person is the response body. No match returns `404` and is not charged."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/match", "POST /v1/prospects/match"],
+      "exploriumInput": ["full_name", "company_name", "business_id"],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": { "prospects_to_match[].full_name": ["filter.query"], "prospects_to_match[].company_name": ["filter.domain"], "prospects_to_match[].business_id": ["filter.domain"] },
+      "note": "Search by name at the company's domain. It returns matching people without a confidence score, so pick the person in your code."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/match", "POST /v1/prospects/match"],
+      "exploriumInput": ["linkedin", "phone_number"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No person lookup by LinkedIn URL or phone number."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects", "POST /v1/prospects"],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": { "filters": ["filter", "company"], "page_size": ["pageSize"], "next_cursor": ["cursor"] },
+      "note": "Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-explorium-search)."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/stats", "POST /v1/prospects/stats"],
+      "companyEnrich": "POST /v2/people/search/count",
+      "status": "partial",
+      "note": "Free. Returns the total only, with no breakdown by department or region."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/profiles/enrich", "POST /v1/prospects/profiles/enrich"],
+      "companyEnrich": "GET /v2/people/{personId}",
+      "status": "partial",
+      "inputs": { "prospect_ids": ["personId"] },
+      "note": "Takes a CompanyEnrich person ID from search or email enrichment. Explorium prospect IDs do not carry over."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/contact_information/enrich", "POST /v1/prospects/contacts_information/enrich"],
+      "companyEnrich": "GET /v2/people/{personId}/email",
+      "status": "partial",
+      "inputs": { "prospect_ids": ["personId"] },
+      "note": "Work email only, with a `status` and `certainty`. No phone numbers, personal emails, or hashed emails. Costs 10 credits only when it finds an email your account has not accessed before."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/linkedin_posts/enrich", "POST /v1/prospects/linkedin_posts/enrich"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No social posts."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/events", "POST /v2/prospects/events/enrollments", "POST /v1/prospects/events"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No event feed. To find recent job changes, search with `currentPositionStartDate` or `currentCompanyStartDate`."
+    },
+    {
+      "group": "people",
+      "explorium": ["POST /v2/prospects/research/enrich", "POST /v2/prospects/research/job"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No custom AI research endpoint."
+    },
+    {
+      "group": "supporting",
+      "explorium": ["POST /v2/<enrichment>/job", "GET /v2/jobs/status/{job_id}", "POST /v1/<enrichment>/bulk_enrich"],
+      "companyEnrich": "POST /v2/companies/enrich/bulk",
+      "status": "partial",
+      "note": "Background jobs exist for company enrichment by domain, up to 10,000 per job, and for exporting search results. Poll the batch, then download JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports)."
+    },
+    {
+      "group": "supporting",
+      "explorium": ["GET /v2/credits", "GET /v1/credits"],
+      "companyEnrich": "GET /v2/me",
+      "status": "partial",
+      "note": "Free. Returns your credit balance and plan capabilities. Each response also carries `x-credit-cost` and `x-credit-remaining` headers."
+    },
+    {
+      "group": "supporting",
+      "explorium": ["POST /v2/webhooks", "POST /v1/webhooks"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No webhooks."
+    },
+    {
+      "group": "supporting",
+      "explorium": ["POST /v2/async/entity-id-datasets/upload"],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No uploaded ID datasets. Send domains directly to batch or bulk enrichment."
+    }
+  ],
+  "mcp": [
+    { "explorium": "match-business", "ce": ["enrich_company", "enrich_company_by_properties"], "note": "Returns the full record in one step, by domain or by name or social profile." },
+    { "explorium": "enrich-business", "ce": ["enrich_company", "get_company_workforce"], "note": "Firmographics come back with the company. Use `get_company_workforce` for headcount by department." },
+    { "explorium": "fetch-businesses", "ce": ["search_companies"], "note": "Takes filters or a plain-language description." },
+    { "explorium": "fetch-businesses-statistics", "ce": null, "note": "No statistics tool. Your agent can call the free count endpoint through the API." },
+    { "explorium": "fetch-businesses-events", "ce": null, "note": "No events." },
+    { "explorium": "match-prospects", "ce": ["lookup_person_by_email", "search_people"], "note": "By work email, or by name and company." },
+    { "explorium": "fetch-prospects", "ce": ["search_people"], "note": "Filters by seniority, department, title, country, and employer." },
+    { "explorium": "fetch-prospects-statistics", "ce": null, "note": "No statistics tool." },
+    { "explorium": "fetch-prospects-events", "ce": null, "note": "No events." },
+    { "explorium": "enrich-prospects", "ce": ["get_person_by_id", "enrich_person_email"], "note": "Profile and work email. No phone numbers." },
+    { "explorium": "autocomplete", "ce": null, "note": "Not needed. `search_companies` and `search_people` accept plain values and descriptions." },
+    { "explorium": null, "ce": ["find_similar_companies"], "note": "Lookalikes from 1 to 10 seed domains. Explorium offered this as an enrichment rather than a tool." },
+    { "explorium": null, "ce": ["get_current_user"], "note": "Free. Checks your credit balance." }
+  ],
+  "fields": {
+    "company": [
+      { "group": "Identity", "explorium": "business_id", "ce": "id", "fidelity": "lossy", "note": "A separate ID space. Explorium IDs do not carry over, so store the domain or the CompanyEnrich ID." },
+      { "group": "Identity", "explorium": "name", "ce": "name", "fidelity": "same" },
+      { "group": "Identity", "explorium": "domain", "ce": "domain", "fidelity": "same", "note": "Returned by Explorium fetch. Every CompanyEnrich company has one." },
+      { "group": "Identity", "explorium": "website", "ce": "website", "fidelity": "transformed", "note": "CompanyEnrich returns a full URL, such as `https://acme.example`. Explorium examples use a bare domain." },
+      { "group": "Identity", "explorium": "business_description", "ce": "description", "fidelity": "transformed", "note": "Written from different sources, so the text differs." },
+      { "group": "Identity", "explorium": ["business_logo", "logo"], "ce": "logoUrl", "fidelity": "transformed" },
+      { "group": "Identity", "explorium": "ticker", "ce": "financial.stockSymbol", "expand": "financial", "fidelity": "renamed" },
+      { "group": "Size and industry", "explorium": "number_of_employees_range", "ce": "employees", "values": "companySize", "fidelity": "lossy", "note": "Calculated from CompanyEnrich employee data. `reportedEmployees` is only a search filter, for the range on the company's LinkedIn page." },
+      { "group": "Size and industry", "explorium": "yearly_revenue_range", "ce": "revenue", "values": "revenue", "fidelity": "lossy" },
+      { "group": "Size and industry", "explorium": "naics", "ce": "naicsCodes", "expand": "naicsCodes", "fidelity": "transformed", "note": "A list of codes instead of one code." },
+      { "group": "Size and industry", "explorium": "naics_description", "ce": "industry", "fidelity": "lossy", "note": "CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`." },
+      { "group": "Size and industry", "explorium": "linkedin_industry_category", "ce": "industries", "fidelity": "lossy", "note": "A list from a different taxonomy." },
+      { "group": "Size and industry", "explorium": ["sic_code", "sic_code_description"], "ce": null, "fidelity": "none" },
+      { "group": "Location", "explorium": "country_name", "ce": "location.country.name", "fidelity": "transformed", "note": "Explorium lowercases names. CompanyEnrich also returns the ISO code in `location.country.code`." },
+      { "group": "Location", "explorium": ["region_name", "region"], "ce": "location.state.name", "fidelity": "transformed" },
+      { "group": "Location", "explorium": "city_name", "ce": "location.city.name", "fidelity": "transformed" },
+      { "group": "Location", "explorium": "street", "ce": "location.address", "fidelity": "transformed" },
+      { "group": "Location", "explorium": "zip_code", "ce": "location.postalCode", "fidelity": "renamed" },
+      { "group": "Location", "explorium": ["locations_distribution", "number_of_locations"], "ce": null, "fidelity": "none" },
+      { "group": "Social", "explorium": "linkedin_profile", "ce": "socials.linkedinUrl", "fidelity": "transformed", "note": "CompanyEnrich returns `https://www.linkedin.com/company/...`. Normalize both before comparing." },
+      { "group": "Technographics", "explorium": ["full_tech_stack", "technologies_used_by_company_website"], "ce": "technologies", "expand": "technologies", "fidelity": "lossy", "note": "One flat list from different detection." },
+      { "group": "Technographics", "explorium": ["full_nested_tech_stack", "technologies_categories", "categories_to_technologies_tree"], "ce": null, "fidelity": "none", "note": "No categories. Look up technologies with technology autocomplete." },
+      { "group": "Technographics", "explorium": ["money_spent_on_website_technologies", "spend", "q_rank", "number_of_pages_on_sitemap", "ecommerce", "payment_options"], "ce": null, "fidelity": "none" },
+      { "group": "Workforce", "explorium": "perc_<department>_roles", "ce": "workforce.departmentHeadcount", "expand": "workforce", "fidelity": "transformed", "note": "Counts per department instead of percentages. Divide by `workforce.observedEmployeeCount`. The departments differ; see the department values below." },
+      { "group": "Workforce", "explorium": "change_in_<department>_roles", "ce": "workforce.history[].departmentHeadcount", "fidelity": "transformed", "note": "From `GET /v2/companies/workforce`. Compare two history points to get the change." },
+      { "group": "Workforce", "explorium": "profiles_found_per_quarter", "ce": "workforce.observedEmployeeCount", "expand": "workforce", "fidelity": "lossy" },
+      { "group": "Workforce", "explorium": "quarters", "ce": "workforce.history[].date", "fidelity": "transformed", "note": "One date per history point instead of quarter labels." },
+      { "group": "Funding", "explorium": "known_funding_total_value", "ce": "financial.totalFunding", "expand": "financial", "fidelity": "renamed" },
+      { "group": "Funding", "explorium": "last_funding_round_type", "ce": "financial.fundingStage", "expand": "financial", "fidelity": "transformed" },
+      { "group": "Funding", "explorium": "last_funding_round_date", "ce": "financial.fundingDate", "expand": "financial", "fidelity": "transformed" },
+      { "group": "Funding", "explorium": ["funding_rounds_info", "number_of_funding_rounds"], "ce": "financial.fundingRounds", "expand": "financial", "fidelity": "transformed", "note": "Each round has `type`, `date`, `amount`, and `investors`. Count the list for the number of rounds." },
+      { "group": "Funding", "explorium": ["first_funding_round_type", "first_funding_round_date", "first_funding_round_value_usd", "last_funding_round_value_usd"], "ce": "financial.fundingRounds", "expand": "financial", "fidelity": "transformed", "note": "Sort the rounds by `date` and take the first or last." },
+      { "group": "Funding", "explorium": "investors", "ce": "financial.fundingRounds[].investors", "expand": "financial", "fidelity": "transformed", "note": "Listed per round." },
+      { "group": "Funding", "explorium": ["acquired_by", "is_ipo", "ipo_date", "ipo_size_usd", "current_advisors", "number_of_advisors", "latest_funding_increase_percentage"], "ce": null, "fidelity": "none" },
+      { "group": "Other enrichments", "explorium": ["business_intent_topics", "events"], "ce": null, "fidelity": "none" },
+      { "group": "Other enrichments", "explorium": ["parent_company_id", "parent_company_name", "ultimate_parent_id", "ultimate_parent_name", "subsidiaries"], "ce": null, "fidelity": "none" },
+      { "group": "Other enrichments", "explorium": ["lookalike_business_id", "similarity_score"], "ce": null, "fidelity": "none", "note": "Lookalike results are full company records from search." }
+    ],
+    "person": [
+      { "group": "Identity", "explorium": "prospect_id", "ce": "id", "fidelity": "lossy", "note": "A separate ID space. CompanyEnrich person IDs are 64-bit integers." },
+      { "group": "Identity", "explorium": "full_name", "ce": "name", "fidelity": "transformed" },
+      { "group": "Identity", "explorium": "first_name", "ce": "firstName", "fidelity": "transformed" },
+      { "group": "Identity", "explorium": "last_name", "ce": "lastName", "fidelity": "transformed" },
+      { "group": "Identity", "explorium": ["gender", "age_group"], "ce": null, "fidelity": "none" },
+      { "group": "Current job", "explorium": "job_title", "ce": "position", "fidelity": "transformed" },
+      { "group": "Current job", "explorium": ["job_level_main", "job_level_array", "job_seniority_level"], "ce": "seniority", "values": "seniority", "fidelity": "lossy", "note": "One value instead of a list. The deprecated `job_seniority_level` uses older values such as `cxo`; translate them as their `job_level` equivalents." },
+      { "group": "Current job", "explorium": ["job_department_main", "job_department_array", "job_department"], "ce": "department", "values": "department", "fidelity": "lossy", "note": "One value, which can be a sub-department such as `sales/partnerships`." },
+      { "group": "Current job", "explorium": "company_name", "ce": ["experiences[].company.name", "experiences[].companyName"], "fidelity": "transformed", "note": "From the current experience. See the note below." },
+      { "group": "Current job", "explorium": "company_website", "ce": "experiences[].company.domain", "fidelity": "transformed" },
+      { "group": "Current job", "explorium": "company_linkedin", "ce": "experiences[].company.socials.linkedinUrl", "expand": "company", "fidelity": "transformed" },
+      { "group": "History", "explorium": "experience", "ce": "experiences", "fidelity": "transformed" },
+      { "group": "History", "explorium": "education", "ce": "education", "expand": "education", "fidelity": "transformed" },
+      { "group": "History", "explorium": ["skills", "interests"], "ce": null, "fidelity": "none" },
+      { "group": "Location", "explorium": "country_name", "ce": "location.country.name", "fidelity": "transformed" },
+      { "group": "Location", "explorium": ["region_name", "city"], "ce": "location.address", "fidelity": "lossy", "note": "A single text field, such as a city and country." },
+      { "group": "Social", "explorium": "linkedin", "ce": "socials.linkedinUrl", "fidelity": "transformed", "note": "Explorium often returns member-ID URLs such as `linkedin.com/in/ACoAA...`, which do not match profile URLs." },
+      { "group": "Social", "explorium": "linkedin_url_array", "ce": null, "fidelity": "none" },
+      { "group": "Contact", "explorium": ["professional_email", "professions_email"], "ce": "email", "in": "workEmail", "fidelity": "transformed", "note": "`professions_email` is the v1 name." },
+      { "group": "Contact", "explorium": "professional_email_status", "ce": "certainty", "in": "workEmail", "fidelity": "lossy" },
+      { "group": "Contact", "explorium": ["phone_numbers", "mobile_phone"], "ce": null, "fidelity": "none" },
+      { "group": "Contact", "explorium": ["emails", "hashed_personal_emails", "hashed_professional_emails", "professional_email_hashed"], "ce": null, "fidelity": "none" }
+    ]
+  },
+  "ceOnly": {
+    "company": [
+      { "ce": "legalName", "note": "The registered legal name." },
+      { "ce": "foundedYear", "note": "Explorium filters by company age range. CompanyEnrich returns the year." },
+      { "ce": "type", "note": "Such as `private`, `public`, or `nonprofit`." },
+      { "ce": "categories", "note": "Business model, such as `saas` or `b2b`." },
+      { "ce": "location.country.code", "note": "ISO 3166-1 alpha-2 country code." },
+      { "ce": ["socials.twitterUrl", "socials.facebookUrl", "socials.crunchbaseUrl", "socials.githubUrl"], "note": "Other social profiles." },
+      { "ce": "keywords", "expand": "keywords", "note": "Keywords that describe what the company does." },
+      { "ce": "workforce.history", "note": "Monthly headcount history from `GET /v2/companies/workforce`." },
+      { "ce": "updatedAt", "note": "When the record last changed." }
+    ],
+    "person": [
+      { "ce": "imageUrl", "note": "Profile image." },
+      { "ce": "experiences[].isMatched", "note": "Which experience matched your search filters or your email lookup." },
+      { "ce": "experiences[].startDate", "note": "Start and end dates for each job." }
+    ]
+  },
+  "values": {
+    "companySize": {
+      "title": "Company size",
+      "explorium": "number_of_employees_range, company_size",
+      "ce": "employees",
+      "enum": "CompanySearchFilter.employees",
+      "note": "The labels translate one to one. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range.",
+      "rows": [
+        { "explorium": "1-10", "ce": "1-10", "fidelity": "same" },
+        { "explorium": "11-50", "ce": "11-50", "fidelity": "same" },
+        { "explorium": "51-200", "ce": "51-200", "fidelity": "same" },
+        { "explorium": "201-500", "ce": "201-500", "fidelity": "same" },
+        { "explorium": "501-1000", "ce": "501-1K", "fidelity": "renamed" },
+        { "explorium": "1001-5000", "ce": "1K-5K", "fidelity": "renamed" },
+        { "explorium": "5001-10000", "ce": "5K-10K", "fidelity": "renamed" },
+        { "explorium": "10001+", "ce": "over-10K", "fidelity": "renamed" }
+      ]
+    },
+    "revenue": {
+      "title": "Revenue",
+      "explorium": "yearly_revenue_range, company_revenue",
+      "ce": "revenue",
+      "enum": "CompanySearchFilter.revenue",
+      "note": "CompanyEnrich has fewer, wider ranges. To keep a search at least as broad, include every range that overlaps.",
+      "rows": [
+        { "explorium": ["0-500K", "500K-1M"], "ce": "under-1m", "fidelity": "lossy", "note": "Wider range." },
+        { "explorium": ["1M-5M", "5M-10M"], "ce": "1m-10m", "fidelity": "lossy", "note": "Wider range." },
+        { "explorium": "10M-25M", "ce": "10m-50m", "fidelity": "lossy", "note": "Wider range." },
+        { "explorium": "25M-75M", "ce": ["10m-50m", "50m-100m"], "fidelity": "lossy", "note": "Spans two ranges." },
+        { "explorium": "75M-200M", "ce": ["50m-100m", "100m-200m"], "fidelity": "lossy", "note": "Spans two ranges." },
+        { "explorium": ["200M-500M", "500M-1B"], "ce": "200m-1b", "fidelity": "lossy", "note": "Wider range." },
+        { "explorium": ["1B-10B", "10B-100B", "100B-1T", "1T-10T", "10T+"], "ce": "over-1b", "fidelity": "lossy", "note": "Wider range." }
+      ]
+    },
+    "seniority": {
+      "title": "Seniority",
+      "explorium": "job_level_main, job_level",
+      "ce": "seniority",
+      "enum": "PersonSearchFilter.seniority",
+      "note": "Values marked as not mapped automatically need a decision for your use case.",
+      "rows": [
+        { "explorium": "owner", "ce": "owner", "fidelity": "same" },
+        { "explorium": "founder", "ce": "founder", "fidelity": "same" },
+        { "explorium": "c-suite", "ce": "c-suite", "fidelity": "same" },
+        { "explorium": "partner", "ce": "partner", "fidelity": "same" },
+        { "explorium": "vice president", "ce": "vp", "fidelity": "renamed" },
+        { "explorium": "director", "ce": "director", "fidelity": "same" },
+        { "explorium": "manager", "ce": "manager", "fidelity": "same" },
+        { "explorium": "senior manager", "ce": "manager", "fidelity": "lossy", "note": "No separate senior manager level." },
+        { "explorium": "senior non-managerial", "ce": "senior", "fidelity": "renamed" },
+        { "explorium": "junior", "ce": "entry", "fidelity": "renamed" },
+        { "explorium": "president", "ce": null, "fidelity": "none", "note": "Not mapped automatically. Often `c-suite`." },
+        { "explorium": "non-managerial", "ce": null, "fidelity": "none", "note": "Not mapped automatically. Covers `entry` and `senior`." },
+        { "explorium": "training", "ce": null, "fidelity": "none", "note": "Not mapped automatically. `intern` overlaps." },
+        { "explorium": "unpaid", "ce": null, "fidelity": "none", "note": "Not mapped automatically. `intern` overlaps." },
+        { "explorium": ["advisor", "board member", "freelancer"], "ce": null, "fidelity": "none", "note": "No equivalent level." }
+      ]
+    },
+    "department": {
+      "title": "Department",
+      "explorium": "job_department_main, job_department",
+      "ce": "department",
+      "enum": "PersonSearchFilter.department",
+      "note": "A department filter also matches its sub-departments, such as `sales` matching `sales/partnerships`.",
+      "rows": [
+        { "explorium": "c-suite", "ce": "c-suite", "fidelity": "same" },
+        { "explorium": "sales", "ce": "sales", "fidelity": "same" },
+        { "explorium": "marketing", "ce": "marketing", "fidelity": "same" },
+        { "explorium": "finance", "ce": "finance", "fidelity": "same" },
+        { "explorium": "legal", "ce": "legal", "fidelity": "same" },
+        { "explorium": "operations", "ce": "operations", "fidelity": "same" },
+        { "explorium": "design", "ce": "design", "fidelity": "same" },
+        { "explorium": "education", "ce": "education", "fidelity": "same" },
+        { "explorium": "engineering", "ce": "engineering-technical", "fidelity": "renamed" },
+        { "explorium": "product", "ce": "product-management", "fidelity": "renamed" },
+        { "explorium": "human resources", "ce": "human-resources", "fidelity": "renamed" },
+        { "explorium": "it", "ce": "information-technology", "fidelity": "renamed" },
+        { "explorium": "healthcare", "ce": "medical-health", "fidelity": "renamed" },
+        { "explorium": "partnerships", "ce": "sales/partnerships", "fidelity": "renamed", "note": "A sub-department of `sales`." },
+        { "explorium": "customer success", "ce": "sales/customer-success", "fidelity": "renamed", "note": "A sub-department of `sales`." },
+        { "explorium": "procurement", "ce": "finance/sourcing-procurement", "fidelity": "renamed", "note": "A sub-department of `finance`." },
+        { "explorium": "logistics", "ce": "operations/logistics", "fidelity": "renamed", "note": "A sub-department of `operations`." },
+        { "explorium": "real estate", "ce": "operations/real-estate", "fidelity": "renamed", "note": "A sub-department of `operations`." },
+        { "explorium": "r&d", "ce": "engineering-technical/research-development", "fidelity": "renamed", "note": "A sub-department of `engineering-technical`." },
+        { "explorium": "strategy", "ce": "operations/corporate-strategy", "fidelity": "lossy", "note": "A sub-department of `operations`." },
+        { "explorium": ["administration", "creative", "data", "manufacturing", "public service", "retail", "security", "support", "trade"], "ce": null, "fidelity": "none", "note": "No single department." }
+      ]
+    }
+  },
+  "search": {
+    "company": [
+      { "explorium": { "business_id": { "values": ["BUSINESS_ID"] } }, "ce": { "filter": { "domain": ["acme.example"] } }, "fidelity": "transformed", "note": "Explorium IDs do not carry over. Search by the companies' domains." },
+      { "explorium": { "company_name": { "values": ["acme"] } }, "ce": { "filter": { "query": "acme" } }, "fidelity": "lossy", "note": "Matches company names, keywords, or domain prefixes." },
+      { "explorium": { "country_code": { "values": ["us", "ca"] } }, "ce": { "filter": { "country": ["US", "CA"] } }, "fidelity": "transformed", "note": "Uppercase the ISO codes." },
+      { "explorium": { "country_code": { "values": ["cn"], "negate": true } }, "ce": { "filter": { "country": { "notIn": ["CN"] } } }, "fidelity": "transformed" },
+      { "explorium": { "region_country_code": { "values": ["us-ca"] } }, "ce": { "filter": { "state": "STATE_ID" } }, "fidelity": "transformed", "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`." },
+      { "explorium": { "city_region_country": { "values": ["austin, tx, us"] } }, "ce": { "filter": { "city": "CITY_ID" } }, "fidelity": "transformed", "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`." },
+      { "explorium": { "company_size": { "values": ["51-200", "201-500"] } }, "ce": { "filter": { "employees": ["51-200", "201-500"] } }, "fidelity": "lossy", "note": "Calculated ranges. Use `reportedEmployees` for the range on the company's LinkedIn page." },
+      { "explorium": { "company_revenue": { "values": ["10M-25M", "25M-75M"] } }, "ce": { "filter": { "revenue": ["10m-50m", "50m-100m"] } }, "fidelity": "lossy", "note": "See the revenue values table." },
+      { "explorium": { "company_age": { "values": ["0-3"] } }, "ce": { "filter": { "foundedYear": { "min": 2023 } } }, "fidelity": "transformed", "note": "Convert ages to founding years from the current year. `0-3` in 2026 is a minimum of 2023." },
+      { "explorium": { "naics_category": { "values": ["5112"] } }, "ce": { "filter": { "naicsCodes": ["5112"] } }, "fidelity": "renamed", "note": "Codes have 2 to 6 digits." },
+      { "explorium": { "linkedin_category": { "values": ["software development"] } }, "ce": { "filter": { "naicsCodes": ["5132"] } }, "fidelity": "lossy", "note": "No LinkedIn industry filter. Pick NAICS codes, or describe the industry in a semantic query." },
+      { "explorium": { "google_category": { "values": ["coffee shop"] } }, "ce": { "semantic": { "query": "coffee shops" } }, "fidelity": "lossy", "note": "No Google category filter. A semantic search finds companies from a description." },
+      { "explorium": { "company_tech_stack_tech": { "values": ["Salesforce"] } }, "ce": { "filter": { "technologies": ["salesforce"] } }, "fidelity": "lossy", "note": "Look up names with `GET /v2/technologies/autocomplete`." },
+      { "explorium": { "website_keywords": { "values": ["payments"] } }, "ce": { "filter": { "keywords": "payments" } }, "fidelity": "lossy", "note": "Keywords that describe the company, not text on its website." },
+      { "explorium": { "is_public_company": { "value": true } }, "ce": { "filter": { "type": "public" } }, "fidelity": "renamed" },
+      { "explorium": { "has_website": { "value": true } }, "ce": { "filter": {} }, "fidelity": "same", "note": "Every CompanyEnrich company has a domain and website, so drop the condition." },
+      { "explorium": { "company_tech_stack_category": { "values": ["crm"] } }, "ce": null, "fidelity": "none", "note": "No technology category filter. List the technologies instead." },
+      { "explorium": { "number_of_locations": { "values": ["2-5"] } }, "ce": null, "fidelity": "none" },
+      { "explorium": { "business_intent_topics": { "values": ["TOPIC"] } }, "ce": null, "fidelity": "none" },
+      { "explorium": { "events": { "values": ["new_funding_round"] } }, "ce": { "filter": { "fundingYear": { "min": 2026 } } }, "fidelity": "lossy", "note": "No event filter. For recent funding, filter on `fundingYear`. Other events have no filter." }
+    ],
+    "person": [
+      { "explorium": { "job_level": { "values": ["vice president", "director"] } }, "ce": { "filter": { "seniority": ["vp", "director"] } }, "fidelity": "renamed", "note": "See the seniority values table." },
+      { "explorium": { "job_department": { "values": ["engineering"] } }, "ce": { "filter": { "department": "engineering-technical" } }, "fidelity": "renamed", "note": "See the department values table." },
+      { "explorium": { "job_title": { "values": ["account executive"] } }, "ce": { "filter": { "position": "account executive" } }, "fidelity": "lossy", "note": "`include_related_job_titles` has no equivalent. List the titles you want." },
+      { "explorium": { "country_code": { "values": ["de"] } }, "ce": { "filter": { "country": "DE" } }, "fidelity": "transformed", "note": "Uppercase the ISO code." },
+      { "explorium": { "business_id": { "values": ["BUSINESS_ID"] } }, "ce": { "filter": { "domain": ["acme.example"] } }, "fidelity": "transformed", "note": "Search by the employers' domains." },
+      { "explorium": { "company_name": { "values": ["acme"] } }, "ce": { "company": { "filter": { "query": "acme" } } }, "fidelity": "lossy" },
+      { "explorium": { "company_size": { "values": ["51-200"] } }, "ce": { "company": { "filter": { "employees": ["51-200"] } } }, "fidelity": "lossy" },
+      { "explorium": { "company_revenue": { "values": ["10M-25M"] } }, "ce": { "company": { "filter": { "revenue": ["10m-50m"] } } }, "fidelity": "lossy" },
+      { "explorium": { "company_country_code": { "values": ["us"] } }, "ce": { "company": { "filter": { "country": ["US"] } } }, "fidelity": "transformed", "note": "The employer's country, not the person's." },
+      { "explorium": { "naics_category": { "values": ["5112"] } }, "ce": { "company": { "filter": { "naicsCodes": ["5112"] } } }, "fidelity": "renamed" },
+      { "explorium": { "current_role_months": { "lte": 6 } }, "ce": { "filter": { "currentPositionStartDate": { "after": "2026-05-16T00:00:00Z" } } }, "fidelity": "transformed", "note": "Convert months to a date from today." },
+      { "explorium": { "region_country_code": { "values": ["us-ca"] } }, "ce": null, "fidelity": "none", "note": "People search filters by country only." },
+      { "explorium": { "city_region_country": { "values": ["berlin, be, de"] } }, "ce": null, "fidelity": "none", "note": "People search filters by country only." },
+      { "explorium": { "has_contact_details": { "value": "email" } }, "ce": null, "fidelity": "none", "note": "No contact availability filter. Find work emails per person with `GET /v2/people/{personId}/email`." },
+      { "explorium": { "total_experience_months": { "gte": 60 } }, "ce": null, "fidelity": "none" },
+      { "explorium": { "skills": { "values": ["python"] } }, "ce": null, "fidelity": "none" },
+      { "explorium": { "interests": { "values": ["TOPIC"] } }, "ce": null, "fidelity": "none" },
+      { "explorium": { "prospect_id": { "values": ["PROSPECT_ID"] } }, "ce": null, "fidelity": "none", "note": "Explorium IDs do not carry over." }
+    ]
+  },
+  "fixtures": {
+    "$comment": "Fictional records for offline tests. Shapes follow each provider's documented schema.",
+    "company": {
+      "explorium": {
+        "business_id": "0f3c9a1b2d4e5f60718293a4b5c6d7e8",
+        "name": "Acme Analytics",
+        "business_description": "Acme Analytics builds a product analytics platform.",
+        "website": "acme-analytics.example",
+        "country_name": "united states",
+        "region_name": "california",
+        "city_name": "san francisco",
+        "zip_code": "94105",
+        "naics": "513210",
+        "naics_description": "software publishers",
+        "number_of_employees_range": "201-500",
+        "yearly_revenue_range": "10M-25M",
+        "linkedin_industry_category": "software development",
+        "linkedin_profile": "linkedin.com/company/acme-analytics-example"
+      },
+      "companyEnrich": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "website": "https://acme-analytics.example",
+        "logoUrl": "https://logo.example/acme-analytics.example.png",
+        "description": "Acme Analytics builds a product analytics platform.",
+        "type": "private",
+        "foundedYear": 2016,
+        "employees": "201-500",
+        "revenue": "10m-50m",
+        "industry": "Software Publishers",
+        "location": {
+          "country": { "code": "US", "name": "United States" },
+          "state": { "id": 1416, "name": "California", "code": "US-CA" },
+          "city": { "id": 125634, "name": "San Francisco" },
+          "postalCode": "94105"
+        },
+        "socials": { "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example" },
+        "updatedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    "notFound": {
+      "explorium": {
+        "matched_businesses": [
+          { "input": { "domain": "missing.example" }, "business_id": null }
+        ]
+      },
+      "companyEnrich": { "status": 404, "title": "Not Found" }
+    }
+  }
+}
