@@ -1,0 +1,338 @@
+---
+title: "Explorium field mapping"
+sidebarTitle: "Field mapping"
+description: "Every Explorium AgentSource business and prospect field next to its CompanyEnrich V2 field, with the expansion it needs, value translations, and the fields that have no counterpart."
+---
+
+{/* Tables between "generated" markers come from migrations/explorium.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This page maps the fields Explorium returns for businesses and prospects to the CompanyEnrich V2 [company record](/docs/company-schema) and [person record](/docs/person-schema). Use it to rewrite the code that reads Explorium responses and to migrate the records you stored.
+
+Business fields come from firmographics, fetch, and the technographics, webstack, workforce trends, and funding enrichments. Prospect fields come from fetch, profiles, and contact information. Field names are the same in v1 and v2 unless a row lists both.
+
+The same mapping is available as JSON at [/migrations/explorium.json](https://docs.companyenrich.com/migrations/explorium.json), for scripts and [coding agents](/docs/migrate-from-explorium-agent).
+
+## How to read this page
+
+Paths use dots for nested objects and `[]` for arrays, as in `experiences[].company.domain`. **Expand** names the [expansion](/docs/credits#expansions) you must request to get the field. Each one adds credits.
+
+**Fidelity** describes how the definitions compare:
+
+{/* generated: explorium fidelity */}
+
+| Fidelity | Meaning |
+| --- | --- |
+| `same` | Same meaning and format. |
+| `renamed` | Same meaning and values under a different name or label. |
+| `transformed` | Same information in a different format, casing, or structure. Convert it in code. |
+| `lossy` | Related but not equivalent. Values can differ, so check the fields your code depends on. |
+| `none` | No CompanyEnrich equivalent. |
+
+{/* end generated */}
+
+Fidelity compares definitions, not data. The two providers build their records from different sources, so a value can differ even when the fields mean the same thing.
+
+## Business fields
+
+{/* generated: explorium fields:company */}
+
+### Identity
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `business_id` | `id` |   | lossy | A separate ID space. Explorium IDs do not carry over, so store the domain or the CompanyEnrich ID. |
+| `name` | `name` |   | same |   |
+| `domain` | `domain` |   | same | Returned by Explorium fetch. Every CompanyEnrich company has one. |
+| `website` | `website` |   | transformed | CompanyEnrich returns a full URL, such as `https://acme.example`. Explorium examples use a bare domain. |
+| `business_description` | `description` |   | transformed | Written from different sources, so the text differs. |
+| `business_logo`, `logo` | `logoUrl` |   | transformed |   |
+| `ticker` | `financial.stockSymbol` | `financial` | renamed |   |
+
+### Size and industry
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `number_of_employees_range` | `employees` |   | lossy | Calculated from CompanyEnrich employee data. `reportedEmployees` is only a search filter, for the range on the company's LinkedIn page. See [Company size](#company-size). |
+| `yearly_revenue_range` | `revenue` |   | lossy | See [Revenue](#revenue). |
+| `naics` | `naicsCodes` | `naicsCodes` | transformed | A list of codes instead of one code. |
+| `naics_description` | `industry` |   | lossy | CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`. |
+| `linkedin_industry_category` | `industries` |   | lossy | A list from a different taxonomy. |
+| `sic_code`, `sic_code_description` | — |   | none |   |
+
+### Location
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `country_name` | `location.country.name` |   | transformed | Explorium lowercases names. CompanyEnrich also returns the ISO code in `location.country.code`. |
+| `region_name`, `region` | `location.state.name` |   | transformed |   |
+| `city_name` | `location.city.name` |   | transformed |   |
+| `street` | `location.address` |   | transformed |   |
+| `zip_code` | `location.postalCode` |   | renamed |   |
+| `locations_distribution`, `number_of_locations` | — |   | none |   |
+
+### Social
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `linkedin_profile` | `socials.linkedinUrl` |   | transformed | CompanyEnrich returns `https://www.linkedin.com/company/...`. Normalize both before comparing. |
+
+### Technographics
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `full_tech_stack`, `technologies_used_by_company_website` | `technologies` | `technologies` | lossy | One flat list from different detection. |
+| `full_nested_tech_stack`, `technologies_categories`, `categories_to_technologies_tree` | — |   | none | No categories. Look up technologies with technology autocomplete. |
+| `money_spent_on_website_technologies`, `spend`, `q_rank`, `number_of_pages_on_sitemap`, `ecommerce`, `payment_options` | — |   | none |   |
+
+### Workforce
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `perc_<department>_roles` | `workforce.departmentHeadcount` | `workforce` | transformed | Counts per department instead of percentages. Divide by `workforce.observedEmployeeCount`. The departments differ; see the department values below. |
+| `change_in_<department>_roles` | `workforce.history[].departmentHeadcount` |   | transformed | From `GET /v2/companies/workforce`. Compare two history points to get the change. |
+| `profiles_found_per_quarter` | `workforce.observedEmployeeCount` | `workforce` | lossy |   |
+| `quarters` | `workforce.history[].date` |   | transformed | One date per history point instead of quarter labels. |
+
+### Funding
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `known_funding_total_value` | `financial.totalFunding` | `financial` | renamed |   |
+| `last_funding_round_type` | `financial.fundingStage` | `financial` | transformed |   |
+| `last_funding_round_date` | `financial.fundingDate` | `financial` | transformed |   |
+| `funding_rounds_info`, `number_of_funding_rounds` | `financial.fundingRounds` | `financial` | transformed | Each round has `type`, `date`, `amount`, and `investors`. Count the list for the number of rounds. |
+| `first_funding_round_type`, `first_funding_round_date`, `first_funding_round_value_usd`, `last_funding_round_value_usd` | `financial.fundingRounds` | `financial` | transformed | Sort the rounds by `date` and take the first or last. |
+| `investors` | `financial.fundingRounds[].investors` | `financial` | transformed | Listed per round. |
+| `acquired_by`, `is_ipo`, `ipo_date`, `ipo_size_usd`, `current_advisors`, `number_of_advisors`, `latest_funding_increase_percentage` | — |   | none |   |
+
+### Other enrichments
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `business_intent_topics`, `events` | — |   | none |   |
+| `parent_company_id`, `parent_company_name`, `ultimate_parent_id`, `ultimate_parent_name`, `subsidiaries` | — |   | none |   |
+| `lookalike_business_id`, `similarity_score` | — |   | none | Lookalike results are full company records from search. |
+
+{/* end generated */}
+
+## Prospect fields
+
+Fields under **Current job** come from the person's current experience. A CompanyEnrich person can have more than one current experience, marked with `isCurrent`. After an email lookup, the experience at the email's company has `isMatched` set to `true`.
+
+Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), a separate call.
+
+{/* generated: explorium fields:person */}
+
+### Identity
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `prospect_id` | `id` |   | lossy | A separate ID space. CompanyEnrich person IDs are 64-bit integers. |
+| `full_name` | `name` |   | transformed |   |
+| `first_name` | `firstName` |   | transformed |   |
+| `last_name` | `lastName` |   | transformed |   |
+| `gender`, `age_group` | — |   | none |   |
+
+### Current job
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `job_title` | `position` |   | transformed |   |
+| `job_level_main`, `job_level_array`, `job_seniority_level` | `seniority` |   | lossy | One value instead of a list. The deprecated `job_seniority_level` uses older values such as `cxo`; translate them as their `job_level` equivalents. See [Seniority](#seniority). |
+| `job_department_main`, `job_department_array`, `job_department` | `department` |   | lossy | One value, which can be a sub-department such as `sales/partnerships`. See [Department](#department). |
+| `company_name` | `experiences[].company.name` or `experiences[].companyName` |   | transformed | From the current experience. See the note below. |
+| `company_website` | `experiences[].company.domain` |   | transformed |   |
+| `company_linkedin` | `experiences[].company.socials.linkedinUrl` | `company` | transformed |   |
+
+### History
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `experience` | `experiences` |   | transformed |   |
+| `education` | `education` | `education` | transformed |   |
+| `skills`, `interests` | — |   | none |   |
+
+### Location
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `country_name` | `location.country.name` |   | transformed |   |
+| `region_name`, `city` | `location.address` |   | lossy | A single text field, such as a city and country. |
+
+### Social
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `linkedin` | `socials.linkedinUrl` |   | transformed | Explorium often returns member-ID URLs such as `linkedin.com/in/ACoAA...`, which do not match profile URLs. |
+| `linkedin_url_array` | — |   | none |   |
+
+### Contact
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `professional_email`, `professions_email` | `email` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | transformed | `professions_email` is the v1 name. |
+| `professional_email_status` | `certainty` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | lossy |   |
+| `phone_numbers`, `mobile_phone` | — |   | none |   |
+| `emails`, `hashed_personal_emails`, `hashed_professional_emails`, `professional_email_hashed` | — |   | none |   |
+
+{/* end generated */}
+
+## Account fields
+
+These come from [`GET /v2/me`](/api-reference/v2/get-me), which replaces Explorium's credits endpoint and is free.
+
+{/* generated: explorium fields:account */}
+
+### Credits
+
+| Explorium | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `remaining_credits` | `credits.total` |   | transformed | Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional. |
+| `allocated_credits` | `credits.total` |   | renamed | The total allowance. It can be fractional. |
+| `account_type` | `capabilities` |   | lossy | The features and limits of your plan, such as `previews` and `companySearchLimit`. |
+
+{/* end generated */}
+
+## Value translations
+
+These tables translate fixed values. Values not listed have no counterpart. Use them to convert stored values and search filters, and keep the original Explorium value when you store converted data.
+
+{/* generated: explorium values */}
+
+### Company size
+
+Explorium `number_of_employees_range`, `company_size` → CompanyEnrich `employees`. The labels translate one to one. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range.
+
+| Explorium | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `1-10` | `1-10` | same |   |
+| `11-50` | `11-50` | same |   |
+| `51-200` | `51-200` | same |   |
+| `201-500` | `201-500` | same |   |
+| `501-1000` | `501-1K` | renamed |   |
+| `1001-5000` | `1K-5K` | renamed |   |
+| `5001-10000` | `5K-10K` | renamed |   |
+| `10001+` | `over-10K` | renamed |   |
+
+### Revenue
+
+Explorium `yearly_revenue_range`, `company_revenue` → CompanyEnrich `revenue`. CompanyEnrich has fewer, wider ranges. To keep a search at least as broad, include every range that overlaps.
+
+| Explorium | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `0-500K`, `500K-1M` | `under-1m` | lossy | Wider range. |
+| `1M-5M`, `5M-10M` | `1m-10m` | lossy | Wider range. |
+| `10M-25M` | `10m-50m` | lossy | Wider range. |
+| `25M-75M` | `10m-50m`, `50m-100m` | lossy | Spans two ranges. |
+| `75M-200M` | `50m-100m`, `100m-200m` | lossy | Spans two ranges. |
+| `200M-500M`, `500M-1B` | `200m-1b` | lossy | Wider range. |
+| `1B-10B`, `10B-100B`, `100B-1T`, `1T-10T`, `10T+` | `over-1b` | lossy | Wider range. |
+
+### Seniority
+
+Explorium `job_level_main`, `job_level` → CompanyEnrich `seniority`. Values marked as not mapped automatically need a decision for your use case.
+
+| Explorium | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `owner` | `owner` | same |   |
+| `founder` | `founder` | same |   |
+| `c-suite` | `c-suite` | same |   |
+| `partner` | `partner` | same |   |
+| `vice president` | `vp` | renamed |   |
+| `director` | `director` | same |   |
+| `manager` | `manager` | same |   |
+| `senior manager` | `manager` | lossy | No separate senior manager level. |
+| `senior non-managerial` | `senior` | renamed |   |
+| `junior` | `entry` | renamed |   |
+| `president` | — | none | Not mapped automatically. Often `c-suite`. |
+| `non-managerial` | — | none | Not mapped automatically. Covers `entry` and `senior`. |
+| `training` | — | none | Not mapped automatically. `intern` overlaps. |
+| `unpaid` | — | none | Not mapped automatically. `intern` overlaps. |
+| `advisor`, `board member`, `freelancer` | — | none | No equivalent level. |
+
+### Department
+
+Explorium `job_department_main`, `job_department` → CompanyEnrich `department`. A department filter also matches its sub-departments, such as `sales` matching `sales/partnerships`.
+
+| Explorium | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `c-suite` | `c-suite` | same |   |
+| `sales` | `sales` | same |   |
+| `marketing` | `marketing` | same |   |
+| `finance` | `finance` | same |   |
+| `legal` | `legal` | same |   |
+| `operations` | `operations` | same |   |
+| `design` | `design` | same |   |
+| `education` | `education` | same |   |
+| `engineering` | `engineering-technical` | renamed |   |
+| `product` | `product-management` | renamed |   |
+| `human resources` | `human-resources` | renamed |   |
+| `it` | `information-technology` | renamed |   |
+| `healthcare` | `medical-health` | renamed |   |
+| `partnerships` | `sales/partnerships` | renamed | A sub-department of `sales`. |
+| `customer success` | `sales/customer-success` | renamed | A sub-department of `sales`. |
+| `procurement` | `finance/sourcing-procurement` | renamed | A sub-department of `finance`. |
+| `logistics` | `operations/logistics` | renamed | A sub-department of `operations`. |
+| `real estate` | `operations/real-estate` | renamed | A sub-department of `operations`. |
+| `r&d` | `engineering-technical/research-development` | renamed | A sub-department of `engineering-technical`. |
+| `strategy` | `operations/corporate-strategy` | lossy | A sub-department of `operations`. |
+| `administration`, `creative`, `data`, `manufacturing`, `public service`, `retail`, `security`, `support`, `trade` | — | none | No single department. |
+
+{/* end generated */}
+
+### Country
+
+Explorium returns a lowercase country name, such as `united states`, and takes lowercase ISO codes in filters, such as `us`. CompanyEnrich returns `location.country.code`, an uppercase ISO 3166-1 alpha-2 code such as `US`, and `location.country.name`. To convert stored names, look up the codes with [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries), which is free.
+
+### Company age
+
+Explorium filters by age ranges such as `0-3` and `20+`. CompanyEnrich returns `foundedYear` and filters on it with `min` and `max`. Subtract the range from the current year.
+
+## CompanyEnrich fields Explorium does not return
+
+### Company
+
+{/* generated: explorium ceOnly:company */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `legalName` |   | The registered legal name. |
+| `foundedYear` |   | Explorium filters by company age range. CompanyEnrich returns the year. |
+| `type` |   | Such as `private`, `public`, or `nonprofit`. |
+| `categories` |   | Business model, such as `saas` or `b2b`. |
+| `location.country.code` |   | ISO 3166-1 alpha-2 country code. |
+| `socials.twitterUrl`, `socials.facebookUrl`, `socials.crunchbaseUrl`, `socials.githubUrl` |   | Other social profiles. |
+| `keywords` | `keywords` | Keywords that describe what the company does. |
+| `workforce.history` |   | Monthly headcount history from `GET /v2/companies/workforce`. |
+| `updatedAt` |   | When the record last changed. |
+
+{/* end generated */}
+
+### Person
+
+{/* generated: explorium ceOnly:person */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `imageUrl` |   | Profile image. |
+| `experiences[].isMatched` |   | Which experience matched your search filters or your email lookup. |
+| `experiences[].startDate` |   | Start and end dates for each job. |
+
+{/* end generated */}
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-explorium">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-explorium-search">
+    Translate fetch filters for businesses and prospects.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a CompanyEnrich company record.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a CompanyEnrich person record.
+  </Card>
+</CardGroup>

@@ -81,6 +81,7 @@ const roots = {
   company: responseSchema('get', '/v2/companies/enrich'),
   person: responseSchema('get', '/v2/people/{personId}'),
   workEmail: responseSchema('get', '/v2/people/{personId}/email'),
+  account: responseSchema('get', '/v2/me'),
 };
 const searchRequests = {
   company: requestSchema('post', '/v2/companies/search'),
@@ -112,8 +113,13 @@ function checkKeys(value, schema, where) {
 
 const list = (value) => (value == null ? [] : Array.isArray(value) ? value : [value]);
 
+// Each mapping names its vendor key, such as `pdl`, which rows use for the vendor side.
+const source = (mapping) => mapping.vendor.key;
+
 function validate(slug, mapping) {
   const where = `migrations/${slug}.json`;
+  const key = source(mapping);
+  if (!key) errors.push(`${where}: vendor.key is required`);
   for (const [index, endpoint] of mapping.endpoints.entries()) {
     const label = `${where} endpoints[${index}]`;
     if (!['company', 'people', 'supporting'].includes(endpoint.group)) errors.push(`${label}: bad group`);
@@ -128,7 +134,7 @@ function validate(slug, mapping) {
 
   for (const [object, rows] of Object.entries(mapping.fields)) {
     for (const [index, row] of rows.entries()) {
-      const label = `${where} fields.${object}[${index}] (${list(row.pdl).join(', ')})`;
+      const label = `${where} fields.${object}[${index}] (${list(row[key]).join(', ')})`;
       const root = roots[row.in ?? object];
       if (!root) errors.push(`${label}: unknown object ${row.in ?? object}`);
       if (!fidelities.includes(row.fidelity)) errors.push(`${label}: bad fidelity ${row.fidelity}`);
@@ -158,11 +164,17 @@ function validate(slug, mapping) {
     for (const row of table.rows) {
       if (!fidelities.includes(row.fidelity)) errors.push(`${where} values.${name}: bad fidelity ${row.fidelity}`);
       if ((row.ce === null) !== (row.fidelity === 'none')) {
-        errors.push(`${where} values.${name} (${list(row.pdl).join(', ')}): fidelity none and a null ce must go together`);
+        errors.push(`${where} values.${name} (${list(row[key]).join(', ')}): fidelity none and a null ce must go together`);
       }
       for (const value of list(row.ce)) {
         if (!allowed.has(value)) errors.push(`${where} values.${name}: ${value} is not a value of ${table.enum}`);
       }
+    }
+  }
+
+  for (const [index, row] of (mapping.mcp ?? []).entries()) {
+    for (const tool of list(row.ce)) {
+      if (!mcpTools.has(tool)) errors.push(`${where} mcp[${index}]: ${tool} is not a tool in docs/mcp-server.mdx`);
     }
   }
 
@@ -229,24 +241,30 @@ const renderers = {
   ),
 
   endpoints: (mapping, group) => table(
-    ['People Data Labs', 'CompanyEnrich V2', 'Notes'],
+    [mapping.vendor.name, 'CompanyEnrich V2', 'Notes'],
     mapping.endpoints.filter((endpoint) => endpoint.group === group).map((endpoint) => {
-      let pdl = endpoint.pdl.startsWith('/') ? code(endpoint.pdl) : text(endpoint.pdl);
-      if (Array.isArray(endpoint.pdlInput)) pdl += ` with ${codes(endpoint.pdlInput)}`;
-      else if (endpoint.pdlInput) pdl += `, ${text(endpoint.pdlInput)}`;
+      const key = source(mapping);
+      const input = endpoint[`${key}Input`];
+      let from = list(endpoint[key])
+        .map((value) => (/^(\/|[A-Z]+ \/)/.test(value) ? code(value) : text(value)))
+        .join(', ');
+      if (Array.isArray(input)) from += ` with ${codes(input)}`;
+      else if (input) from += `, ${text(input)}`;
       const inputs = Object.entries(endpoint.inputs ?? {})
         .map(([from, to]) => `${code(from)} → ${codes(to, ' or ')}`);
-      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', text(endpoint.note ?? '')].filter(Boolean).join(' ');
-      return [pdl, endpoint.companyEnrich ? reference(endpoint.companyEnrich) : 'None', notes || ' '];
+      const drops = Object.entries(endpoint.drop ?? {}).map(([from, why]) => `Drop ${code(from)}: ${text(why)}`);
+      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', ...drops, text(endpoint.note ?? '')]
+        .filter(Boolean).join(' ');
+      return [from, endpoint.companyEnrich ? reference(endpoint.companyEnrich) : 'None', notes || ' '];
     }),
   ),
 
   fields: (mapping, object) => {
     const groups = [...new Set(mapping.fields[object].map((row) => row.group))];
     return groups.map((group) => `### ${group}\n\n${table(
-      ['People Data Labs', 'CompanyEnrich', 'Expand', 'Fidelity', 'Notes'],
+      [mapping.vendor.name, 'CompanyEnrich', 'Expand', 'Fidelity', 'Notes'],
       mapping.fields[object].filter((row) => row.group === group).map((row) => [
-        codes(row.pdl),
+        codes(row[source(mapping)]),
         row.ce === null ? '—' : row.in === 'workEmail'
           ? `${codes(row.ce)} from ${reference('GET /v2/people/{personId}/email')}`
           : codes(row.ce, ' or '),
@@ -264,17 +282,26 @@ const renderers = {
 
   values: (mapping) => Object.values(mapping.values).map((values) => [
     `### ${values.title}`,
-    `People Data Labs ${codes(values.pdl.split(', '))} → CompanyEnrich ${codes(values.ce.split(', '))}. ${text(values.note)}`,
+    `${mapping.vendor.name} ${codes(values[source(mapping)].split(', '))} → CompanyEnrich ${codes(values.ce.split(', '))}. ${text(values.note)}`,
     table(
-      ['People Data Labs', 'CompanyEnrich', 'Fidelity', 'Notes'],
-      values.rows.map((row) => [codes(row.pdl), row.ce === null ? '—' : codes(row.ce), row.fidelity, text(row.note ?? ' ')]),
+      [mapping.vendor.name, 'CompanyEnrich', 'Fidelity', 'Notes'],
+      values.rows.map((row) => [codes(row[source(mapping)]), row.ce === null ? '—' : codes(row.ce), row.fidelity, text(row.note ?? ' ')]),
     ),
   ].join('\n\n')).join('\n\n'),
 
+  mcp: (mapping) => table(
+    [`${mapping.vendor.name} tool`, 'CompanyEnrich tool', 'Notes'],
+    mapping.mcp.map((row) => [
+      row[source(mapping)] ? codes(row[source(mapping)]) : 'None',
+      row.ce ? codes(row.ce, ' or ') : 'None',
+      text(row.note ?? ' '),
+    ]),
+  ),
+
   search: (mapping, object) => table(
-    ['People Data Labs query', 'CompanyEnrich request', 'Fidelity', 'Notes'],
+    [`${mapping.vendor.name} ${mapping.vendor.searchLabel ?? 'query'}`, 'CompanyEnrich request', 'Fidelity', 'Notes'],
     mapping.search[object].map((row) => [
-      code(row.pdl),
+      code(typeof row[source(mapping)] === 'string' ? row[source(mapping)] : json(row[source(mapping)])),
       row.ce === null ? 'None' : code(json(row.ce)),
       row.fidelity,
       text(row.note ?? ' '),
@@ -283,6 +310,11 @@ const renderers = {
 };
 
 // --- Pages --------------------------------------------------------------------
+
+// MCP tool names come from the tools table in the MCP server guide.
+const mcpTools = new Set(
+  [...(await readFile('docs/mcp-server.mdx', 'utf8')).matchAll(/^\| `([a-z_]+)` +\|/gm)].map((match) => match[1]),
+);
 
 const mappings = new Map();
 for (const file of (await readdir('migrations')).filter((name) => name.endsWith('.json'))) {

@@ -1,0 +1,174 @@
+---
+title: "Migrate from Explorium with a coding agent"
+sidebarTitle: "With a coding agent"
+description: "Instructions a coding agent such as Claude Code, Codex, or Cursor follows to migrate a codebase and its MCP setup from the Explorium AgentSource API to the CompanyEnrich V2 API, using the published mapping file."
+---
+
+A coding agent can find every Explorium API call, MCP server entry, and stored Explorium value in your codebase, rewrite the calls to the official CompanyEnrich SDK, and list what has no equivalent. This page holds the instructions it follows. The agent reads them together with the [mapping file](https://docs.companyenrich.com/migrations/explorium.json), the same data behind the [field mapping](/docs/migrate-from-explorium-field-mapping) and [search filter](/docs/migrate-from-explorium-search) tables.
+
+The instructions work in any language and cover AgentSource v1 and v2.
+
+<Warning>
+  Explorium says AgentSource will be discontinued on December 2, 2026. Unlike a gradual migration, every call site needs a CompanyEnrich path, another provider, or removal. The report lists which is which.
+</Warning>
+
+## Start the migration
+
+Open your agent in the repository and give it this prompt:
+
+```text
+Migrate this codebase from Explorium to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-explorium-agent.md and use the mapping at https://docs.companyenrich.com/migrations/explorium.json. Show me the migration report before changing any code.
+```
+
+The URL ends in `.md`, which serves this page as plain Markdown for the agent to read.
+
+If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/explorium.json) and the [API specification](https://docs.companyenrich.com/openapi/v2.json) into the repository, and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then tell it where the files are and ask it to follow the instructions.
+
+## What the agent does
+
+| Step | The agent | You |
+| --- | --- | --- |
+| 1. Inventory | Finds Explorium HTTP calls, MCP configuration, prompts that name Explorium tools, keys, field reads, stored Explorium data, and tests | Nothing |
+| 2. Report | Writes `explorium-migration-report.md`, classifying each call site as moves, needs redesign, or no equivalent. Then it stops. | Approve, change, or exclude call sites, and decide what replaces each feature with no equivalent |
+| 3. Rewrite | Replaces approved calls with SDK calls behind a feature flag | Name the flag, if you have a convention |
+| 4. Searches | Translates fetch filters whose conditions all map, and marks the rest | Decide on filters that need a redesign |
+| 5. MCP | Points MCP configuration at the CompanyEnrich server and updates tool names in prompts | Sign in to the server, or set its key |
+| 6. Stored data | Writes migration files for new ID columns and converted values, without running them | Review and run them |
+| 7. Tests | Adds tests with mocked HTTP and runs your suite | Review the diff |
+| 8. Final report | Lists what moved, what has no equivalent, open TODOs, and the expansions each call requests | Run the [parity check](/docs/migrate-from-explorium#verify-parity-on-your-own-data) |
+
+## Guardrails
+
+The instructions tell the agent to:
+
+* **Stop for review.** No code changes before you approve the report.
+* **Spend nothing.** No paid CompanyEnrich requests and no Explorium requests. Tests use mocked HTTP. With your key, the agent may call only free endpoints: `GET /v2/me`, the counts, and the lookups for filter values.
+* **Keep Explorium working until you switch.** The Explorium path stays behind the flag until you remove it.
+* **Not guess.** Any field, input, or filter without an entry in the mapping file gets a TODO and a line in the report.
+* **Protect keys.** Keys come from environment variables and are never printed or committed.
+
+Review the diff as you would any other change. Pay most attention to the `lossy` fields your code depends on, the filters the agent marked for redesign, and the features with no equivalent.
+
+## Instructions
+
+Copy this block if you want to keep the instructions in your repository.
+
+````markdown
+# Migrate from Explorium AgentSource to CompanyEnrich V2
+
+You are migrating this codebase from the Explorium AgentSource API, v1 or v2, and the Explorium MCP server to the CompanyEnrich V2 API and MCP server. Explorium says AgentSource will be discontinued on December 2, 2026, so no call site can stay on Explorium after that date.
+
+## Sources
+
+Read the mapping file first. It is authoritative for endpoints, inputs, fields, values, search patterns, and MCP tools.
+
+- Mapping: https://docs.companyenrich.com/migrations/explorium.json
+- Guide: https://docs.companyenrich.com/docs/migrate-from-explorium.md
+- Field mapping: https://docs.companyenrich.com/docs/migrate-from-explorium-field-mapping.md
+- Search translation: https://docs.companyenrich.com/docs/migrate-from-explorium-search.md
+- Credits: https://docs.companyenrich.com/docs/credits.md
+- MCP server: https://docs.companyenrich.com/docs/mcp-server.md
+- API specification: https://docs.companyenrich.com/openapi/v2.json
+- SDKs: https://docs.companyenrich.com/docs/python-sdk.md, https://docs.companyenrich.com/docs/javascript-typescript-sdk.md, https://docs.companyenrich.com/docs/ruby-sdk.md, https://docs.companyenrich.com/docs/php-sdk.md
+
+If you cannot read the mapping file, stop and ask the user to add it to the repository.
+
+## Rules
+
+1. Use only the mappings in the mapping file and the endpoints in the API specification. If an Explorium field, input, filter, or tool has no entry, do not guess: leave the Explorium code in place, add a `TODO(companyenrich-migration)` comment that names it, and list it in the report.
+2. Do not change code until the user approves the migration report from step 2.
+3. Do not make Explorium requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, `POST /v2/people/search/count`, and the lookups for filter values (autocomplete, the industry list, and the `geo` endpoints), which are free. Any other live call needs the user's explicit approval and a credit budget.
+4. Read the CompanyEnrich key from the `COMPANYENRICH_API_KEY` environment variable. Never hardcode, print, log, or commit an API key.
+5. Keep the Explorium integration until the user removes it. Put each CompanyEnrich path behind a feature flag or configuration switch, using the project's existing convention if there is one.
+6. Request only the expansions for fields the code reads. Each expansion adds credits per record.
+7. Translate a fetch only when every filter has a pattern. Never drop a filter, and never replace filters with a semantic query, unless the user approves it.
+8. Use the official CompanyEnrich SDK for the repository's language. Use HTTP only when no SDK exists for it.
+9. Do not run database migrations or backfills. Write migration files for the user to review.
+
+## Step 1: Inventory
+
+Find every use of Explorium:
+
+- HTTP requests to `api.explorium.ai`, under `/v1` or `/v2`, and wrappers around them. Explorium has no official SDK, so look for the paths in the mapping file's `endpoints`.
+- MCP configuration that points at `mcp.explorium.ai` or `mcp-v2.explorium.ai`, in files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, or agent code.
+- Prompts, tool lists, and agent code that name Explorium MCP tools, such as `match-business` or `fetch-prospects`. The mapping file's `mcp` lists them.
+- Configuration: Explorium API keys, environment variables, and settings.
+- Reads of Explorium response fields: every `explorium` name in the mapping file's `fields`, plus `business_id`, `prospect_id`, `matched_businesses`, `matched_prospects`, `data`, `total_results`, `page`, and `next_cursor`.
+- Async jobs, events, enrollments, and webhook handlers.
+- Stored Explorium data: models, columns, and serializers with Explorium field names, IDs, or enum values such as employee ranges, revenue ranges, and job levels.
+- Tests, fixtures, and mocks for Explorium.
+
+## Step 2: Write the migration report, then stop
+
+Write `explorium-migration-report.md` at the repository root, unless the user names another place. Include:
+
+1. A table of call sites with: file and line, Explorium endpoint or tool and inputs, fields read, classification, CompanyEnrich replacement, expansions needed, and notes. Classify each call site as:
+   - **moves**: the endpoint or tool has a mapping other than `none`, every input the call sends has a mapping in `inputs` or is listed in `drop`, every field the code reads has a mapping other than `none`, and every search filter has a pattern. `lossy` and `transformed` mappings still move. List them in the notes.
+   - **needs redesign**: the call can move, but behavior the code relies on changes. For example, the code compares, scores, or stores values whose labels or definitions change, such as employee or revenue ranges, or relies on a list where CompanyEnrich returns one value, such as job levels. A fetch in which any filter has no pattern also needs redesign: list the filters that translate and the ones that do not, and the user decides whether to drop, approximate, or replace each one.
+   - **no equivalent**: the endpoint or tool has no equivalent, an input other than a search filter has no equivalent, or the code needs a field whose fidelity is `none`. Because Explorium is being discontinued, propose a replacement for each: a CompanyEnrich approximation, another provider, or removing the feature. The user decides.
+
+   A match followed by an enrichment is one call site, and it moves to one CompanyEnrich call. A check for a `null` ID becomes a not-found check, and choosing among several current jobs is an open question for item 4. Neither alone makes a call site need a redesign.
+2. Billing behavior that changes for each call: empty searches are charged one result's base price, each expansion adds credits, and work emails are a separate call.
+3. Stored data that changes, and the ID plan: add CompanyEnrich ID columns next to Explorium IDs and re-key company data on its domain.
+4. Open questions, such as which current job to use when a person has several, and the feature flag name.
+
+Stop and ask the user to approve, change, or exclude call sites.
+
+## Step 3: Rewrite approved call sites
+
+- Replace each call with the CompanyEnrich endpoint from `endpoints`, and map its inputs with `inputs`. Remove the separate match step: a lookup by domain, by name or social profile, or by work email returns the record.
+- Convert field reads with `fields`. A row with `in: workEmail` comes from `GET /v2/people/{personId}/email`, a separate call. A row with `expand` needs that expansion in the request.
+- Convert enum values with `values`.
+- A person can have several current experiences, marked with `isCurrent`. Use the one with `isMatched` set: after an email lookup, that is the job at the email's company. If none or several qualify, follow the policy the user approved. Do not silently take the first one.
+- CompanyEnrich returns the record as the response body, with no `data` wrapper.
+- No match returns `404` and is not charged, instead of a `null` ID in a `200` response. The SDKs raise a not-found error. Out of credits returns `402`, not `403`, and `402` can also mean a plan without the feature, so do not retry it.
+- Enrich lists of domains with `POST /v2/companies/enrich/batch`, 50 per request, or a bulk job for up to 10,000.
+- Page searches with `pageSize` (1 to 100) and `cursor`, taken from `nextCursor`. There are no numbered pages.
+- CompanyEnrich returns text in source casing, uppercase ISO country codes, and social URLs with `https://`. Normalize explicitly where the code compares strings.
+
+## Step 4: Translate searches
+
+For each fetch, list its filters and map each one with the `search` patterns. If any filter has no pattern, or its pattern maps to `null`, keep the Explorium code, add a TODO, and list it in the report. Patterns with `STATE_ID` or `CITY_ID` need an ID from the free `geo` endpoints. Without a key, leave a TODO that names the place to look up. Convert `company_age` ranges to `foundedYear` from the current year. Add a test that asserts the exact filter your code builds.
+
+## Step 5: MCP
+
+- Replace each Explorium MCP server entry with the CompanyEnrich server, `https://mcp.companyenrich.com/mcp`, following the MCP server guide for that client. Do not put a key in a committed file; use the client's sign-in or an environment variable.
+- Update prompts, tool allow-lists, and agent code that name Explorium tools, using `mcp` in the mapping file. Remove steps that only fetched IDs or autocomplete values for Explorium.
+
+## Step 6: Stored data
+
+Write, but do not run, migrations that add columns for CompanyEnrich IDs and values next to the Explorium columns. Keep the original Explorium values, and do not overwrite Explorium columns with CompanyEnrich data. A stored Explorium value converted with `values` has a CompanyEnrich label but is still Explorium data. Keep it apart from values the API returns, or record where each value came from. Do not backfill records through the API without approval.
+
+## Step 7: Tests
+
+- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Start from the records under `fixtures` in the mapping file, and build other responses from the response schemas in the API specification.
+- Cover a match, `404`, `402`, `429`, and an empty search.
+- Run the project's test suite. Tests must not call live APIs.
+
+## Step 8: Final report
+
+Update `explorium-migration-report.md` with the files changed, the call sites that moved, the ones with no equivalent and the replacement the user chose, the remaining TODOs, the expansions each call requests, how to switch the feature flag, the MCP changes, and a link to the parity check: https://docs.companyenrich.com/docs/migrate-from-explorium.md#verify-parity-on-your-own-data
+````
+
+## Limitations
+
+* The mapping covers AgentSource v1 and v2 as documented on November 16, 2026. Check the `checkedAt` date in the mapping file.
+* The agent cannot decide whether a `lossy` field is good enough for your product, or what replaces a feature with no equivalent. The report lists both for you.
+* Search translations change results by design, because the two APIs rank and match differently. Compare totals with the free count endpoints before you switch.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-explorium">
+    Endpoint and MCP tool mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-explorium-field-mapping">
+    The human-readable version of the mapping file.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-explorium-search">
+    How Explorium fetch filters become CompanyEnrich filters.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Connect your AI client to CompanyEnrich.
+  </Card>
+</CardGroup>

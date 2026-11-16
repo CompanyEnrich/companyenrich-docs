@@ -1,0 +1,481 @@
+---
+title: "Migrate from Explorium to CompanyEnrich"
+sidebarTitle: "Overview"
+description: "Move Explorium AgentSource v1 and v2 API calls and MCP tools to the CompanyEnrich V2 API: endpoint and tool mapping, request and response differences, and a parity check on your own data."
+---
+
+{/* Tables between "generated" markers come from migrations/explorium.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This guide is for engineers whose code or AI agents call Explorium's AgentSource API, v1 or v2, or its MCP server. It maps each Explorium endpoint and MCP tool to CompanyEnrich, lists the behavior that changes in your code, and shows how to check the result on records you already have.
+
+<Warning>
+  Explorium says AgentSource will be discontinued on December 2, 2026. Read [Explorium's notice](https://www.explorium.ai/blog/news-and-updates/farewell-from-explorium-with-gratitude/) for what happens to your credits and account.
+</Warning>
+
+<Note>
+  Explorium behavior on these pages was checked against Explorium's public developer documentation for AgentSource v1 and v2 on November 16, 2026. CompanyEnrich behavior comes from the [V2 API reference](/api-reference/v2/overview). The full mapping is also available as JSON at [/migrations/explorium.json](https://docs.companyenrich.com/migrations/explorium.json).
+</Note>
+
+<CardGroup cols={3}>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-explorium-field-mapping">
+    Every Explorium business and prospect field, with its CompanyEnrich counterpart.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-explorium-search">
+    Translate fetch filters for businesses and prospects.
+  </Card>
+  <Card title="With a coding agent" icon="robot" href="/docs/migrate-from-explorium-agent">
+    Instructions a coding agent follows to migrate your codebase.
+  </Card>
+</CardGroup>
+
+## Check the fit first
+
+| Workload | Status | Start here |
+| --- | --- | --- |
+| Match a business by domain, then enrich firmographics | Moves, in one call | [Switch company enrichment](#switch-company-enrichment-in-five-minutes) |
+| Match a business by name or LinkedIn URL | Moves | [Endpoint mapping](#company) |
+| Firmographics for many businesses | Moves, in batches of 50 or as a background job | [Endpoint mapping](#company) |
+| Technographics, funding, and workforce trends | Move as expansions or the workforce endpoint, with fewer fields | [Field mapping](/docs/migrate-from-explorium-field-mapping) |
+| Lookalikes | Moves to lookalike search, with up to 10 seed domains | [Endpoint mapping](#company) |
+| Fetch businesses or prospects | Rewrite each filter | [Search filters](/docs/migrate-from-explorium-search) |
+| Match a prospect by work email, then get the profile or professional email | Moves | [Endpoint mapping](#people) |
+| MCP server | Moves to the CompanyEnrich MCP server | [Move your MCP setup](#move-your-mcp-setup) |
+| Phone numbers, personal emails, and prospect match by LinkedIn URL or phone | No equivalent | [What has no equivalent](#what-has-no-equivalent) |
+| Events, webhooks, intent, research, and the other enrichments | No equivalent | [What has no equivalent](#what-has-no-equivalent) |
+
+## Switch company enrichment in five minutes
+
+This is the shortest path: a business match and firmographics call, replaced by one enrichment call with the Python SDK.
+
+<Steps>
+  <Step title="Get an API key">
+    Create a key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys) and export it as `COMPANYENRICH_API_KEY`. Check it with [`GET /v2/me`](/api-reference/v2/get-me), which is free:
+
+    ```bash
+    curl https://api.companyenrich.com/v2/me \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+  </Step>
+  <Step title="Install the SDK">
+    ```bash
+    pip install companyenrich
+    ```
+
+    The [Python SDK](/docs/python-sdk) needs Python 3.10 or later. There are also SDKs for [JavaScript](/docs/javascript-typescript-sdk), [Ruby](/docs/ruby-sdk), and [PHP](/docs/php-sdk).
+  </Step>
+  <Step title="Replace the calls">
+    <CodeGroup>
+
+    ```python Before (Explorium)
+    import os
+
+    import requests
+
+    BASE = "https://api.explorium.ai/v2"
+    HEADERS = {"api_key": os.environ["EXPLORIUM_API_KEY"]}
+
+    match = requests.post(f"{BASE}/businesses/match", headers=HEADERS,
+                          json={"businesses_to_match": [{"domain": "stripe.com"}]}).json()
+    business_id = match["matched_businesses"][0]["business_id"]
+    if business_id:
+        result = requests.post(f"{BASE}/businesses/firmographics/enrich", headers=HEADERS,
+                               json={"business_ids": [business_id]}).json()
+        company = result["data"][0]["data"]
+        print(company["name"], company["number_of_employees_range"], company["linkedin_profile"])
+    ```
+
+    ```python After (CompanyEnrich)
+    from companyenrich import CompanyEnrich, NotFoundError
+
+    client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+    try:
+        company = client.companies.enrich("stripe.com")
+        socials = company.get("socials") or {}
+        print(company.get("name"), company.get("employees"), socials.get("linkedinUrl"))
+    except NotFoundError:
+        company = None  # no match, not charged
+    ```
+
+    ```bash cURL
+    curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Update the fields you read">
+    | Explorium field | CompanyEnrich field | Change |
+    | --- | --- | --- |
+    | `business_id` | `id`, or the domain | A different ID. Store the domain or the CompanyEnrich ID. |
+    | `name` | `name` | Same |
+    | `website` | `domain` or `website` | `domain` is the host. `website` is a full URL. |
+    | `number_of_employees_range` | `employees` | Different labels above 500, such as `1K-5K` |
+    | `country_name` | `location.country.name` or `location.country.code` | Name in source casing, or an ISO code |
+    | `linkedin_profile` | `socials.linkedinUrl` | Full URL with `https://` |
+
+    The [field mapping](/docs/migrate-from-explorium-field-mapping) covers every other field.
+  </Step>
+  <Step title="Handle no match">
+    Explorium's match returns `200` with a `business_id` of `null`. CompanyEnrich returns `404`, and the SDK raises `NotFoundError`. It is not charged.
+  </Step>
+</Steps>
+
+## What takes longer
+
+| Workload | Why | Guide |
+| --- | --- | --- |
+| Fetch filters | Each filter has a different name and value format, and some have no equivalent. | [Search filters](/docs/migrate-from-explorium-search) |
+| Stored records | Explorium IDs do not carry over, and casing and enum values change. | [Field mapping](/docs/migrate-from-explorium-field-mapping) |
+| Contact data | CompanyEnrich finds work emails only, one person at a time. | [People](#people) |
+| Events and webhooks | There is no event feed. Re-enrich the records you track on a schedule. | [What has no equivalent](#what-has-no-equivalent) |
+| AI agents | MCP tool names and arguments change. | [Move your MCP setup](#move-your-mcp-setup) |
+
+## Migrate with a coding agent
+
+A coding agent can do the inventory, the rewrite, and the tests. Give it this prompt in your repository:
+
+```text
+Migrate this codebase from Explorium to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-explorium-agent.md and use the mapping at https://docs.companyenrich.com/migrations/explorium.json. Show me the migration report before changing any code.
+```
+
+See [Migrate with a coding agent](/docs/migrate-from-explorium-agent) for what the agent does and the rules it follows.
+
+## Move your MCP setup
+
+If your agent uses the Explorium MCP server, point it at the CompanyEnrich server instead. The hosted server is at `https://mcp.companyenrich.com/mcp`. For example, in Claude Code:
+
+```bash
+claude mcp add --transport http companyenrich https://mcp.companyenrich.com/mcp
+```
+
+The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code, and other clients, and lists the credits each tool uses. Then update any prompts or code that name Explorium tools:
+
+{/* generated: explorium mcp */}
+
+| Explorium tool | CompanyEnrich tool | Notes |
+| --- | --- | --- |
+| `match-business` | `enrich_company` or `enrich_company_by_properties` | Returns the full record in one step, by domain or by name or social profile. |
+| `enrich-business` | `enrich_company` or `get_company_workforce` | The company record includes technologies, keywords, and funding. For headcount by department, set `includeWorkforce` or use `get_company_workforce`. |
+| `fetch-businesses` | `search_companies` | Takes filters or a plain-language description. |
+| `fetch-businesses-statistics` | None | No statistics tool. Your agent can call the free count endpoint through the API. |
+| `fetch-businesses-events` | None | No events. |
+| `match-prospects` | `lookup_person_by_email` or `search_people` | By work email, or by name and company. |
+| `fetch-prospects` | `search_people` | Filters by seniority, department, title, country, and employer. |
+| `fetch-prospects-statistics` | None | No statistics tool. |
+| `fetch-prospects-events` | None | No events. |
+| `enrich-prospects` | `get_person_by_id` or `enrich_person_email` | Profile and work email. No phone numbers. |
+| `autocomplete` | None | Not needed. `search_companies` and `search_people` accept plain values and descriptions. |
+| None | `find_similar_companies` | Lookalikes from 1 to 10 seed domains. Explorium offered this as an enrichment rather than a tool. |
+| None | `get_current_user` | Free. Checks your credit balance. |
+
+{/* end generated */}
+
+CompanyEnrich tools take plain values, such as a domain or a job title, so your agent does not need to look up IDs or autocomplete values first.
+
+## Endpoint mapping
+
+Both API versions are listed. A v1 path such as `/v1/businesses/match` maps the same way as its v2 path. Where an Explorium call takes `business_ids` or `prospect_ids`, send the company's domain, or the CompanyEnrich person ID, instead. Explorium IDs cannot be converted.
+
+### Company
+
+{/* generated: explorium endpoints:company */}
+
+| Explorium | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `POST /v2/businesses/match`, `POST /v1/businesses/match` with `domain`, `url` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `businesses_to_match[].domain` → `domain`; `businesses_to_match[].url` → `domain`. There is no separate match step. The enrich call returns the company record, or `404` when there is none. Send the host only, such as `stripe.com`. Store the domain, or the CompanyEnrich `id`, instead of `business_id`. |
+| `POST /v2/businesses/match`, `POST /v1/businesses/match` with `name`, `linkedin_url` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `businesses_to_match[].name` → `name`; `businesses_to_match[].linkedin_url` → `linkedinUrl`. Every property you send must match. When several companies match, the highest-ranked one is returned. No match returns `404` and is not charged. |
+| `POST /v2/businesses/firmographics/enrich`, `POST /v1/businesses/firmographics/enrich` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `business_id` → `domain`; `business_ids` → `domain`; `businesses_to_match` → `domain`. Firmographics are the base company record. One request per domain. |
+| `POST /v2/businesses/firmographics/job`, `POST /v1/businesses/firmographics/bulk_enrich` | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | `business_ids` → `domains[]`; `businesses_to_match` → `domains[]`. Up to 50 domains per request, returned in request order with a `status` of `found`, `not-found`, `invalid-domain`, or `pending`. For up to 10,000 domains in the background, use `POST /v2/companies/enrich/bulk`. |
+| `POST /v2/businesses/technographics/enrich`, `POST /v2/businesses/webstack/enrich`, `POST /v1/businesses/technographics/enrich`, `POST /v1/businesses/webstack/enrich` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `business_id` → `domain`; `business_ids` → `domain`; `businesses_to_match` → `domain`. Request `expand=technologies`. It returns a flat list of technologies, with no categories and no website spend or traffic fields. |
+| `POST /v2/businesses/workforce_trends/enrich`, `POST /v1/businesses/workforce_trends/enrich` | [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) | `business_id` → `domain`; `business_ids` → `domain`; `businesses_to_match` → `domain`. Returns headcount by department and its history, as counts instead of percentages. To get the current breakdown with the company record, request `expand=workforce` on enrichment. |
+| `POST /v2/businesses/funding_and_acquisition/enrich`, `POST /v1/businesses/funding_and_acquisition/enrich` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `business_id` → `domain`; `business_ids` → `domain`; `businesses_to_match` → `domain`. Request `expand=financial` for funding rounds, total funding, and the stock symbol. Acquisitions, advisors, and IPO details have no equivalent. |
+| `POST /v2/businesses/lookalikes/enrich`, `POST /v1/businesses/lookalikes/enrich` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `business_id` → `lookalike.domains`; `business_ids` → `lookalike.domains`; `businesses_to_match` → `lookalike.domains`. Send a `lookalike` query with 1 to 10 seed domains, plus optional filters. Results are company records ranked by similarity, without a `similarity_score`. |
+| `POST /v2/businesses`, `POST /v1/businesses` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `filters` → `filter`; `page_size` → `pageSize`; `next_cursor` → `cursor`. Drop `mode`: results are always full records. Rewrite each filter. See [Translate search filters](/docs/migrate-from-explorium-search). Results are full company records, so no enrichment call is needed afterwards for firmographic fields. Numbered `page` requests have no equivalent; page with the cursor. |
+| `POST /v2/businesses/stats`, `POST /v1/businesses/stats` | [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count) | Free. Returns the total only, with no breakdown by industry, revenue, size, or region. Run one count per segment you need. |
+| `GET /v2/autocomplete`, `GET /v1/businesses/autocomplete` | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete) | Free. Company autocomplete suggests companies by name. For filter values, use technology, keyword, or position autocomplete, the industry list, or the geo endpoints. |
+| `POST /v2/businesses/financial_indicators/enrich`, `POST /v1/businesses/financial_indicators/enrich` | None | No public-company financial metrics such as EBITDA or ratios. `expand=financial` returns the stock symbol and exchange. |
+| `POST /v2/businesses/company_hierarchies/enrich`, `POST /v1/businesses/company_hierarchies/enrich` | None | No parent or subsidiary data. |
+| `POST /v2/businesses/linkedin_posts/enrich`, `POST /v1/businesses/linkedin_posts/enrich` | None | No social posts. |
+| `POST /v2/businesses/website_changes/enrich`, `POST /v1/businesses/website_changes/enrich` | None | No website change history. Every record has an `updatedAt` timestamp. |
+| `POST /v2/businesses/company_website_keywords/enrich`, `POST /v1/businesses/company_website_keywords/enrich` | None | No full-text search of website pages. The `keywords` search filter and expansion use keywords that describe the company, not page text. |
+| `POST /v2/businesses/company_ratings_by_employees/enrich`, `POST /v1/businesses/company_ratings_by_employees/enrich` | None | No employee ratings. |
+| `POST /v2/businesses/bombora_intent/enrich`, `POST /v1/businesses/bombora_intent/enrich` | None | No intent data. |
+| `POST /v2/businesses/pc_strategy_10k/enrich`, `POST /v2/businesses/pc_competitive_landscape_10k/enrich`, `POST /v2/businesses/pc_business_challenges_10k/enrich` | None | No analysis of annual reports. The same applies to the v1 routes. |
+| `POST /v2/businesses/research/enrich`, `POST /v2/businesses/research/job` | None | No custom AI research endpoint. Semantic search finds companies from a description, and the MCP server lets your own agent combine CompanyEnrich data with other tools. |
+| `POST /v2/businesses/events`, `POST /v2/businesses/events/enrollments`, `POST /v1/businesses/events` | None | No event feed, enrollments, or webhooks. To watch for changes, re-enrich the companies you track on a schedule and compare `updatedAt`, headcount, or funding. |
+
+{/* end generated */}
+
+### People
+
+{/* generated: explorium endpoints:people */}
+
+| Explorium | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `POST /v2/prospects/match`, `POST /v1/prospects/match` with `email` | [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich) | `prospects_to_match[].email` → `email`. Work emails only. The API resolves the company from the email domain, then matches the person. The person is the response body. No match returns `404` and is not charged. |
+| `POST /v2/prospects/match`, `POST /v1/prospects/match` with `full_name`, `company_name`, `business_id` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `prospects_to_match[].full_name` → `filter.query`; `prospects_to_match[].company_name` → `filter.domain`; `prospects_to_match[].business_id` → `filter.domain`. Search by name at the company's domain. It returns matching people without a confidence score, so pick the person in your code. |
+| `POST /v2/prospects/match`, `POST /v1/prospects/match` with `linkedin`, `phone_number` | None | No person lookup by LinkedIn URL or phone number. |
+| `POST /v2/prospects`, `POST /v1/prospects` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `filters` → `filter` or `company`; `page_size` → `pageSize`; `next_cursor` → `cursor`. Drop `mode`: results are always full records. Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-explorium-search). Numbered `page` requests have no equivalent; page with the cursor. |
+| `POST /v2/prospects/stats`, `POST /v1/prospects/stats` | [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count) | Free. Returns the total only, with no breakdown by department or region. |
+| `POST /v2/prospects/profiles/enrich`, `POST /v1/prospects/profiles/enrich` | [`GET /v2/people/{personId}`](/api-reference/v2/get-people-personid) | `prospect_id` → `personId`; `prospect_ids` → `personId`. Takes a CompanyEnrich person ID from search or email enrichment. Explorium prospect IDs do not carry over. |
+| `POST /v2/prospects/contact_information/enrich`, `POST /v1/prospects/contacts_information/enrich` | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) | `prospect_id` → `personId`; `prospect_ids` → `personId`. Work email only, with a `status` and `certainty`. No phone numbers, personal emails, or hashed emails. Costs 10 credits only when it finds an email your account has not accessed before. |
+| `POST /v2/prospects/linkedin_posts/enrich`, `POST /v1/prospects/linkedin_posts/enrich` | None | No social posts. |
+| `POST /v2/prospects/events`, `POST /v2/prospects/events/enrollments`, `POST /v1/prospects/events` | None | No event feed. To find recent job changes, search with `currentPositionStartDate` or `currentCompanyStartDate`. |
+| `POST /v2/prospects/research/enrich`, `POST /v2/prospects/research/job` | None | No custom AI research endpoint. |
+
+{/* end generated */}
+
+### Supporting APIs
+
+{/* generated: explorium endpoints:supporting */}
+
+| Explorium | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `POST /v2/<enrichment>/job`, `GET /v2/jobs/status/{job_id}`, `POST /v1/<enrichment>/bulk_enrich` | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk) | Background jobs exist for company enrichment by domain, up to 10,000 per job, and for exporting search results. Poll the batch, then download JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports). |
+| `GET /v2/credits`, `GET /v1/credits` | [`GET /v2/me`](/api-reference/v2/get-me) | Free. Returns your credit totals and plan capabilities. See [Account fields](/docs/migrate-from-explorium-field-mapping#account-fields). Each paid response also carries `x-credit-cost` and `x-credit-remaining` headers. |
+| `POST /v2/webhooks`, `POST /v1/webhooks` | None | No webhooks. |
+| `POST /v2/async/entity-id-datasets/upload` | None | No uploaded ID datasets. Send domains directly to batch or bulk enrichment. |
+
+{/* end generated */}
+
+## Request and response differences
+
+### Authentication
+
+| | Explorium | CompanyEnrich |
+| --- | --- | --- |
+| Header | `api_key: YOUR_EXPLORIUM_API_KEY` | `Authorization: Bearer YOUR_API_TOKEN` |
+| SDK | None | `CompanyEnrich()` reads `COMPANYENRICH_API_KEY`, or takes the key as its first argument |
+
+### From match and enrich to one call
+
+Explorium works in two steps: match a business or prospect to get its ID, then pass the ID to each enrichment you need. v2 can also match and enrich in one call with `businesses_to_match`.
+
+CompanyEnrich returns the record from the lookup itself:
+
+* Enrich a company by domain with [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich), or by name or social profile with [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich).
+* Add data with the `expand` parameter instead of separate enrichment calls: `technologies`, `financial`, `workforce`, `keywords`, or `naicsCodes`.
+* Enrich a person by work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich), or find people with [people search](/api-reference/v2/post-people-search).
+
+### Response shape
+
+| Call | Explorium | CompanyEnrich |
+| --- | --- | --- |
+| Match | `matched_businesses` or `matched_prospects`, each with an `input` and an ID | No match step |
+| Enrichment | v2: `data`, a list of `business_id` and `data` pairs. v1: one `data` object. | The record is the body |
+| Batch enrichment | Up to 50 IDs per request, in `data` | `items`, each with `domain`, `status`, and `company` when `status` is `found` |
+| Fetch | `data`, `total_results`, and `page` | `items` and `nextCursor`. Get totals from the free count endpoint. |
+| Errors | `details` and a `correlation_id`. Validation errors return `422` with a `detail` list. | A problem document with `type`, `title`, `status`, and `detail`. `422` adds `errors` per field. The `x-trace-id` header identifies the request. |
+
+### Status codes
+
+| Status | CompanyEnrich |
+| --- | --- |
+| `200` | A match, or a search that ran |
+| `400` | Malformed request |
+| `401` | Missing or invalid key |
+| `402` | Out of credits, or the plan does not include the request. Do not retry. |
+| `403` | The key may not perform this request |
+| `404` | No match. Not charged. |
+| `422` | Validation failed. `errors` lists the messages per field. |
+| `429` | Rate limit hit. Wait for the time the response gives. |
+
+Two differences need code changes. Explorium reports a missed match inside a `200` response, as a `null` ID, while CompanyEnrich returns `404`. Explorium returns `403` when your credits run out, while CompanyEnrich returns `402`. The SDK raises a typed exception for each non-2xx status, such as `NotFoundError`, `PaymentRequiredError`, and `RateLimitError`.
+
+### Billing behavior that affects your code
+
+These differences change how you write retries, guards, and tests. Prices for each endpoint are in [Credits](/docs/credits).
+
+* **No match is free.** Enrichment that finds nothing returns `404` and is not charged.
+* **An empty search is charged.** A search with no results costs one result's base price, such as 1 credit for a filter search. Check a new filter with the free [count endpoint](/api-reference/v2/post-companies-search-count) first.
+* **Extra company fields are expansions.** The base record excludes `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. Each one you request adds 1 credit per company returned, so request only the ones your code reads.
+* **Work emails are a separate call.** [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) costs 10 credits only when it finds an email your account has not accessed before.
+* **Responses report their cost.** Read `x-credit-cost` and `x-credit-remaining` from the response headers.
+
+### Pagination
+
+| | Explorium | CompanyEnrich |
+| --- | --- | --- |
+| Page size | `page_size`, up to 500 | `pageSize`, 1 to 100 |
+| Next page | `page`, or the `next_cursor` from the last response | Send the `nextCursor` from the last response as `cursor` |
+
+On CompanyEnrich, `nextCursor` is omitted on the last page, and a cursor expires 24 hours after the first page. The Python SDK pages for you with `search_all()`.
+
+### Rate limits
+
+Explorium counts each ID in a request toward 200 queries per minute. CompanyEnrich counts requests: a global limit of 500 requests per minute per IP address, and a per-route limit from your plan, reported in `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-window`. A batch of 50 domains is one request. The SDKs wait and retry on `429`. See [Rate limits](/docs/rate-limit).
+
+### Text, URLs, and codes
+
+| | Explorium | CompanyEnrich |
+| --- | --- | --- |
+| Place names | Lowercase, such as `united states` and `seattle` | Source casing |
+| Country codes | Lowercase in filters, such as `us` | Uppercase ISO 3166-1 alpha-2, such as `US` |
+| Company websites | Often a bare domain | `domain` is the host, and `website` is a full URL |
+| LinkedIn URLs | Sometimes without a scheme. Person URLs can use a member ID, such as `linkedin.com/in/ACoAA...`. | Full URL, such as `https://www.linkedin.com/company/stripe` |
+
+### IDs
+
+Explorium IDs and CompanyEnrich IDs are separate. CompanyEnrich company IDs are UUIDs, and person IDs are 64-bit integers. Store the CompanyEnrich ID next to the Explorium ID, and re-key company data on its domain.
+
+## Verify parity on your own data
+
+Measure CompanyEnrich on records you already have before you switch. This makes no Explorium requests, so it works after AgentSource is discontinued.
+
+<Steps>
+  <Step title="Check your key and plan">
+    Call [`GET /v2/me`](/api-reference/v2/get-me). It is free and returns your balance and plan capabilities.
+  </Step>
+  <Step title="Size your searches for free">
+    Send each translated filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint and compare `total` with Explorium's `total_results`.
+  </Step>
+  <Step title="Pick a sample">
+    Take 100 to 200 firmographics records you already stored from Explorium. CompanyEnrich charges 1 credit per company found.
+  </Step>
+  <Step title="Compare the fields you read">
+    Run the script below on the sample. It enriches the domains in batches of 50 and sorts each field into `equal`, `differ`, `only Explorium`, `only CompanyEnrich`, or `both empty`. Fields marked `lossy` in the [field mapping](/docs/migrate-from-explorium-field-mapping) differ by definition, so leave them out or compare them by hand.
+  </Step>
+  <Step title="Check searches and people">
+    For each translated search, run the count, then a [preview](/api-reference/v2/post-companies-search-preview) if your plan includes it, then one page. For person lookups, test work emails you already know.
+  </Step>
+</Steps>
+
+<Accordion title="compare.py" icon="code">
+
+```python compare.py
+"""compare.py: compare stored Explorium firmographics with CompanyEnrich on the same domains.
+
+Usage: python compare.py explorium_companies.jsonl   (one stored firmographics record per line)
+Costs 1 CompanyEnrich credit per company found. Makes no Explorium requests.
+"""
+
+import json
+import sys
+from collections import Counter
+
+from companyenrich import CompanyEnrich
+
+SIZES = {"501-1K": "501-1000", "1K-5K": "1001-5000", "5K-10K": "5001-10000", "over-10K": "10001+"}
+
+# Explorium field -> how to read the comparable CompanyEnrich value
+FIELDS = {
+    "name": lambda c: c.get("name"),
+    "website": lambda c: c.get("domain"),
+    "country_name": lambda c: ((c.get("location") or {}).get("country") or {}).get("name"),
+    "city_name": lambda c: ((c.get("location") or {}).get("city") or {}).get("name"),
+    "number_of_employees_range": lambda c: SIZES.get(c.get("employees"), c.get("employees")),
+    "linkedin_profile": lambda c: (c.get("socials") or {}).get("linkedinUrl"),
+}
+
+
+def domain(website):
+    host = website.lower().removeprefix("https://").removeprefix("http://").removeprefix("www.")
+    return host.split("/")[0]
+
+
+def normalize(value):
+    if isinstance(value, str):
+        value = value.lower().removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+    return value or None
+
+
+def outcome(explorium, ce):
+    if explorium is None and ce is None:
+        return "both empty"
+    if ce is None:
+        return "only Explorium"
+    if explorium is None:
+        return "only CompanyEnrich"
+    return "equal" if explorium == ce else "differ"
+
+
+def main(path, client=None):
+    records = [json.loads(line) for line in open(path) if line.strip()]
+    records = [record for record in records if record.get("website")]
+    client = client or CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+    results = Counter()
+    for start in range(0, len(records), 50):
+        chunk = records[start:start + 50]
+        batch = client.companies.enrich_batch([domain(record["website"]) for record in chunk])
+        for record, item in zip(chunk, batch["items"], strict=True):
+            if item["status"] != "found":
+                results[f"lookup: {item['status']}"] += 1
+                continue
+            for field, read in FIELDS.items():
+                results[f"{field}: {outcome(normalize(record.get(field)), normalize(read(item['company'])))}"] += 1
+    for key, count in sorted(results.items()):
+        print(f"{key:45} {count}")
+    return results
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
+```
+
+</Accordion>
+
+## Cut over
+
+* Put the CompanyEnrich path behind a feature flag, and switch it on before Explorium stops serving requests.
+* Store CompanyEnrich IDs next to Explorium IDs, and keep the Explorium values you stored.
+* Log `x-credit-cost` per call for the first weeks.
+* Remove the Explorium client, keys, and MCP configuration once nothing calls them.
+
+## What has no equivalent
+
+Plan a replacement for these, because there is no Explorium to fall back on:
+
+| Explorium feature | What you can do |
+| --- | --- |
+| Business and prospect events, enrollments, and webhooks | Re-enrich the companies and people you track on a schedule, and compare `updatedAt`, headcount, funding, or `currentPositionStartDate`. |
+| Phone numbers, personal emails, and hashed emails | Use another provider. CompanyEnrich finds work emails. |
+| Prospect match by LinkedIn URL or phone number | Match by work email, or search by name at the company's domain. |
+| Fetch and stats breakdowns | Run one free count per segment. |
+| Bombora intent, 10-K analysis, employee ratings, website changes, website keyword search, and LinkedIn posts | Use another provider. |
+| Company hierarchies and financial indicators | Use another provider. `expand=financial` returns the stock symbol, exchange, and funding. |
+| Research endpoints | Give your own agent the [MCP server](/docs/mcp-server) with your other tools. |
+| Person location below country level, skills, interests, and contact availability filters | Filter in your code after the search. |
+
+## What you can add after migrating
+
+<CardGroup cols={2}>
+  <Card title="Semantic company search" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Search companies with a plain-language description instead of filters.
+  </Card>
+  <Card title="Similar companies" icon="clone" href="/docs/similar-companies-api">
+    Find lookalikes of up to 10 seed domains.
+  </Card>
+  <Card title="Company headcount" icon="chart-line" href="/docs/company-headcount-api">
+    Headcount by department, with monthly history.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Give AI agents access to the same data.
+  </Card>
+</CardGroup>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="Can I keep using my Explorium business IDs?">
+    No. Store the CompanyEnrich ID alongside the Explorium ID, and re-key company data on its domain.
+  </Accordion>
+  <Accordion title="Do I need to match before I enrich?">
+    No. Send the domain, or the name or a social profile, and the record comes back in the same response.
+  </Accordion>
+  <Accordion title="Is there an equivalent of each Explorium enrichment?">
+    Firmographics, technographics, funding, workforce trends, and lookalikes have one, with fewer fields. See the [endpoint mapping](#endpoint-mapping) for the rest.
+  </Accordion>
+  <Accordion title="Can I get phone numbers?">
+    No. CompanyEnrich finds work emails with [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email).
+  </Accordion>
+  <Accordion title="How do I get the total number of results?">
+    Send the same filter to the free count endpoint. Search responses do not include a total.
+  </Accordion>
+  <Accordion title="Do batch and bulk enrichment need a specific plan?">
+    No. Batch and bulk enrichment work on every plan.
+  </Accordion>
+  <Accordion title="Why are place names in a different case?">
+    Explorium lowercases place names. CompanyEnrich returns the source casing. Lowercase values yourself if your code compares strings.
+  </Accordion>
+</AccordionGroup>

@@ -67,6 +67,15 @@
                   "docs/migrate-from-people-data-labs-search",
                   "docs/migrate-from-people-data-labs-agent"
                 ]
+              },
+              {
+                "group": "From Explorium",
+                "pages": [
+                  "docs/migrate-from-explorium",
+                  "docs/migrate-from-explorium-field-mapping",
+                  "docs/migrate-from-explorium-search",
+                  "docs/migrate-from-explorium-agent"
+                ]
               }
             ]
           },
