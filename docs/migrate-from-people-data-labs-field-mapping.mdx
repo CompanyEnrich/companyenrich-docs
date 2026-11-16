@@ -1,0 +1,380 @@
+---
+title: "People Data Labs field mapping"
+sidebarTitle: "Field mapping"
+description: "Every People Data Labs v5 company and person field next to its CompanyEnrich V2 field, with the expansion it needs, value translations, and the fields that have no counterpart."
+---
+
+{/* Tables between "generated" markers come from migrations/people-data-labs.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This page maps the fields of a People Data Labs (PDL) v5 company or person record to the CompanyEnrich V2 [company record](/docs/company-schema) and [person record](/docs/person-schema). Use it to rewrite the code that reads enrichment responses and to migrate stored records.
+
+The same mapping is available as JSON at [/migrations/people-data-labs.json](https://docs.companyenrich.com/migrations/people-data-labs.json), for scripts and [coding agents](/docs/migrate-from-people-data-labs-agent).
+
+## How to read this page
+
+Paths use dots for nested objects and `[]` for arrays, as in `experiences[].company.domain`. **Expand** names the [expansion](/docs/credits#expansions) you must request to get the field. Each one adds credits.
+
+**Fidelity** describes how the definitions compare:
+
+{/* generated: people-data-labs fidelity */}
+
+| Fidelity | Meaning |
+| --- | --- |
+| `same` | Same field name, meaning, and values. |
+| `renamed` | Same meaning under a different name or path. |
+| `transformed` | Same information in a different shape, format, or casing. Convert it in code. |
+| `lossy` | Related information with a different definition, scale, or granularity. Review before you rely on it. |
+| `none` | No CompanyEnrich equivalent. |
+
+{/* end generated */}
+
+Fidelity compares definitions, not data. The two providers build their records from different sources, so a value can differ even when the fields mean the same thing.
+
+## Company fields
+
+{/* generated: people-data-labs fields:company */}
+
+### Identity
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `id` | `id` |   | lossy | A UUID in a separate ID space. Store it in a new column and re-key on `domain`. |
+| `name` | `name` |   | transformed | PDL lowercases names. CompanyEnrich keeps the source casing. |
+| `display_name` | `name` |   | renamed |   |
+| `website` | `domain` |   | renamed | Both are a bare host such as `stripe.com`. CompanyEnrich `website` is a full URL, so do not map `website` to `website`. |
+| `alternative_names` | `legalName` |   | lossy | One legal name, not a list of aliases. |
+| `alternative_domains` | — |   | none | Only the primary `domain` is returned. |
+| `summary` | `description` |   | transformed | PDL lowercases the text and caps it at 1,000 characters. |
+| `headline` | — |   | none |   |
+| `founded` | `foundedYear` |   | renamed |   |
+| `type` | `type` |   | lossy | PDL `public_subsidiary` has no CompanyEnrich value. See [Company type](#company-type). |
+| `dataset_version` | — |   | none | `updatedAt` is a per-record timestamp, not a dataset release. |
+
+### Size and headcount
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `size` | `employees` |   | lossy | PDL `size` is the range the company selected on its social profile. CompanyEnrich `employees` is calculated from its employee data. The self-reported range exists only as the `reportedEmployees` search filter. See [Company size](#company-size). |
+| `employee_count` | `workforce.observedEmployeeCount` | `workforce` | renamed | Both are counted from each provider's people data. Without the expansion, use the `employees` range. |
+| `employee_count_by_month` | `workforce.history[].observedEmployeeCount` | `workforce` | transformed | An object keyed by `YYYY-MM` becomes an array of monthly entries, newest first, 12 months per page. Page back with `GET /v2/companies/workforce`. |
+| `employee_count_by_role` | `workforce.departmentHeadcount` | `workforce` | lossy | PDL job roles against 14 CompanyEnrich departments. |
+| `employee_growth_rate` | — |   | none | Compute it from `workforce.history`. Search by growth with the `workforceGrowth` filter. |
+| `employee_count_by_country` | — |   | none |   |
+| `inferred_revenue` | `revenue` |   | lossy | Different range boundaries. `revenue` is in the base record. See [Revenue](#revenue). |
+
+### Industry
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `industry` | `industry` |   | lossy | Different taxonomies. PDL uses lowercase canonical industries; CompanyEnrich uses names such as `Software Publishers`. |
+| `industry_v2` | `industries` |   | lossy | A list in the CompanyEnrich taxonomy. |
+| `naics` | `naicsCodes` | `naicsCodes` | transformed | An array of objects becomes an array of code strings. Use `naics[].naics_code`. |
+| `sic` | — |   | none |   |
+| `tags` | `keywords` | `keywords` | lossy | Different vocabularies. |
+| `technologies_used` | `technologies` | `technologies` | lossy | Technology names only, without PDL's observation dates and mention counts. |
+
+### Location
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `location.country` | `location.country.name` |   | transformed | PDL uses a lowercase name. CompanyEnrich adds the ISO 3166-1 alpha-2 code in `location.country.code`. |
+| `location.region` | `location.state.name` |   | transformed | Casing. CompanyEnrich adds `location.state.code` (ISO 3166-2) and `location.state.id`. |
+| `location.locality` | `location.city.name` |   | transformed | Casing. CompanyEnrich adds `location.city.id`. |
+| `location.street_address` | `location.address` |   | transformed | Casing. |
+| `location.postal_code` | `location.postalCode` |   | renamed |   |
+| `location.name` | — |   | none | Build it from the city, state, and country names. |
+| `location.address_line_2`, `location.metro`, `location.continent`, `location.geo` | — |   | none |   |
+
+### Social profiles
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `linkedin_url` | `socials.linkedinUrl` |   | transformed | PDL omits the scheme, as in `linkedin.com/company/x`. CompanyEnrich returns a full URL. |
+| `linkedin_id` | `socials.linkedinId` |   | renamed |   |
+| `linkedin_slug` | — |   | none | Take the last path segment of `socials.linkedinUrl`. |
+| `facebook_url` | `socials.facebookUrl` |   | transformed | Full URL. |
+| `twitter_url` | `socials.twitterUrl` |   | transformed | Full URL. |
+| `profiles` | `socials` |   | transformed | One array of URLs becomes one field per network. |
+
+### Funding and stock
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `ticker` | `financial.stockSymbol` | `financial` | renamed | Returned only. You cannot enrich or search by ticker. |
+| `mic_exchange` | `financial.stockExchange` | `financial` | lossy | PDL returns a MIC code. CompanyEnrich returns the exchange name. |
+| `total_funding_raised` | `financial.totalFunding` | `financial` | transformed | A float in USD becomes an integer in USD. |
+| `latest_funding_stage` | `financial.fundingStage` | `financial` | transformed | A canonical value such as `series_b` becomes a label such as `Series B`. |
+| `last_funding_date` | `financial.fundingDate` | `financial` | transformed | A date becomes a date-time. |
+| `number_funding_rounds` | `financial.fundingRounds` | `financial` | transformed | Count the array. |
+| `funding_stages` | `financial.fundingRounds[].type` | `financial` | transformed | Labels, not canonical values. |
+| `funding_details` | `financial.fundingRounds` | `financial` | lossy | `amount` is a string with its currency, such as `$36M`, and `investors` is one string. |
+
+### Corporate structure and premium insights
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `immediate_parent`, `ultimate_parent`, `direct_subsidiaries`, `all_subsidiaries`, `affiliated_profiles` | — |   | none |   |
+| `average_employee_tenure`, `employee_churn_rate`, `employee_turnover_rate`, `gross_additions_by_month`, `gross_departures_by_month` | — |   | none |   |
+| `recent_exec_hires`, `recent_exec_departures`, `top_previous_employers`, `top_next_employers`, `top_us_employee_metros` | — |   | none |   |
+| `active_job_postings`, `locations`, `linkedin_follower_count` | — |   | none |   |
+
+{/* end generated */}
+
+## Person fields
+
+Fields under **Current job** and **Current company** come from the person's current experience. A CompanyEnrich person can have more than one current experience, marked with `isCurrent`. After an email lookup, the experience at the email's company has `isMatched` set to `true`.
+
+{/* generated: people-data-labs fields:person */}
+
+### Identity
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `id` | `id` |   | lossy | A 64-bit integer in a separate ID space. Parse it as a string or `BigInt` in JavaScript. |
+| `full_name` | `name` |   | transformed | PDL lowercases names. CompanyEnrich keeps the source casing. |
+| `first_name` | `firstName` |   | transformed | Casing. |
+| `last_name` | `lastName` |   | transformed | Casing. |
+| `middle_name`, `middle_initial`, `last_initial`, `name_aliases` | — |   | none |   |
+| `sex`, `birth_year`, `birth_date` | — |   | none |   |
+
+### Current job
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `job_title` | `position` |   | transformed | Casing. |
+| `job_title_levels` | `seniority` |   | lossy | An array becomes one value. See [Seniority](#seniority). |
+| `job_title_role` | `department` |   | lossy | See [Job role and department](#job-role-and-department). |
+| `job_title_sub_role` | `department` |   | lossy | CompanyEnrich sub-departments are department values with a slash, such as `sales/customer-success`. |
+| `job_start_date` | `experiences[].startDate` |   | transformed | From the current experience. PDL dates can be partial, such as `2015-03`; CompanyEnrich returns a full date. |
+| `job_last_changed`, `job_last_verified` | — |   | none | `updatedAt` describes the whole record. |
+| `job_title_class`, `job_onet_code`, `job_summary`, `inferred_salary` | — |   | none |   |
+
+### Current company
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `job_company_name` | `experiences[].company.name` or `experiences[].companyName` |   | transformed | From the current experience. `companyName` is set when no company record matched. A person can have several current experiences; choose one deliberately. |
+| `job_company_website` | `experiences[].company.domain` |   | transformed | From the current experience. |
+| `job_company_id` | `experiences[].company.id` |   | lossy | A CompanyEnrich company UUID. |
+| `job_company_industry` | `experiences[].company.industry` |   | lossy | Different taxonomies. |
+| `job_company_size` | `experiences[].company.employees` | `company` | lossy | Calculated range, not the self-reported one. See [Company size](#company-size). |
+| `job_company_founded` | `experiences[].company.foundedYear` | `company` | renamed |   |
+| `job_company_type` | `experiences[].company.type` | `company` | lossy | See [Company type](#company-type). |
+| `job_company_inferred_revenue` | `experiences[].company.revenue` | `company` | lossy | See [Revenue](#revenue). |
+| `job_company_linkedin_url` | `experiences[].company.socials.linkedinUrl` | `company` | transformed | Full URL. |
+| `job_company_location_country` | `experiences[].company.location.country.name` | `company` | transformed |   |
+| `job_company_ticker`, `job_company_total_funding_raised`, `job_company_12mo_employee_growth_rate` | — |   | none | The `company` expansion excludes paid company data. Enrich the employer's domain with `financial` or `workforce` instead. |
+
+### Work history
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `experience` | `experiences` |   | transformed |   |
+| `experience[].title.name` | `experiences[].position` |   | transformed |   |
+| `experience[].title.levels` | `experiences[].seniority` |   | lossy | See [Seniority](#seniority). |
+| `experience[].title.role` | `experiences[].department` |   | lossy | See [Job role and department](#job-role-and-department). |
+| `experience[].company.name` | `experiences[].company.name` or `experiences[].companyName` |   | transformed |   |
+| `experience[].company.website` | `experiences[].company.domain` |   | transformed |   |
+| `experience[].start_date` | `experiences[].startDate` |   | transformed | Partial dates become full dates. |
+| `experience[].end_date` | `experiences[].endDate` |   | transformed | Partial dates become full dates. |
+| `experience[].is_primary` | `experiences[].isCurrent` |   | lossy | PDL marks one primary job. CompanyEnrich can mark several current jobs. |
+| `experience[].summary`, `experience[].location_names` | — |   | none |   |
+
+### Education
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `education` | `education` | `education` | transformed |   |
+| `education[].school.name` | `education[].institutionName` | `education` | renamed |   |
+| `education[].degrees`, `education[].majors` | `education[].degree` | `education` | lossy | One array holds degrees and fields of study, without PDL's canonical values. |
+| `education[].start_date` | `education[].startYear` | `education` | transformed | A date becomes a year. |
+| `education[].end_date` | `education[].endYear` | `education` | transformed | A date becomes a year. |
+| `education[].gpa`, `education[].minors` | — |   | none |   |
+
+### Contact data
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `work_email` | `email` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | transformed | Not on the person record. Call `GET /v2/people/{personId}/email`, which also returns `certainty`. |
+| `emails`, `personal_emails`, `recommended_personal_email` | — |   | none |   |
+| `mobile_phone`, `phone_numbers`, `phones` | — |   | none |   |
+
+### Location
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `location_country` | `location.country.name` |   | transformed | PDL uses a lowercase name. CompanyEnrich adds `location.country.code`. |
+| `location_name` | `location.address` |   | lossy | The person's reported location as free text. |
+| `location_locality`, `location_region`, `location_metro`, `location_postal_code`, `location_street_address`, `location_geo`, `location_continent` | — |   | none |   |
+
+### Social profiles
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `linkedin_url` | `socials.linkedinUrl` |   | transformed | PDL omits the scheme. CompanyEnrich returns a full URL. |
+| `profiles` | `socials.linkedinUrl` |   | lossy | LinkedIn only. |
+| `linkedin_id`, `linkedin_username`, `facebook_url`, `twitter_url`, `github_url` | — |   | none |   |
+
+### Other
+
+| People Data Labs | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `skills`, `interests`, `certifications`, `languages`, `headline`, `summary`, `industry`, `inferred_years_experience` | — |   | none |   |
+| `profile_score`, `activity_score`, `dataset_version` | — |   | none |   |
+
+{/* end generated */}
+
+## Value translations
+
+These tables translate fixed values. Values not listed have no counterpart. Use them to convert stored values and search filters, and keep the original PDL value when you store converted data.
+
+{/* generated: people-data-labs values */}
+
+### Company size
+
+People Data Labs `size`, `job_company_size` → CompanyEnrich `employees`, `reportedEmployees`. The labels translate one to one. The meaning depends on the field: PDL `size` is self-reported, so search it with `reportedEmployees`; CompanyEnrich `employees` is calculated.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `1-10` | `1-10` | same |   |
+| `11-50` | `11-50` | same |   |
+| `51-200` | `51-200` | same |   |
+| `201-500` | `201-500` | same |   |
+| `501-1000` | `501-1K` | renamed |   |
+| `1001-5000` | `1K-5K` | renamed |   |
+| `5001-10000` | `5K-10K` | renamed |   |
+| `10001+` | `over-10K` | renamed |   |
+
+### Revenue
+
+People Data Labs `inferred_revenue`, `job_company_inferred_revenue` → CompanyEnrich `revenue`. The ranges have different boundaries. When a PDL range spans two CompanyEnrich ranges, a search on both returns a wider set.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `$0-$1M` | `under-1m` | renamed |   |
+| `$1M-$10M` | `1m-10m` | renamed |   |
+| `$10M-$25M` | `10m-50m` | lossy | Wider range. |
+| `$25M-$50M` | `10m-50m` | lossy | Wider range. |
+| `$50M-$100M` | `50m-100m` | renamed |   |
+| `$100M-$250M` | `100m-200m`, `200m-1b` | lossy | Spans two ranges. |
+| `$250M-$500M` | `200m-1b` | lossy | Wider range. |
+| `$500M-$1B` | `200m-1b` | lossy | Wider range. |
+| `$1B-$10B` | `over-1b` | lossy | Wider range. |
+| `$10B+` | `over-1b` | lossy | Wider range. |
+
+### Company type
+
+People Data Labs `type`, `job_company_type` → CompanyEnrich `type`. CompanyEnrich also has `self-employed`, `self-owned`, and `partnership`.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `private` | `private` | same |   |
+| `public` | `public` | same |   |
+| `nonprofit` | `nonprofit` | same |   |
+| `educational` | `educational` | same |   |
+| `government` | `government` | same |   |
+| `public_subsidiary` | — | none |   |
+
+### Seniority
+
+People Data Labs `job_title_levels`, `experience[].title.levels` → CompanyEnrich `seniority`. PDL returns an array of levels; CompanyEnrich returns one. CompanyEnrich also has `founder`, `head`, and `intern`.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `cxo` | `c-suite` | renamed |   |
+| `owner` | `owner` | same |   |
+| `partner` | `partner` | same |   |
+| `vp` | `vp` | same |   |
+| `director` | `director` | same |   |
+| `manager` | `manager` | same |   |
+| `senior` | `senior` | same |   |
+| `entry` | `entry` | same |   |
+| `training` | — | none | Not mapped automatically. `intern` and `entry` both overlap. |
+| `unpaid` | — | none | Not mapped automatically. `intern` overlaps. |
+
+### Job role and department
+
+People Data Labs `job_title_role`, `experience[].title.role` → CompanyEnrich `department`. Only roles with a clear counterpart are mapped. For the rest, filter on `position` phrases instead.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `engineering` | `engineering-technical` | renamed |   |
+| `product` | `product-management` | renamed |   |
+| `finance` | `finance` | same |   |
+| `human_resources` | `human-resources` | renamed |   |
+| `legal` | `legal` | same |   |
+| `marketing` | `marketing` | same |   |
+| `operations` | `operations` | same |   |
+| `sales` | `sales` | same |   |
+| `education` | `education` | same |   |
+| `health` | `medical-health` | renamed |   |
+| `sales_engineering` | `sales/sales-engineering` | renamed | A sub-department of `sales`. |
+| `partnerships` | `sales/partnerships` | renamed | A sub-department of `sales`. |
+| `advisory`, `analyst`, `creative`, `fulfillment`, `hospitality`, `manufacturing`, `professional_service`, `public_service`, `research`, `support`, `trade`, `unemployed` | — | none | No single department. |
+
+### Funding round
+
+People Data Labs `latest_funding_stage`, `funding_stages`, `funding_details[].funding_type` → CompanyEnrich `fundingRounds filter`. These are search filter values. Company records return labels such as `Series A` instead.
+
+| People Data Labs | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `seed` | `seed` | same |   |
+| `angel` | `angel` | same |   |
+| `series_a`, `series_b`, `series_c`, `series_d`, `series_e`, `series_f`, `series_g`, `series_h` | `series_a`, `series_b`, `series_c`, `series_d`, `series_e`, `series_f`, `series_g`, `series_h` | same | Same value for each round. |
+| `debt_financing` | `debt_financing` | same |   |
+| `pre_seed`, `series_i`, `series_j`, `series_unknown`, `convertible_note`, `corporate_round`, `equity_crowdfunding`, `funding_round`, `grant`, `initial_coin_offering`, `non_equity_assistance`, `post_ipo_debt`, `post_ipo_equity`, `post_ipo_secondary`, `private_equity`, `product_crowdfunding`, `secondary_market`, `undisclosed` | — | none | No exact value. CompanyEnrich also has `venture` and `other`. |
+
+{/* end generated */}
+
+### Country
+
+PDL returns a lowercase country name, such as `united states`. CompanyEnrich returns `location.country.code`, an ISO 3166-1 alpha-2 code such as `US`, and `location.country.name`. To convert stored names, look up the codes with [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries), which is free.
+
+## CompanyEnrich fields PDL does not return
+
+### Company
+
+{/* generated: people-data-labs ceOnly:company */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `logoUrl` |   | A logo URL for every company. |
+| `categories` |   | Business model, such as `saas` or `b2b`. |
+| `location.phone` |   | The company phone number. |
+| `location.country.code` |   | ISO 3166-1 alpha-2. |
+| `location.state.code` |   | ISO 3166-2. |
+| `socials.instagramUrl`, `socials.youtubeUrl`, `socials.githubUrl`, `socials.g2Url`, `socials.angellistUrl`, `socials.crunchbaseUrl` |   | Separate fields. PDL lists other networks only inside `profiles`. |
+| `workforce.history[].departmentHeadcount` | `workforce` | Monthly headcount by department. |
+| `updatedAt` |   | When the record was last updated. |
+
+{/* end generated */}
+
+### Person
+
+{/* generated: people-data-labs ceOnly:person */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `imageUrl` |   | The person image URL. |
+| `experiences[].isMatched` |   | Which experience matched your search filters or your email lookup. |
+| `education[].institution` | `education` | The school as a company summary. |
+| `updatedAt` |   | When the record was last updated. |
+
+{/* end generated */}
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-people-data-labs">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-people-data-labs-search">
+    Translate Elasticsearch and SQL queries into filters.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a CompanyEnrich company record.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a CompanyEnrich person record.
+  </Card>
+</CardGroup>

@@ -9,8 +9,10 @@
     "validate": "mint validate",
     "check:links": "mint broken-links",
     "check:api": "node scripts/sync-openapi.mjs --check",
-    "check": "npm run check:api && npm run validate && npm run check:links",
-    "sync:openapi": "node scripts/sync-openapi.mjs"
+    "check:migrations": "node scripts/sync-migrations.mjs --check",
+    "check": "npm run check:api && npm run check:migrations && npm run validate && npm run check:links",
+    "sync:openapi": "node scripts/sync-openapi.mjs",
+    "sync:migrations": "node scripts/sync-migrations.mjs"
   },
   "engines": {
     "node": ">=22"

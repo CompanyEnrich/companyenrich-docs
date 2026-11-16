@@ -1,0 +1,1949 @@
+{
+  "$comment": "Source of truth for the People Data Labs migration guides. Tables in docs/migrate-from-people-data-labs*.mdx are generated from this file: edit it, then run npm run sync:migrations. npm run check:migrations verifies every CompanyEnrich path and filter against openapi/v2.json.",
+  "version": 1,
+  "checkedAt": "2026-11-13",
+  "vendor": {
+    "name": "People Data Labs",
+    "slug": "people-data-labs",
+    "api": "v5",
+    "baseUrl": "https://api.peopledatalabs.com/v5",
+    "docs": "https://docs.peopledatalabs.com",
+    "pythonClient": "peopledatalabs (PDLPY)"
+  },
+  "companyEnrich": {
+    "api": "v2",
+    "baseUrl": "https://api.companyenrich.com",
+    "spec": "https://docs.companyenrich.com/openapi/v2.json",
+    "auth": "Authorization: Bearer YOUR_API_TOKEN",
+    "apiKeyEnv": "COMPANYENRICH_API_KEY",
+    "guides": {
+      "overview": "https://docs.companyenrich.com/docs/migrate-from-people-data-labs",
+      "fieldMapping": "https://docs.companyenrich.com/docs/migrate-from-people-data-labs-field-mapping",
+      "search": "https://docs.companyenrich.com/docs/migrate-from-people-data-labs-search",
+      "agent": "https://docs.companyenrich.com/docs/migrate-from-people-data-labs-agent"
+    },
+    "sdks": {
+      "python": "https://docs.companyenrich.com/docs/python-sdk",
+      "javascript": "https://docs.companyenrich.com/docs/javascript-typescript-sdk",
+      "ruby": "https://docs.companyenrich.com/docs/ruby-sdk",
+      "php": "https://docs.companyenrich.com/docs/php-sdk"
+    }
+  },
+  "fidelity": {
+    "same": "Same field name, meaning, and values.",
+    "renamed": "Same meaning under a different name or path.",
+    "transformed": "Same information in a different shape, format, or casing. Convert it in code.",
+    "lossy": "Related information with a different definition, scale, or granularity. Review before you rely on it.",
+    "none": "No CompanyEnrich equivalent."
+  },
+  "endpoints": [
+    {
+      "group": "company",
+      "pdl": "/v5/company/enrich",
+      "pdlInput": [
+        "website"
+      ],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "mapped",
+      "inputs": {
+        "website": [
+          "domain"
+        ]
+      },
+      "note": "Send the host only, such as `stripe.com`. PDL keeps paths for hosted sites such as `etsy.com/shop`; those have no domain to send."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/enrich",
+      "pdlInput": [
+        "name",
+        "profile"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "name": [
+          "name"
+        ],
+        "profile": [
+          "linkedinUrl",
+          "twitterUrl",
+          "facebookUrl",
+          "instagramUrl",
+          "youtubeUrl"
+        ]
+      },
+      "note": "Every property you send must match. When several companies match, the highest-ranked one is returned, with no likelihood score. No match returns `404` and is not charged."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/enrich",
+      "pdlInput": [
+        "ticker",
+        "pdl_id",
+        "location",
+        "street_address",
+        "locality",
+        "region",
+        "country",
+        "postal_code"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No equivalent inputs. Resolve a domain first, for example from the `website` in records you already stored."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/enrich/bulk",
+      "companyEnrich": "POST /v2/companies/enrich/batch",
+      "status": "partial",
+      "inputs": {
+        "requests[].params.website": [
+          "domains[]"
+        ]
+      },
+      "note": "Up to 50 domains per request, against 100 parameter objects in PDL. Domains only. Items come back in request order with a `status` of `found`, `not-found`, `invalid-domain`, or `pending`."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/enrich/bulk",
+      "pdlInput": "more than 50 domains",
+      "companyEnrich": "POST /v2/companies/enrich/bulk",
+      "status": "partial",
+      "note": "Background job for up to 10,000 domains. Poll the batch, then download JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports)."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/search",
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter"
+        ],
+        "sql": [
+          "filter"
+        ],
+        "size": [
+          "pageSize"
+        ],
+        "scroll_token": [
+          "cursor"
+        ]
+      },
+      "note": "Rewrite each query as a `filter` object. See [Translate search queries](/docs/migrate-from-people-data-labs-search)."
+    },
+    {
+      "group": "company",
+      "pdl": "/v5/company/search",
+      "pdlInput": "`total` in the response",
+      "companyEnrich": "POST /v2/companies/search/count",
+      "status": "partial",
+      "note": "Search responses carry no total. Send the same filter to the count endpoint, which is free."
+    },
+    {
+      "group": "people",
+      "pdl": "/v5/person/enrich",
+      "pdlInput": [
+        "email"
+      ],
+      "companyEnrich": "POST /v2/people/enrich",
+      "status": "partial",
+      "inputs": {
+        "email": [
+          "email"
+        ]
+      },
+      "note": "Work emails only. The API resolves the company from the email domain, then matches the person by common address patterns. The person is the response body; PDL nests it under `data`."
+    },
+    {
+      "group": "people",
+      "pdl": "/v5/person/enrich",
+      "pdlInput": [
+        "profile",
+        "lid",
+        "phone",
+        "email_hash",
+        "pdl_id",
+        "name"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No equivalent. `name` here means a name with a company, school, or location. People search by `query` and `domain` returns candidates without a confidence score."
+    },
+    {
+      "group": "people",
+      "pdl": "/v5/person/bulk",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No bulk person enrichment in V2. Call `POST /v2/people/enrich` per work email within your rate limit."
+    },
+    {
+      "group": "people",
+      "pdl": "/v5/person/search",
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter",
+          "company"
+        ],
+        "sql": [
+          "filter",
+          "company"
+        ],
+        "size": [
+          "pageSize"
+        ],
+        "scroll_token": [
+          "cursor"
+        ]
+      },
+      "note": "Rewrite each query as a `filter` object, plus a `company` query for employer attributes. The `dataset` parameter has no equivalent."
+    },
+    {
+      "group": "people",
+      "pdl": "/v5/person/identify",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No ranked identity candidates. People search returns matches without a score."
+    },
+    {
+      "group": "people",
+      "pdl": "Person Retrieve API",
+      "companyEnrich": "GET /v2/people/{personId}",
+      "status": "partial",
+      "note": "Takes a CompanyEnrich person ID. PDL IDs do not carry over."
+    },
+    {
+      "group": "people",
+      "pdl": "`work_email` on a person record",
+      "companyEnrich": "GET /v2/people/{personId}/email",
+      "status": "partial",
+      "note": "A separate call that returns `status`, `email`, and `certainty`. Costs 10 credits only when it finds an email your account has not accessed before."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/autocomplete",
+      "companyEnrich": "GET /v2/companies/autocomplete",
+      "status": "partial",
+      "note": "Free. For `field=title`, `industry`, `country`, or `region`, use position autocomplete, the industry list, or the geo endpoints. There is no school, major, or skill lookup."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/company/clean",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No name or URL cleaner. Company autocomplete suggests domains for a partial name."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/location/clean",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No address parser. The free geo endpoints find country, state, and city IDs by name."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/school/clean",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No equivalent."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/ip/enrich",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No IP-to-company lookup."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/job_title/enrich",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No title classifier. Position autocomplete suggests titles."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/job_posting/search",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No job posting data in V2. Workforce history is headcount, not postings."
+    },
+    {
+      "group": "supporting",
+      "pdl": "/v5/person/changelog",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No change feed. Every record has an `updatedAt` timestamp."
+    },
+    {
+      "group": "supporting",
+      "pdl": "Sandbox APIs",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No sandbox. Test with mocked HTTP and the free endpoints: `GET /v2/me`, counts, and lookups."
+    }
+  ],
+  "fields": {
+    "company": [
+      {
+        "group": "Identity",
+        "pdl": "id",
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A UUID in a separate ID space. Store it in a new column and re-key on `domain`."
+      },
+      {
+        "group": "Identity",
+        "pdl": "name",
+        "ce": "name",
+        "fidelity": "transformed",
+        "note": "PDL lowercases names. CompanyEnrich keeps the source casing."
+      },
+      {
+        "group": "Identity",
+        "pdl": "display_name",
+        "ce": "name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "pdl": "website",
+        "ce": "domain",
+        "fidelity": "renamed",
+        "note": "Both are a bare host such as `stripe.com`. CompanyEnrich `website` is a full URL, so do not map `website` to `website`."
+      },
+      {
+        "group": "Identity",
+        "pdl": "alternative_names",
+        "ce": "legalName",
+        "fidelity": "lossy",
+        "note": "One legal name, not a list of aliases."
+      },
+      {
+        "group": "Identity",
+        "pdl": "alternative_domains",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Only the primary `domain` is returned."
+      },
+      {
+        "group": "Identity",
+        "pdl": "summary",
+        "ce": "description",
+        "fidelity": "transformed",
+        "note": "PDL lowercases the text and caps it at 1,000 characters."
+      },
+      {
+        "group": "Identity",
+        "pdl": "headline",
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Identity",
+        "pdl": "founded",
+        "ce": "foundedYear",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "pdl": "type",
+        "ce": "type",
+        "fidelity": "lossy",
+        "values": "companyType",
+        "note": "PDL `public_subsidiary` has no CompanyEnrich value."
+      },
+      {
+        "group": "Identity",
+        "pdl": "dataset_version",
+        "ce": null,
+        "fidelity": "none",
+        "note": "`updatedAt` is a per-record timestamp, not a dataset release."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "size",
+        "ce": "employees",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "PDL `size` is the range the company selected on its social profile. CompanyEnrich `employees` is calculated from its employee data. The self-reported range exists only as the `reportedEmployees` search filter."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "employee_count",
+        "ce": "workforce.observedEmployeeCount",
+        "expand": "workforce",
+        "fidelity": "renamed",
+        "note": "Both are counted from each provider's people data. Without the expansion, use the `employees` range."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "employee_count_by_month",
+        "ce": "workforce.history[].observedEmployeeCount",
+        "expand": "workforce",
+        "fidelity": "transformed",
+        "note": "An object keyed by `YYYY-MM` becomes an array of monthly entries, newest first, 12 months per page. Page back with `GET /v2/companies/workforce`."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "employee_count_by_role",
+        "ce": "workforce.departmentHeadcount",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "PDL job roles against 14 CompanyEnrich departments."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "employee_growth_rate",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Compute it from `workforce.history`. Search by growth with the `workforceGrowth` filter."
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "employee_count_by_country",
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Size and headcount",
+        "pdl": "inferred_revenue",
+        "ce": "revenue",
+        "fidelity": "lossy",
+        "values": "revenue",
+        "note": "Different range boundaries. `revenue` is in the base record."
+      },
+      {
+        "group": "Industry",
+        "pdl": "industry",
+        "ce": "industry",
+        "fidelity": "lossy",
+        "note": "Different taxonomies. PDL uses lowercase canonical industries; CompanyEnrich uses names such as `Software Publishers`."
+      },
+      {
+        "group": "Industry",
+        "pdl": "industry_v2",
+        "ce": "industries",
+        "fidelity": "lossy",
+        "note": "A list in the CompanyEnrich taxonomy."
+      },
+      {
+        "group": "Industry",
+        "pdl": "naics",
+        "ce": "naicsCodes",
+        "expand": "naicsCodes",
+        "fidelity": "transformed",
+        "note": "An array of objects becomes an array of code strings. Use `naics[].naics_code`."
+      },
+      {
+        "group": "Industry",
+        "pdl": "sic",
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Industry",
+        "pdl": "tags",
+        "ce": "keywords",
+        "expand": "keywords",
+        "fidelity": "lossy",
+        "note": "Different vocabularies."
+      },
+      {
+        "group": "Industry",
+        "pdl": "technologies_used",
+        "ce": "technologies",
+        "expand": "technologies",
+        "fidelity": "lossy",
+        "note": "Technology names only, without PDL's observation dates and mention counts."
+      },
+      {
+        "group": "Location",
+        "pdl": "location.country",
+        "ce": "location.country.name",
+        "fidelity": "transformed",
+        "note": "PDL uses a lowercase name. CompanyEnrich adds the ISO 3166-1 alpha-2 code in `location.country.code`."
+      },
+      {
+        "group": "Location",
+        "pdl": "location.region",
+        "ce": "location.state.name",
+        "fidelity": "transformed",
+        "note": "Casing. CompanyEnrich adds `location.state.code` (ISO 3166-2) and `location.state.id`."
+      },
+      {
+        "group": "Location",
+        "pdl": "location.locality",
+        "ce": "location.city.name",
+        "fidelity": "transformed",
+        "note": "Casing. CompanyEnrich adds `location.city.id`."
+      },
+      {
+        "group": "Location",
+        "pdl": "location.street_address",
+        "ce": "location.address",
+        "fidelity": "transformed",
+        "note": "Casing."
+      },
+      {
+        "group": "Location",
+        "pdl": "location.postal_code",
+        "ce": "location.postalCode",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Location",
+        "pdl": "location.name",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Build it from the city, state, and country names."
+      },
+      {
+        "group": "Location",
+        "pdl": [
+          "location.address_line_2",
+          "location.metro",
+          "location.continent",
+          "location.geo"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "linkedin_url",
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "PDL omits the scheme, as in `linkedin.com/company/x`. CompanyEnrich returns a full URL."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "linkedin_id",
+        "ce": "socials.linkedinId",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "linkedin_slug",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Take the last path segment of `socials.linkedinUrl`."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "facebook_url",
+        "ce": "socials.facebookUrl",
+        "fidelity": "transformed",
+        "note": "Full URL."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "twitter_url",
+        "ce": "socials.twitterUrl",
+        "fidelity": "transformed",
+        "note": "Full URL."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "profiles",
+        "ce": "socials",
+        "fidelity": "transformed",
+        "note": "One array of URLs becomes one field per network."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "ticker",
+        "ce": "financial.stockSymbol",
+        "expand": "financial",
+        "fidelity": "renamed",
+        "note": "Returned only. You cannot enrich or search by ticker."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "mic_exchange",
+        "ce": "financial.stockExchange",
+        "expand": "financial",
+        "fidelity": "lossy",
+        "note": "PDL returns a MIC code. CompanyEnrich returns the exchange name."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "total_funding_raised",
+        "ce": "financial.totalFunding",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A float in USD becomes an integer in USD."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "latest_funding_stage",
+        "ce": "financial.fundingStage",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A canonical value such as `series_b` becomes a label such as `Series B`."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "last_funding_date",
+        "ce": "financial.fundingDate",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A date becomes a date-time."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "number_funding_rounds",
+        "ce": "financial.fundingRounds",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Count the array."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "funding_stages",
+        "ce": "financial.fundingRounds[].type",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Labels, not canonical values."
+      },
+      {
+        "group": "Funding and stock",
+        "pdl": "funding_details",
+        "ce": "financial.fundingRounds",
+        "expand": "financial",
+        "fidelity": "lossy",
+        "note": "`amount` is a string with its currency, such as `$36M`, and `investors` is one string."
+      },
+      {
+        "group": "Corporate structure and premium insights",
+        "pdl": [
+          "immediate_parent",
+          "ultimate_parent",
+          "direct_subsidiaries",
+          "all_subsidiaries",
+          "affiliated_profiles"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Corporate structure and premium insights",
+        "pdl": [
+          "average_employee_tenure",
+          "employee_churn_rate",
+          "employee_turnover_rate",
+          "gross_additions_by_month",
+          "gross_departures_by_month"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Corporate structure and premium insights",
+        "pdl": [
+          "recent_exec_hires",
+          "recent_exec_departures",
+          "top_previous_employers",
+          "top_next_employers",
+          "top_us_employee_metros"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Corporate structure and premium insights",
+        "pdl": [
+          "active_job_postings",
+          "locations",
+          "linkedin_follower_count"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      }
+    ],
+    "person": [
+      {
+        "group": "Identity",
+        "pdl": "id",
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A 64-bit integer in a separate ID space. Parse it as a string or `BigInt` in JavaScript."
+      },
+      {
+        "group": "Identity",
+        "pdl": "full_name",
+        "ce": "name",
+        "fidelity": "transformed",
+        "note": "PDL lowercases names. CompanyEnrich keeps the source casing."
+      },
+      {
+        "group": "Identity",
+        "pdl": "first_name",
+        "ce": "firstName",
+        "fidelity": "transformed",
+        "note": "Casing."
+      },
+      {
+        "group": "Identity",
+        "pdl": "last_name",
+        "ce": "lastName",
+        "fidelity": "transformed",
+        "note": "Casing."
+      },
+      {
+        "group": "Identity",
+        "pdl": [
+          "middle_name",
+          "middle_initial",
+          "last_initial",
+          "name_aliases"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Identity",
+        "pdl": [
+          "sex",
+          "birth_year",
+          "birth_date"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Current job",
+        "pdl": "job_title",
+        "ce": "position",
+        "fidelity": "transformed",
+        "note": "Casing."
+      },
+      {
+        "group": "Current job",
+        "pdl": "job_title_levels",
+        "ce": "seniority",
+        "fidelity": "lossy",
+        "values": "seniority",
+        "note": "An array becomes one value."
+      },
+      {
+        "group": "Current job",
+        "pdl": "job_title_role",
+        "ce": "department",
+        "fidelity": "lossy",
+        "values": "department"
+      },
+      {
+        "group": "Current job",
+        "pdl": "job_title_sub_role",
+        "ce": "department",
+        "fidelity": "lossy",
+        "note": "CompanyEnrich sub-departments are department values with a slash, such as `sales/customer-success`."
+      },
+      {
+        "group": "Current job",
+        "pdl": "job_start_date",
+        "ce": "experiences[].startDate",
+        "fidelity": "transformed",
+        "note": "From the current experience. PDL dates can be partial, such as `2015-03`; CompanyEnrich returns a full date."
+      },
+      {
+        "group": "Current job",
+        "pdl": [
+          "job_last_changed",
+          "job_last_verified"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "`updatedAt` describes the whole record."
+      },
+      {
+        "group": "Current job",
+        "pdl": [
+          "job_title_class",
+          "job_onet_code",
+          "job_summary",
+          "inferred_salary"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_name",
+        "ce": [
+          "experiences[].company.name",
+          "experiences[].companyName"
+        ],
+        "fidelity": "transformed",
+        "note": "From the current experience. `companyName` is set when no company record matched. A person can have several current experiences; choose one deliberately."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_website",
+        "ce": "experiences[].company.domain",
+        "fidelity": "transformed",
+        "note": "From the current experience."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_id",
+        "ce": "experiences[].company.id",
+        "fidelity": "lossy",
+        "note": "A CompanyEnrich company UUID."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_industry",
+        "ce": "experiences[].company.industry",
+        "fidelity": "lossy",
+        "note": "Different taxonomies."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_size",
+        "ce": "experiences[].company.employees",
+        "expand": "company",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "Calculated range, not the self-reported one."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_founded",
+        "ce": "experiences[].company.foundedYear",
+        "expand": "company",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_type",
+        "ce": "experiences[].company.type",
+        "expand": "company",
+        "fidelity": "lossy",
+        "values": "companyType"
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_inferred_revenue",
+        "ce": "experiences[].company.revenue",
+        "expand": "company",
+        "fidelity": "lossy",
+        "values": "revenue"
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_linkedin_url",
+        "ce": "experiences[].company.socials.linkedinUrl",
+        "expand": "company",
+        "fidelity": "transformed",
+        "note": "Full URL."
+      },
+      {
+        "group": "Current company",
+        "pdl": "job_company_location_country",
+        "ce": "experiences[].company.location.country.name",
+        "expand": "company",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Current company",
+        "pdl": [
+          "job_company_ticker",
+          "job_company_total_funding_raised",
+          "job_company_12mo_employee_growth_rate"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "The `company` expansion excludes paid company data. Enrich the employer's domain with `financial` or `workforce` instead."
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience",
+        "ce": "experiences",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].title.name",
+        "ce": "experiences[].position",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].title.levels",
+        "ce": "experiences[].seniority",
+        "fidelity": "lossy",
+        "values": "seniority"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].title.role",
+        "ce": "experiences[].department",
+        "fidelity": "lossy",
+        "values": "department"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].company.name",
+        "ce": [
+          "experiences[].company.name",
+          "experiences[].companyName"
+        ],
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].company.website",
+        "ce": "experiences[].company.domain",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].start_date",
+        "ce": "experiences[].startDate",
+        "fidelity": "transformed",
+        "note": "Partial dates become full dates."
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].end_date",
+        "ce": "experiences[].endDate",
+        "fidelity": "transformed",
+        "note": "Partial dates become full dates."
+      },
+      {
+        "group": "Work history",
+        "pdl": "experience[].is_primary",
+        "ce": "experiences[].isCurrent",
+        "fidelity": "lossy",
+        "note": "PDL marks one primary job. CompanyEnrich can mark several current jobs."
+      },
+      {
+        "group": "Work history",
+        "pdl": [
+          "experience[].summary",
+          "experience[].location_names"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Education",
+        "pdl": "education",
+        "ce": "education",
+        "expand": "education",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Education",
+        "pdl": "education[].school.name",
+        "ce": "education[].institutionName",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "pdl": [
+          "education[].degrees",
+          "education[].majors"
+        ],
+        "ce": "education[].degree",
+        "expand": "education",
+        "fidelity": "lossy",
+        "note": "One array holds degrees and fields of study, without PDL's canonical values."
+      },
+      {
+        "group": "Education",
+        "pdl": "education[].start_date",
+        "ce": "education[].startYear",
+        "expand": "education",
+        "fidelity": "transformed",
+        "note": "A date becomes a year."
+      },
+      {
+        "group": "Education",
+        "pdl": "education[].end_date",
+        "ce": "education[].endYear",
+        "expand": "education",
+        "fidelity": "transformed",
+        "note": "A date becomes a year."
+      },
+      {
+        "group": "Education",
+        "pdl": [
+          "education[].gpa",
+          "education[].minors"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Contact data",
+        "pdl": "work_email",
+        "ce": "email",
+        "in": "workEmail",
+        "fidelity": "transformed",
+        "note": "Not on the person record. Call `GET /v2/people/{personId}/email`, which also returns `certainty`."
+      },
+      {
+        "group": "Contact data",
+        "pdl": [
+          "emails",
+          "personal_emails",
+          "recommended_personal_email"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Contact data",
+        "pdl": [
+          "mobile_phone",
+          "phone_numbers",
+          "phones"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Location",
+        "pdl": "location_country",
+        "ce": "location.country.name",
+        "fidelity": "transformed",
+        "note": "PDL uses a lowercase name. CompanyEnrich adds `location.country.code`."
+      },
+      {
+        "group": "Location",
+        "pdl": "location_name",
+        "ce": "location.address",
+        "fidelity": "lossy",
+        "note": "The person's reported location as free text."
+      },
+      {
+        "group": "Location",
+        "pdl": [
+          "location_locality",
+          "location_region",
+          "location_metro",
+          "location_postal_code",
+          "location_street_address",
+          "location_geo",
+          "location_continent"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "linkedin_url",
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "PDL omits the scheme. CompanyEnrich returns a full URL."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": "profiles",
+        "ce": "socials.linkedinUrl",
+        "fidelity": "lossy",
+        "note": "LinkedIn only."
+      },
+      {
+        "group": "Social profiles",
+        "pdl": [
+          "linkedin_id",
+          "linkedin_username",
+          "facebook_url",
+          "twitter_url",
+          "github_url"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Other",
+        "pdl": [
+          "skills",
+          "interests",
+          "certifications",
+          "languages",
+          "headline",
+          "summary",
+          "industry",
+          "inferred_years_experience"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Other",
+        "pdl": [
+          "profile_score",
+          "activity_score",
+          "dataset_version"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      }
+    ]
+  },
+  "ceOnly": {
+    "company": [
+      {
+        "ce": "logoUrl",
+        "note": "A logo URL for every company."
+      },
+      {
+        "ce": "categories",
+        "note": "Business model, such as `saas` or `b2b`."
+      },
+      {
+        "ce": "location.phone",
+        "note": "The company phone number."
+      },
+      {
+        "ce": "location.country.code",
+        "note": "ISO 3166-1 alpha-2."
+      },
+      {
+        "ce": "location.state.code",
+        "note": "ISO 3166-2."
+      },
+      {
+        "ce": [
+          "socials.instagramUrl",
+          "socials.youtubeUrl",
+          "socials.githubUrl",
+          "socials.g2Url",
+          "socials.angellistUrl",
+          "socials.crunchbaseUrl"
+        ],
+        "note": "Separate fields. PDL lists other networks only inside `profiles`."
+      },
+      {
+        "ce": "workforce.history[].departmentHeadcount",
+        "expand": "workforce",
+        "note": "Monthly headcount by department."
+      },
+      {
+        "ce": "updatedAt",
+        "note": "When the record was last updated."
+      }
+    ],
+    "person": [
+      {
+        "ce": "imageUrl",
+        "note": "The person image URL."
+      },
+      {
+        "ce": "experiences[].isMatched",
+        "note": "Which experience matched your search filters or your email lookup."
+      },
+      {
+        "ce": "education[].institution",
+        "expand": "education",
+        "note": "The school as a company summary."
+      },
+      {
+        "ce": "updatedAt",
+        "note": "When the record was last updated."
+      }
+    ]
+  },
+  "values": {
+    "companySize": {
+      "title": "Company size",
+      "pdl": "size, job_company_size",
+      "ce": "employees, reportedEmployees",
+      "enum": "CompanySearchFilter.employees",
+      "note": "The labels translate one to one. The meaning depends on the field: PDL `size` is self-reported, so search it with `reportedEmployees`; CompanyEnrich `employees` is calculated.",
+      "rows": [
+        {
+          "pdl": "1-10",
+          "ce": "1-10",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "11-50",
+          "ce": "11-50",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "51-200",
+          "ce": "51-200",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "201-500",
+          "ce": "201-500",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "501-1000",
+          "ce": "501-1K",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "1001-5000",
+          "ce": "1K-5K",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "5001-10000",
+          "ce": "5K-10K",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "10001+",
+          "ce": "over-10K",
+          "fidelity": "renamed"
+        }
+      ]
+    },
+    "revenue": {
+      "title": "Revenue",
+      "pdl": "inferred_revenue, job_company_inferred_revenue",
+      "ce": "revenue",
+      "enum": "CompanySearchFilter.revenue",
+      "note": "The ranges have different boundaries. When a PDL range spans two CompanyEnrich ranges, a search on both returns a wider set.",
+      "rows": [
+        {
+          "pdl": "$0-$1M",
+          "ce": "under-1m",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "$1M-$10M",
+          "ce": "1m-10m",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "$10M-$25M",
+          "ce": "10m-50m",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        },
+        {
+          "pdl": "$25M-$50M",
+          "ce": "10m-50m",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        },
+        {
+          "pdl": "$50M-$100M",
+          "ce": "50m-100m",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "$100M-$250M",
+          "ce": [
+            "100m-200m",
+            "200m-1b"
+          ],
+          "fidelity": "lossy",
+          "note": "Spans two ranges."
+        },
+        {
+          "pdl": "$250M-$500M",
+          "ce": "200m-1b",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        },
+        {
+          "pdl": "$500M-$1B",
+          "ce": "200m-1b",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        },
+        {
+          "pdl": "$1B-$10B",
+          "ce": "over-1b",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        },
+        {
+          "pdl": "$10B+",
+          "ce": "over-1b",
+          "fidelity": "lossy",
+          "note": "Wider range."
+        }
+      ]
+    },
+    "companyType": {
+      "title": "Company type",
+      "pdl": "type, job_company_type",
+      "ce": "type",
+      "enum": "CompanySearchFilter.type",
+      "note": "CompanyEnrich also has `self-employed`, `self-owned`, and `partnership`.",
+      "rows": [
+        {
+          "pdl": "private",
+          "ce": "private",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "public",
+          "ce": "public",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "nonprofit",
+          "ce": "nonprofit",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "educational",
+          "ce": "educational",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "government",
+          "ce": "government",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "public_subsidiary",
+          "ce": null,
+          "fidelity": "none"
+        }
+      ]
+    },
+    "seniority": {
+      "title": "Seniority",
+      "pdl": "job_title_levels, experience[].title.levels",
+      "ce": "seniority",
+      "enum": "PersonSearchFilter.seniority",
+      "note": "PDL returns an array of levels; CompanyEnrich returns one. CompanyEnrich also has `founder`, `head`, and `intern`.",
+      "rows": [
+        {
+          "pdl": "cxo",
+          "ce": "c-suite",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "owner",
+          "ce": "owner",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "partner",
+          "ce": "partner",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "vp",
+          "ce": "vp",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "director",
+          "ce": "director",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "manager",
+          "ce": "manager",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "senior",
+          "ce": "senior",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "entry",
+          "ce": "entry",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "training",
+          "ce": null,
+          "fidelity": "none",
+          "note": "Not mapped automatically. `intern` and `entry` both overlap."
+        },
+        {
+          "pdl": "unpaid",
+          "ce": null,
+          "fidelity": "none",
+          "note": "Not mapped automatically. `intern` overlaps."
+        }
+      ]
+    },
+    "department": {
+      "title": "Job role and department",
+      "pdl": "job_title_role, experience[].title.role",
+      "ce": "department",
+      "enum": "PersonSearchFilter.department",
+      "note": "Only roles with a clear counterpart are mapped. For the rest, filter on `position` phrases instead.",
+      "rows": [
+        {
+          "pdl": "engineering",
+          "ce": "engineering-technical",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "product",
+          "ce": "product-management",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "finance",
+          "ce": "finance",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "human_resources",
+          "ce": "human-resources",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "legal",
+          "ce": "legal",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "marketing",
+          "ce": "marketing",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "operations",
+          "ce": "operations",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "sales",
+          "ce": "sales",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "education",
+          "ce": "education",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "health",
+          "ce": "medical-health",
+          "fidelity": "renamed"
+        },
+        {
+          "pdl": "sales_engineering",
+          "ce": "sales/sales-engineering",
+          "fidelity": "renamed",
+          "note": "A sub-department of `sales`."
+        },
+        {
+          "pdl": "partnerships",
+          "ce": "sales/partnerships",
+          "fidelity": "renamed",
+          "note": "A sub-department of `sales`."
+        },
+        {
+          "pdl": [
+            "advisory",
+            "analyst",
+            "creative",
+            "fulfillment",
+            "hospitality",
+            "manufacturing",
+            "professional_service",
+            "public_service",
+            "research",
+            "support",
+            "trade",
+            "unemployed"
+          ],
+          "ce": null,
+          "fidelity": "none",
+          "note": "No single department."
+        }
+      ]
+    },
+    "fundingRound": {
+      "title": "Funding round",
+      "pdl": "latest_funding_stage, funding_stages, funding_details[].funding_type",
+      "ce": "fundingRounds filter",
+      "enum": "CompanySearchFilter.fundingRounds",
+      "note": "These are search filter values. Company records return labels such as `Series A` instead.",
+      "rows": [
+        {
+          "pdl": "seed",
+          "ce": "seed",
+          "fidelity": "same"
+        },
+        {
+          "pdl": "angel",
+          "ce": "angel",
+          "fidelity": "same"
+        },
+        {
+          "pdl": [
+            "series_a",
+            "series_b",
+            "series_c",
+            "series_d",
+            "series_e",
+            "series_f",
+            "series_g",
+            "series_h"
+          ],
+          "ce": [
+            "series_a",
+            "series_b",
+            "series_c",
+            "series_d",
+            "series_e",
+            "series_f",
+            "series_g",
+            "series_h"
+          ],
+          "fidelity": "same",
+          "note": "Same value for each round."
+        },
+        {
+          "pdl": "debt_financing",
+          "ce": "debt_financing",
+          "fidelity": "same"
+        },
+        {
+          "pdl": [
+            "pre_seed",
+            "series_i",
+            "series_j",
+            "series_unknown",
+            "convertible_note",
+            "corporate_round",
+            "equity_crowdfunding",
+            "funding_round",
+            "grant",
+            "initial_coin_offering",
+            "non_equity_assistance",
+            "post_ipo_debt",
+            "post_ipo_equity",
+            "post_ipo_secondary",
+            "private_equity",
+            "product_crowdfunding",
+            "secondary_market",
+            "undisclosed"
+          ],
+          "ce": null,
+          "fidelity": "none",
+          "note": "No exact value. CompanyEnrich also has `venture` and `other`."
+        }
+      ]
+    }
+  },
+  "search": {
+    "company": [
+      {
+        "pdl": "{\"term\": {\"website\": \"stripe.com\"}}",
+        "ce": {
+          "filter": {
+            "domain": "stripe.com"
+          }
+        },
+        "fidelity": "renamed"
+      },
+      {
+        "pdl": "SELECT * FROM company WHERE website IN ('stripe.com', 'adyen.com')",
+        "ce": {
+          "filter": {
+            "domain": [
+              "stripe.com",
+              "adyen.com"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "An array matches any value."
+      },
+      {
+        "pdl": "{\"term\": {\"location.country\": \"united states\"}}",
+        "ce": {
+          "filter": {
+            "country": "US"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "ISO 3166-1 alpha-2 codes. Look up codes with `POST /v2/geo/countries`."
+      },
+      {
+        "pdl": "{\"term\": {\"location.region\": \"california\"}}",
+        "ce": {
+          "filter": {
+            "state": "STATE_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`."
+      },
+      {
+        "pdl": "{\"term\": {\"location.locality\": \"austin\"}}",
+        "ce": {
+          "filter": {
+            "city": "CITY_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`."
+      },
+      {
+        "pdl": "{\"terms\": {\"size\": [\"51-200\", \"201-500\"]}}",
+        "ce": {
+          "filter": {
+            "reportedEmployees": [
+              "51-200",
+              "201-500"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Both are self-reported. Translate labels with the company size table."
+      },
+      {
+        "pdl": "{\"range\": {\"employee_count\": {\"gte\": 100, \"lte\": 500}}}",
+        "ce": {
+          "filter": {
+            "workforceSize": [
+              {
+                "min": 100,
+                "max": 500
+              }
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Exact headcount from people data. For ranges, `employees` takes the calculated range values."
+      },
+      {
+        "pdl": "{\"range\": {\"founded\": {\"gte\": 2015}}}",
+        "ce": {
+          "filter": {
+            "foundedYear": {
+              "min": 2015
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Both ends of a range are inclusive."
+      },
+      {
+        "pdl": "{\"term\": {\"type\": \"private\"}}",
+        "ce": {
+          "filter": {
+            "type": "private"
+          }
+        },
+        "fidelity": "same"
+      },
+      {
+        "pdl": "{\"terms\": {\"inferred_revenue\": [\"$10M-$25M\", \"$25M-$50M\"]}}",
+        "ce": {
+          "filter": {
+            "revenue": "10m-50m"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Translate with the revenue table. Some PDL ranges map to a wider range."
+      },
+      {
+        "pdl": "{\"term\": {\"industry\": \"computer software\"}}",
+        "ce": {
+          "filter": {
+            "naicsCodes": [
+              "5112"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "There is no industry filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search."
+      },
+      {
+        "pdl": "{\"term\": {\"tags\": \"payments\"}}",
+        "ce": {
+          "filter": {
+            "keywords": "payments"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Check the keyword with `GET /v2/keywords/autocomplete`. An array of keywords requires every value; use `{\"in\": [...]}` to match any."
+      },
+      {
+        "pdl": "{\"range\": {\"last_funding_date\": {\"gte\": \"2024-01-01\"}}}",
+        "ce": {
+          "filter": {
+            "fundingYear": {
+              "min": 2024
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Year of the latest funding, not a date."
+      },
+      {
+        "pdl": "{\"exists\": {\"field\": \"linkedin_url\"}}",
+        "ce": {
+          "filter": {
+            "require": "linkedin"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "`require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`."
+      },
+      {
+        "pdl": "{\"bool\": {\"must_not\": [{\"term\": {\"location.country\": \"china\"}}]}}",
+        "ce": {
+          "filter": {
+            "country": {
+              "notIn": [
+                "CN"
+              ]
+            }
+          }
+        },
+        "fidelity": "transformed",
+        "note": "`notIn` works on every value filter except `require`."
+      },
+      {
+        "pdl": "{\"match\": {\"summary\": \"payment infrastructure for platforms\"}}",
+        "ce": {
+          "semantic": {
+            "query": "payment infrastructure for platforms"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Semantic search ranks by meaning. It costs 2 credits per company instead of 1."
+      },
+      {
+        "pdl": "SELECT * FROM company WHERE name LIKE 'acme%'",
+        "ce": {
+          "filter": {
+            "query": "acme"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "`query` matches names, keywords, and domain prefixes."
+      },
+      {
+        "pdl": "{\"bool\": {\"should\": [{\"term\": {\"type\": \"public\"}}, {\"range\": {\"founded\": {\"lte\": 1990}}}]}}",
+        "ce": null,
+        "fidelity": "none",
+        "note": "OR across different filters is not expressible. Run one search per branch and deduplicate by `id`."
+      },
+      {
+        "pdl": "{\"wildcard\": {\"website\": \"*.io\"}}",
+        "ce": null,
+        "fidelity": "none",
+        "note": "No wildcard or suffix matching."
+      }
+    ],
+    "person": [
+      {
+        "pdl": "{\"term\": {\"job_company_website\": \"stripe.com\"}}",
+        "ce": {
+          "filter": {
+            "domain": "stripe.com"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Matches current employers. Up to 2,500 domains per rule; PDL caps arrays at 100."
+      },
+      {
+        "pdl": "{\"term\": {\"job_title_levels\": \"vp\"}}",
+        "ce": {
+          "filter": {
+            "seniority": "vp"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Translate values with the seniority table."
+      },
+      {
+        "pdl": "{\"term\": {\"job_title_role\": \"engineering\"}}",
+        "ce": {
+          "filter": {
+            "department": "engineering-technical"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Translate values with the department table. A department includes its sub-departments."
+      },
+      {
+        "pdl": "{\"match\": {\"job_title\": \"account executive\"}}",
+        "ce": {
+          "filter": {
+            "position": "account executive"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Phrase matching on the current title."
+      },
+      {
+        "pdl": "{\"term\": {\"location_country\": \"germany\"}}",
+        "ce": {
+          "filter": {
+            "country": "DE"
+          }
+        },
+        "fidelity": "transformed"
+      },
+      {
+        "pdl": "{\"term\": {\"location_locality\": \"berlin\"}}",
+        "ce": null,
+        "fidelity": "none",
+        "note": "People are filtered by country only."
+      },
+      {
+        "pdl": "{\"term\": {\"experience.company.website\": \"google.com\"}}",
+        "ce": {
+          "filter": {
+            "pastExperience": {
+              "domain": "google.com"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Past employers only. People who still work there are left out; add `domain` to match current employees."
+      },
+      {
+        "pdl": "{\"range\": {\"job_start_date\": {\"gte\": \"2026-01\"}}}",
+        "ce": {
+          "filter": {
+            "currentPositionStartDate": {
+              "after": "2026-01-01T00:00:00Z"
+            }
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Use `currentCompanyStartDate` for the date the person joined the company."
+      },
+      {
+        "pdl": "{\"term\": {\"education.school.name\": \"stanford university\"}}",
+        "ce": {
+          "filter": {
+            "education": {
+              "institutionName": "stanford"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Phrase match on the school name. Matches schools in the person's history."
+      },
+      {
+        "pdl": "{\"terms\": {\"job_company_size\": [\"51-200\", \"201-500\"]}}",
+        "ce": {
+          "company": {
+            "filter": {
+              "reportedEmployees": [
+                "51-200",
+                "201-500"
+              ]
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "A company query with `reportedEmployees` matches people at the 1,000 best-matching companies. `employees` has no such limit."
+      },
+      {
+        "pdl": "{\"term\": {\"job_company_industry\": \"computer software\"}}",
+        "ce": {
+          "company": {
+            "filter": {
+              "naicsCodes": [
+                "5112"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Pick NAICS codes from `GET /v2/industries`."
+      },
+      {
+        "pdl": "{\"exists\": {\"field\": \"work_email\"}}",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Emails are not on person records. Look them up per person with `GET /v2/people/{personId}/email`."
+      },
+      {
+        "pdl": "{\"term\": {\"skills\": \"python\"}}",
+        "ce": null,
+        "fidelity": "none",
+        "note": "No skills data."
+      }
+    ]
+  },
+  "fixtures": {
+    "$comment": "Fictional records for offline tests. Shapes follow each provider's documented schema.",
+    "company": {
+      "pdl": {
+        "status": 200,
+        "likelihood": 6,
+        "name": "acme analytics",
+        "display_name": "Acme Analytics",
+        "website": "acme-analytics.example",
+        "summary": "acme analytics builds a product analytics platform.",
+        "founded": 2016,
+        "size": "201-500",
+        "employee_count": 312,
+        "type": "private",
+        "industry": "computer software",
+        "location": {
+          "name": "san francisco, california, united states",
+          "locality": "san francisco",
+          "region": "california",
+          "country": "united states",
+          "postal_code": "94105"
+        },
+        "linkedin_url": "linkedin.com/company/acme-analytics-example"
+      },
+      "companyEnrich": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "website": "https://acme-analytics.example",
+        "description": "Acme Analytics builds a product analytics platform.",
+        "type": "private",
+        "foundedYear": 2016,
+        "employees": "201-500",
+        "revenue": "10m-50m",
+        "industry": "Software Publishers",
+        "location": {
+          "country": {
+            "code": "US",
+            "name": "United States"
+          },
+          "state": {
+            "id": 1416,
+            "name": "California",
+            "code": "US-CA"
+          },
+          "city": {
+            "id": 125634,
+            "name": "San Francisco"
+          },
+          "postalCode": "94105"
+        },
+        "socials": {
+          "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+        },
+        "updatedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    "notFound": {
+      "pdl": {
+        "status": 404,
+        "error": {
+          "type": "not_found",
+          "message": "No records were found matching your request"
+        }
+      },
+      "companyEnrich": {
+        "status": 404,
+        "title": "Not Found"
+      }
+    }
+  }
+}

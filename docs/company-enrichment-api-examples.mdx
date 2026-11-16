@@ -205,7 +205,7 @@ companyenrich company enrich --name "Stripe" \
 
 </CodeGroup>
 
-You can also send `linkedinId`, `twitterUrl`, `facebookUrl`, `instagramUrl`, or `youtubeUrl`. This method costs 1 credit when a company is returned, and also when the properties cannot be resolved to a company domain.
+You can also send `linkedinId`, `twitterUrl`, `facebookUrl`, `instagramUrl`, or `youtubeUrl`. This method costs 1 credit when a company is returned. When no company matches, it returns `404` and costs nothing.
 
 ## Enrich up to 50 domains in one request
 

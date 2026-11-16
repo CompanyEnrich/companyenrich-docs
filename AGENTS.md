@@ -11,6 +11,7 @@ Read `README.md` for development commands and `MIGRATION.md` for migration conte
 - `api-reference/v1/`, `api-reference/v2/`: generated endpoint pages and hand-written `overview.mdx` pages.
 - `openapi/v1.json`, `openapi/v2.json`: snapshots of the public API specifications.
 - `scripts/sync-openapi.mjs`: specification download, endpoint generation, navigation, and redirect maintenance.
+- `migrations/<vendor>.json`: competitor migration mappings, served publicly for coding agents. `scripts/sync-migrations.mjs` renders the tables between `generated` markers in `docs/migrate-from-*.mdx` and validates every CompanyEnrich path, filter, and value against `openapi/v2.json`. Edit the JSON, not the generated tables.
 - `changelog/`: historical release posts and their index.
 - `logo/`, `favicon.ico`: CompanyEnrich brand assets.
 
@@ -53,9 +54,11 @@ Use the Node.js version supported by `package.json` and the pinned local Mintlif
 | --- | --- |
 | `npm run dev` | Start the local Mintlify preview |
 | `npm run check:api` | Verify generated reference consistency against local specs |
+| `npm run sync:migrations` | Regenerate migration guide tables from `migrations/*.json` |
+| `npm run check:migrations` | Validate migration mappings against `openapi/v2.json` and check the tables are current |
 | `npm run validate` | Validate MDX/configuration and run Mintlify's strict build |
 | `npm run check:links` | Check internal links |
-| `npm run check` | Run all three checks |
+| `npm run check` | Run all four checks |
 
 - Run `npm run check` after changes to documentation, navigation, API snapshots, or generation logic. For maintainer-only instruction edits, review the diff and run `git diff --check`.
 - For layout or interactive component changes, inspect affected pages in the local preview. A passing build did not catch the blank code-group tab labels during migration.
