@@ -235,7 +235,7 @@
       "pdl": "/v5/company/clean",
       "companyEnrich": null,
       "status": "none",
-      "note": "No name or URL cleaner. Company autocomplete suggests domains for a partial name."
+      "note": "No name or URL cleaner. Company autocomplete suggests companies for a domain prefix or URL."
     },
     {
       "group": "supporting",

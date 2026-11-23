@@ -1,0 +1,222 @@
+---
+title: "Translate Crustdata search filters"
+sidebarTitle: "Search filters"
+description: "Rewrite Crustdata company and person search filters as CompanyEnrich V2 search filters, with a pattern table, the conditions that do not translate, and free ways to check the result."
+---
+
+{/* Tables between "generated" markers come from migrations/crustdata.json. Edit the JSON, then run npm run sync:migrations. */}
+
+Crustdata searches take a tree of conditions, each with a `field`, an operator `type`, and a `value`, combined with `and` and `or` groups. CompanyEnrich V2 search takes a flat `filter` object in which every filter must match. Most conditions translate to one filter, but the field names, value formats, and operators differ. This page shows each pattern and the conditions that have no equivalent.
+
+A translation that silently drops a condition returns, and charges for, the wrong records. Translate each condition, and check the result with the free count endpoint.
+
+## How the two search models differ
+
+| | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| Request | `filters`, a condition or an `and`/`or` group of conditions, plus `search` for a ranked query | `filter`, an object with one key per filter. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
+| Combining conditions | Any mix of `and` and `or` groups, nested | Every filter must match. Within a filter, an array or `in` matches any value, and `notIn` excludes values. There is no OR across different filters. |
+| Operators | `=`, `!=`, `in`, `not_in`, `<`, `=<`, `>`, `=>`, fuzzy and phrase text matching, null checks, `has_all`, and geo operators | A value or an array, `in` and `notIn` rules, `min` and `max` ranges, `after` and `before` dates, and `require` for features a company must have |
+| Field names | Dot paths into the record, such as `locations.country` and `experience.employment_details.current.title` | Filter names, such as `country` and `position`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
+| Values | Index values, such as `Privately Held`, `Vice President`, and ISO alpha-3 codes, found with Crustdata autocomplete | Exact values from [field values](/docs/field-values), ISO alpha-2 country codes, and IDs from the free lookup endpoints |
+| Sorting | `sorts` on many fields | None. Results come in relevance order. |
+| Endpoints | `POST /company/search` and `POST /person/search` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search), [`POST /v2/people/search`](/api-reference/v2/post-people-search) |
+| Totals | `total_count` on filter-only search responses | The free [company](/api-reference/v2/post-companies-search-count) and [people](/api-reference/v2/post-people-search-count) count endpoints |
+
+## Translate a search in four steps
+
+<Steps>
+  <Step title="Flatten the conditions">
+    Write down each condition with its field, operator, and value. Note every `or` group: an `or` across different fields cannot be sent as one CompanyEnrich search.
+  </Step>
+  <Step title="Map each condition">
+    Find the pattern for the field in the tables below. A pattern applies whatever the operator's shape: `=` with one value and `in` with a list translate the same way, and `!=` and `not_in` become `notIn`. Convert values with the [value translations](/docs/migrate-from-crustdata-field-mapping#value-translations), and look up IDs and names with the free [geo](/api-reference/v2/post-geo-states), [industry](/api-reference/v2/get-industries), [keyword](/api-reference/v2/get-keywords-autocomplete), [technology](/api-reference/v2/get-technologies-autocomplete), and [position](/api-reference/v2/get-positions-autocomplete) endpoints.
+  </Step>
+  <Step title="Count it for free">
+    Send the filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint. Compare `total` with the `total_count` you recorded from Crustdata. A large gap usually means a condition was dropped or a value was not converted.
+  </Step>
+  <Step title="Fetch one page">
+    Run the search with a small `pageSize` and check the records against what you expect. An empty search still costs one result's base price.
+  </Step>
+</Steps>
+
+For example, this Crustdata search:
+
+```json
+{
+  "filters": {
+    "op": "and",
+    "conditions": [
+      { "field": "locations.country", "type": "=", "value": "USA" },
+      { "field": "basic_info.employee_count_range", "type": "in", "value": ["51-200", "201-500"] },
+      { "field": "basic_info.year_founded", "type": "=>", "value": 2020 },
+      { "field": "funding.last_round_type", "type": "in", "value": ["series_a", "series_b"] }
+    ]
+  },
+  "limit": 100,
+  "fields": ["basic_info.name", "basic_info.primary_domain", "funding.last_round_type"]
+}
+```
+
+becomes this CompanyEnrich search:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer $COMPANYENRICH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pageSize": 100,
+    "expand": ["financial"],
+    "filter": {
+      "country": "US",
+      "reportedEmployees": ["51-200", "201-500"],
+      "foundedYear": { "min": 2020 },
+      "fundingRounds": ["series_a", "series_b"]
+    }
+  }'
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+query = {
+    "country": "US",
+    "reportedEmployees": ["51-200", "201-500"],  # the self-reported range, like employee_count_range
+    "foundedYear": {"min": 2020},
+    "fundingRounds": ["series_a", "series_b"],
+}
+
+print(client.companies.count(filter=query)["total"])  # free
+page = client.companies.search(filter=query, page_size=100, expand=["financial"])
+for company in page["items"]:
+    print(company["name"], company["domain"], (company.get("financial") or {}).get("fundingStage"))
+```
+
+</CodeGroup>
+
+Crustdata's `fields` list has no counterpart, because results are full company records. Funding is an expansion, so the request adds `expand` only because the code reads `fundingStage`.
+
+## Company search patterns
+
+{/* generated: crustdata search:company */}
+
+| Crustdata filter | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"field": "basic_info.primary_domain", "type": "in", "value": ["acme.example", "globex.example"]}` | `{"filter": {"domain": ["acme.example", "globex.example"]}}` | same |   |
+| `{"field": "basic_info.name", "type": "(.)", "value": "acme"}` | `{"filter": {"query": "acme"}}` | lossy | Matches company names, keywords, or domain prefixes. |
+| `{"field": "locations.country", "type": "in", "value": ["USA", "CAN"]}` | `{"filter": {"country": ["US", "CA"]}}` | transformed | ISO 3166-1 alpha-2 codes instead of alpha-3 codes or names. Look up codes with `POST /v2/geo/countries`. |
+| `{"field": "locations.country", "type": "not_in", "value": ["CHN"]}` | `{"filter": {"country": {"notIn": ["CN"]}}}` | transformed |   |
+| `{"field": "locations.state", "type": "=", "value": "California"}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. |
+| `{"field": "locations.city", "type": "=", "value": "Austin"}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. |
+| `{"field": "locations.headquarters", "type": "geo_distance", "value": {"location": "Palo Alto, CA", "distance": 50, "unit": "km"}}` | None | none | No radius or polygon search. Filter by the cities or states in the area. |
+| `{"field": "basic_info.employee_count_range", "type": "in", "value": ["51-200", "201-500"]}` | `{"filter": {"reportedEmployees": ["51-200", "201-500"]}}` | renamed | See the company size table. `employees` filters on the calculated range instead. |
+| `{"op": "and", "conditions": [{"field": "headcount.total", "type": "=>", "value": 50}, {"field": "headcount.total", "type": "=<", "value": 500}]}` | `{"filter": {"workforceSize": [{"department": "overall", "min": 50, "max": 500}]}}` | lossy | Counts from CompanyEnrich employee data. `min` and `max` are inclusive, so `>` 50 becomes `min` 51. |
+| `{"field": "headcount.growth_percent.12m", "type": ">", "value": 20}` | `{"filter": {"workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2}}}` | lossy | A ratio instead of a percentage: divide by 100. Growth comes from CompanyEnrich employee data. `min` is inclusive, so it also matches exactly 20%. `6m` becomes `m6`. There is no one-month or three-month period, and `y2` covers two years. |
+| `{"field": "roles.distribution.engineering", "type": ">", "value": 50}` | `{"filter": {"workforceSize": [{"department": "engineering_technical", "min": 51}]}}` | lossy | 14 departments instead of Crustdata's functions. |
+| `{"field": "taxonomy.professional_network_industry", "type": "in", "value": ["Software Development"]}` | `{"filter": {"naicsCodes": ["5112"]}}` | lossy | No industry-label filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search. |
+| `{"field": "taxonomy.primary_naics_detail.naics_code", "type": "=", "value": "541511"}` | `{"filter": {"naicsCodes": ["541511"]}}` | renamed | Codes have 2 to 6 digits, so `industry_group` and `sub_sector` filters become shorter codes. Crustdata uses the 2022 edition. Some codes changed between editions, such as software publishers, so check yours against `GET /v2/industries`. |
+| `{"field": "taxonomy.sic_detail_list.sic_code", "type": "=", "value": "7372"}` | None | none | No SIC filter. Use NAICS codes. |
+| `{"field": "taxonomy.categories", "type": "(.)", "value": "fintech"}` | `{"filter": {"keywords": "fintech"}}` | lossy | Check the keyword with `GET /v2/keywords/autocomplete`. |
+| `{"field": "technographics.technologies.name", "type": "has_all", "value": ["React", "Stripe"]}` | `{"filter": {"technologies": ["react", "stripe"]}}` | lossy | An array requires every technology, as `has_all` does. Look up names with `GET /v2/technologies/autocomplete`. |
+| `{"field": "technographics.technologies.name", "type": "in", "value": ["Salesforce", "HubSpot"]}` | `{"filter": {"technologies": {"in": ["salesforce", "hubspot"]}}}` | lossy | Use `in` to match any of them. |
+| `{"field": "technographics.technologies.category", "type": "=", "value": "crm"}` | None | none | No technology category filter. List the technologies instead. |
+| `{"field": "funding.last_round_type", "type": "in", "value": ["series_a", "series_b"]}` | `{"filter": {"fundingRounds": ["series_a", "series_b"]}}` | lossy | See the funding round table. Crustdata matches the latest round only. To check the latest round of a result, read `financial.fundingStage`. |
+| `{"field": "funding.total_investment_usd", "type": "=>", "value": 10000000}` | `{"filter": {"fundingAmount": {"min": 10000000}}}` | renamed | `min` is inclusive, as `=>` is. For a strict `>`, raise `min` by the smallest amount you care about, such as 1. |
+| `{"field": "funding.last_fundraise_date", "type": "=>", "value": "2025-01-01"}` | `{"filter": {"fundingYear": {"min": 2025}}}` | lossy | Year of the latest funding, not a date. |
+| `{"field": "funding.total_investment_usd", "type": "is_not_null"}` | `{"filter": {"require": "anyFunding"}}` | renamed | `require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`. |
+| `{"field": "basic_info.year_founded", "type": "=>", "value": 2018}` | `{"filter": {"foundedYear": {"min": 2018}}}` | renamed |   |
+| `{"field": "basic_info.company_type", "type": "=", "value": "Privately Held"}` | `{"filter": {"type": "private"}}` | renamed | See the company type table. |
+| `{"field": "revenue.estimated.lower_bound_usd", "type": "=>", "value": 10000000}` | `{"filter": {"revenue": ["10m-50m", "50m-100m", "100m-200m", "200m-1b", "over-1b"]}}` | lossy | Revenue is a set of ranges. List every range above the bound. |
+| `{"field": "competitors.websites", "type": "=", "value": "stripe.com"}` | `{"lookalike": {"domains": ["stripe.com"]}}` | lossy | Lookalikes of the company, ranked by similarity, rather than its listed competitors. |
+| `{"field": "followers.count", "type": ">", "value": 1000}` | None | none | No follower, hiring, review, or traffic filters. |
+| `{"search": {"query": "developer tooling companies building observability products", "mode": "hybrid"}}` | `{"semantic": {"query": "developer tooling companies building observability products"}}` | transformed | Add a `filter` to apply hard constraints, as with Crustdata `filters`. By default, CompanyEnrich also infers filters such as location and size from the query. Set `semantic.autoFilter` to `false` to rank by the query alone. |
+| `{"op": "or", "conditions": [{"field": "taxonomy.professional_network_industry", "type": "=", "value": "Software Development"}, {"field": "funding.total_investment_usd", "type": ">", "value": 5000000}]}` | None | none | No OR across different filters. Run one search per branch and merge the results on `id`. OR within one filter works: send an array. |
+| `{"sorts": [{"field": "headcount.total", "order": "desc"}]}` | None | none | No sorting. Results come in relevance order. To reproduce a top list by a field, count the matches for free, fetch every page, then sort in your code. |
+| `{"limit": 1000, "cursor": "NEXT_CURSOR"}` | `{"pageSize": 100, "cursor": "NEXT_CURSOR"}` | transformed | Up to 100 per page. Send `nextCursor` from the last response as `cursor`. |
+
+{/* end generated */}
+
+## People search patterns
+
+Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size, industry, or headquarters country, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters). Past jobs go in `pastExperience`.
+
+{/* generated: crustdata search:person */}
+
+| Crustdata filter | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"field": "experience.employment_details.current.company_website_domain", "type": "in", "value": ["stripe.com"]}` | `{"filter": {"domain": ["stripe.com"]}}` | same |   |
+| `{"field": "experience.employment_details.current.company_name", "type": "in", "value": ["Stripe"]}` | `{"company": {"filter": {"query": "Stripe"}}}` | lossy | `query` matches company names, keywords, or domain prefixes, so it can match more than one employer. Filter by `domain` when you know it. |
+| `{"field": "experience.employment_details.current.company_professional_network_profile_url", "type": "=", "value": "https://www.linkedin.com/company/stripe"}` | `{"filter": {"companyLinkedinHandle": "https://www.linkedin.com/company/stripe"}}` | renamed | Takes a handle or a URL. |
+| `{"field": "experience.employment_details.current.company_id", "type": "in", "value": [123456]}` | `{"filter": {"companyId": ["COMPANY_ID"]}}` | transformed | Crustdata IDs do not carry over. Filter by domain, or by CompanyEnrich company IDs. |
+| `{"field": "experience.employment_details.current.title", "type": "(.)", "value": "head of growth"}` | `{"filter": {"position": "head of growth"}}` | lossy | Matches the phrase in current positions. Check titles with `GET /v2/positions/autocomplete`. |
+| `{"field": "experience.employment_details.current.title", "type": "in", "value": ["CTO", "VP Engineering"]}` | `{"filter": {"position": ["CTO", "VP Engineering"]}}` | lossy | An array matches any phrase. Crustdata `in` matches the whole stored title; CompanyEnrich matches the phrase inside it. |
+| `{"field": "experience.employment_details.current.seniority_level", "type": "in", "value": ["CXO", "Vice President"]}` | `{"filter": {"seniority": ["c-suite", "vp"]}}` | renamed | See the seniority table. |
+| `{"field": "experience.employment_details.current.function_category", "type": "=", "value": "Engineering"}` | `{"filter": {"department": "engineering-technical"}}` | renamed | See the department table. |
+| `{"field": "basic_profile.location.country", "type": "in", "value": ["United States", "Canada"]}` | `{"filter": {"country": ["US", "CA"]}}` | transformed | ISO 3166-1 alpha-2 codes instead of full names. |
+| `{"field": "basic_profile.location.city", "type": "=", "value": "San Francisco"}` | None | none | People search filters by country only. Check `location.address` in your code. |
+| `{"field": "experience.employment_details.current.start_date", "type": "=>", "value": "2026-08-01"}` | `{"filter": {"currentPositionStartDate": {"after": "2026-08-01"}}}` | renamed | For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. |
+| `{"field": "experience.employment_details.past.company_website_domain", "type": "=", "value": "google.com"}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | renamed |   |
+| `{"field": "experience.employment_details.past.title", "type": "(.)", "value": "product manager"}` | `{"filter": {"pastExperience": {"position": "product manager"}}}` | lossy |   |
+| `{"field": "education.schools.school", "type": "(.)", "value": "Stanford University"}` | `{"filter": {"education": {"institutionName": "Stanford University"}}}` | lossy | Or match the school's LinkedIn page with `institutionLinkedinHandle`. Degree and year filters have no equivalent. |
+| `{"field": "experience.employment_details.current.company_headcount_range", "type": "in", "value": ["51-200"]}` | `{"company": {"filter": {"reportedEmployees": "51-200"}}}` | renamed | Employer conditions go in a `company` query, which takes any company search filter. |
+| `{"field": "experience.employment_details.current.company_headquarters_country", "type": "=", "value": "USA"}` | `{"company": {"filter": {"country": "US"}}}` | transformed | The employer's country, not the person's. |
+| `{"field": "experience.employment_details.current.company_industries", "type": "in", "value": ["Financial Services"]}` | `{"company": {"filter": {"naicsCodes": ["5221"]}}}` | lossy | Pick NAICS codes from `GET /v2/industries`, or put a `semantic` query in the `company` query. |
+| `{"field": "basic_profile.name", "type": "=", "value": "Jane Doe"}` | `{"filter": {"query": "Jane Doe"}}` | lossy | Matches person names. Combine it with `domain` to find one person at a company. |
+| `{"field": "skills.professional_network_skills", "type": "in", "value": ["Python"]}` | None | none | No skill, certification, connection, follower, or contact-availability filters. |
+| `{"search": {"query": "founding engineers at developer tools startups"}}` | `{"semantic": {"query": "founding engineers at developer tools startups"}}` | transformed |   |
+| `{"op": "or", "conditions": [{"field": "experience.employment_details.current.title", "type": "[.]", "value": "developer"}, {"field": "experience.employment_details.current.function_category", "type": "=", "value": "Engineering"}]}` | None | none | No OR across different filters. Run one search per branch and merge on `id`. |
+| `{"post_processing": {"exclude_profiles": ["https://www.linkedin.com/in/jane-doe"]}}` | None | none | Drop excluded people in your code. |
+
+{/* end generated */}
+
+## Conditions that do not translate
+
+* **OR across different fields.** Run one search per branch and merge the results on `id`. OR across values of one field works: send an array, or `in`.
+* **Sorting.** Sort the records in your code. To reproduce a top list, such as the largest companies, count the matches for free, fetch every page, then sort.
+* **Radius and polygon searches.** Filter by the countries, states, or cities in the area.
+* **Person location below country level.** Filter cities and regions in your code, on `location.address`.
+* **Followers, hiring, web traffic, reviews, SIC codes, and technology categories.**
+* **Skills, certifications, honors, connections, research and developer profiles, and contact availability.**
+* **Text operators on any field.** `(.)` and `[.]` translate only where CompanyEnrich has a text filter: `query` for names, `keywords`, and `position`.
+* **Null checks**, except the 13 company features `require` covers, such as `anyFunding` and `linkedin`.
+* **`post_processing` exclusions.** Drop the excluded profiles or names in your code.
+
+## Totals and pagination
+
+Search responses do not include a total. The free count endpoints return `total`, the number of matching records, and `count`, the number your plan lets you retrieve.
+
+Pages hold 1 to 100 results, set with `pageSize`, against up to 1,000 for a filter-only Crustdata search. Pass the `nextCursor` of one page as `cursor` to get the next, until `nextCursor` is omitted. A cursor expires 24 hours after the first page. A Crustdata cursor does not work on CompanyEnrich, so restart any paging job from the first page.
+
+## When a description works better than filters
+
+If your code or agent sends a ranked `search.query` to Crustdata, send the same text as a [semantic search](/docs/semantic-company-search-api):
+
+```json
+{
+  "semantic": { "query": "developer tooling companies building observability products" },
+  "filter": { "country": "US" }
+}
+```
+
+Semantic search ranks results by meaning and reports the filters it inferred in `interpretation`. It costs 2 credits per company returned instead of 1. For companies like ones you already know, use a [lookalike search](/docs/similar-companies-api), which takes up to 10 seed domains and costs 5 per company.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-crustdata">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-crustdata-field-mapping">
+    Every field, with value translations.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every company filter and its matching rules.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every people filter and the company query.
+  </Card>
+</CardGroup>

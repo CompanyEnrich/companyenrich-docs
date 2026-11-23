@@ -1,0 +1,379 @@
+---
+title: "Crustdata field mapping"
+sidebarTitle: "Field mapping"
+description: "Every Crustdata company and person field next to its CompanyEnrich V2 field, with the expansion it needs, value translations, and the fields that have no counterpart."
+---
+
+{/* Tables between "generated" markers come from migrations/crustdata.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This page maps the fields Crustdata returns for companies and people to the CompanyEnrich V2 [company record](/docs/company-schema) and [person record](/docs/person-schema). Use it to rewrite the code that reads Crustdata responses and to migrate the records you stored.
+
+Company fields come from Company Enrich and Company Search. Person fields come from Person Enrich, Person Search, and Contact Enrich. Crustdata paths are relative to `company_data` or `person_data` in enrichment responses, and to each item of `companies` or `profiles` in search responses.
+
+The same mapping is available as JSON at [/migrations/crustdata.json](https://docs.companyenrich.com/migrations/crustdata.json), for scripts and [coding agents](/docs/migrate-from-crustdata-agent).
+
+## How to read this page
+
+Paths use dots for nested objects and `[]` for arrays, as in `experiences[].company.domain`. **Expand** names the [expansion](/docs/credits#expansions) you must request to get the field. Each one adds credits.
+
+Crustdata returns the sections you name in `fields`, and only `basic_info` by default. CompanyEnrich always returns the base record and adds the expansions you name in `expand`. So a Crustdata `fields` list becomes an `expand` list that holds only the expansions your code reads.
+
+**Fidelity** describes how the definitions compare:
+
+{/* generated: crustdata fidelity */}
+
+| Fidelity | Meaning |
+| --- | --- |
+| `same` | Same meaning and format. |
+| `renamed` | Same meaning and values under a different name or label. |
+| `transformed` | Same information in a different format, casing, or structure. Convert it in code. |
+| `lossy` | Related but not equivalent. Values can differ, so check the fields your code depends on. |
+| `none` | No CompanyEnrich equivalent. |
+
+{/* end generated */}
+
+Fidelity compares definitions, not data. The two providers build their records from different sources, so a value can differ even when the fields mean the same thing.
+
+## Company fields
+
+{/* generated: crustdata fields:company */}
+
+### Identity
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `crustdata_company_id`, `basic_info.crustdata_company_id` | `id` |   | lossy | A separate ID space. Crustdata IDs are integers and CompanyEnrich IDs are UUIDs. Store the CompanyEnrich ID next to the Crustdata ID, and re-key on the domain. |
+| `basic_info.name` | `name` |   | same |   |
+| `basic_info.primary_domain` | `domain` |   | same |   |
+| `basic_info.all_domains` | — |   | none | One domain per company. |
+| `basic_info.website` | `website` |   | transformed | Both are full URLs. Normalize the scheme, `www.`, and trailing slash before comparing. |
+| `basic_info.logo_permalink` | `logoUrl` |   | transformed |   |
+| `basic_info.description` | `description` |   | transformed | Written from different sources, so the text differs. |
+| `basic_info.company_type` | `type` |   | renamed | See [Company type](#company-type). |
+| `basic_info.year_founded` | `foundedYear` |   | renamed |   |
+| `updated_at` | `updatedAt` |   | renamed |   |
+| `basic_info.profile_name`, `basic_info.status`, `basic_info.markets`, `indexed_at`, `metadata` | — |   | none |   |
+
+### Size and headcount
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `basic_info.employee_count_range` | `employees` |   | lossy | Crustdata returns the self-reported range from the company profile. CompanyEnrich `employees` is calculated from its employee data, and the self-reported range is a search filter only, `reportedEmployees`. See [Company size](#company-size). |
+| `headcount.total` | `workforce.observedEmployeeCount` | `workforce` | lossy | Employees observed in CompanyEnrich data. Without the expansion, read the `employees` range. |
+| `headcount.timeseries[].employee_count` | `workforce.history[].observedEmployeeCount` |   | transformed | From `GET /v2/companies/workforce`, one point per month. |
+| `headcount.timeseries[].date` | `workforce.history[].date` |   | transformed | From `GET /v2/companies/workforce`. |
+| `headcount.growth_percent`, `headcount.growth_absolute` | `workforce.history[].observedEmployeeCount` |   | transformed | Not returned. Compare two history points from `GET /v2/companies/workforce`. To filter on growth, use the `workforceGrowth` search filter. |
+| `headcount.by_role_absolute`, `headcount.by_role_percent` | `workforce.departmentHeadcount` | `workforce` | lossy | Counts for 14 departments instead of Crustdata's functions. Divide by `workforce.observedEmployeeCount` for shares. |
+| `headcount.by_function_timeseries.CURRENT_FUNCTION` | `workforce.history[].departmentHeadcount` |   | lossy | From `GET /v2/companies/workforce`, by department. |
+| `headcount.largest_headcount_country`, `headcount.by_region_absolute`, `headcount.by_region_percent`, `headcount.by_skill_absolute`, `headcount.by_skill_percent`, `headcount.by_function_timeseries.GEO_REGION` | — |   | none |   |
+
+### Revenue
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `revenue.estimated.lower_bound_usd`, `revenue.estimated.upper_bound_usd` | `revenue` |   | lossy | A range label, such as `10m-50m`, instead of two bounds. Crustdata returns `0` for no estimate; CompanyEnrich returns `null`. |
+| `revenue.public_markets.stock_symbols` | `financial.stockSymbol` | `financial` | transformed | One symbol instead of a list. `financial.stockExchange` holds the exchange. |
+| `revenue.estimated.timeseries`, `revenue.public_markets.ipo_date`, `revenue.public_markets.fiscal_year_end`, `revenue.acquisition_status` | — |   | none |   |
+
+### Funding
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `funding.total_investment_usd` | `financial.totalFunding` | `financial` | renamed |   |
+| `funding.last_round_type` | `financial.fundingStage` | `financial` | transformed | A label such as `Series A`, where Crustdata returns `series_a`. The labels are not a fixed list, so map them to your own values if your code compares them. |
+| `funding.last_fundraise_date` | `financial.fundingDate` | `financial` | transformed | A date-time instead of a date. |
+| `funding.last_round_amount_usd` | `financial.fundingRounds[].amount` | `financial` | transformed | Take the latest round by `date`. The amount is a string. |
+| `funding.milestones` | `financial.fundingRounds` | `financial` | transformed | Each round has `type`, `date`, `amount`, `investors`, and `url`. |
+| `funding.investors` | `financial.fundingRounds[].investors` | `financial` | transformed | Listed per round, as text. |
+| `funding.investors_detailed`, `funding.acquisitions`, `funding.acquired_by` | — |   | none |   |
+
+### Location
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `locations.country` | `location.country.name` or `location.country.code` |   | transformed | A country name in source casing, or an ISO 3166-1 alpha-2 code. Crustdata filters take alpha-3 codes, such as `USA`. |
+| `locations.state` | `location.state.name` |   | renamed |   |
+| `locations.city` | `location.city.name` |   | renamed | Crustdata returns the city in search results only. |
+| `locations.street_address` | `location.address` |   | transformed |   |
+| `locations.headquarters` | `location.address` |   | lossy | Crustdata holds a full location string. Build one from the city, state, and country objects if you need it. |
+| `locations.all_office_addresses` | — |   | none | Headquarters only. |
+
+### Industry
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `taxonomy.professional_network_industry`, `taxonomy.professional_network_industries` | `industries` |   | lossy | A list of industries. Values can differ. |
+| `taxonomy.primary_naics_detail.naics_code` | `naicsCodes` | `naicsCodes` | transformed | A list of codes instead of one primary code. Crustdata codes come from the 2022 NAICS edition, and a few codes changed between editions. |
+| `taxonomy.primary_naics_detail.industry` | `industry` |   | lossy | CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`. |
+| `taxonomy.categories`, `taxonomy.professional_network_specialities` | `keywords` | `keywords` | lossy | Keywords that describe what the company does, from different sources. |
+| `taxonomy.primary_naics_detail.sector`, `taxonomy.primary_naics_detail.sub_sector`, `taxonomy.primary_naics_detail.industry_group`, `taxonomy.primary_naics_detail.year`, `taxonomy.sic_detail_list` | — |   | none | No SIC codes or NAICS level titles. The first two, three, or four digits of a NAICS code give its sector, sub-sector, or industry group. |
+
+### Social profiles
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `basic_info.professional_network_url`, `social_profiles.professional_network` | `socials.linkedinUrl` |   | transformed | Normalize the scheme, `www.`, and trailing slash before comparing. |
+| `basic_info.professional_network_id` | `socials.linkedinId` |   | renamed |   |
+| `social_profiles.twitter_url` | `socials.twitterUrl` |   | transformed |   |
+| `social_profiles.crunchbase.url` | `socials.crunchbaseUrl` |   | transformed |   |
+| `social_profiles.crunchbase.uuid` | — |   | none |   |
+
+### Technographics
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `technographics.technologies[].name`, `technographics.top_technologies` | `technologies` | `technologies` | lossy | One flat list of technology names from different detection. |
+| `technographics.total_technologies` | `technologies` | `technologies` | transformed | Count the list. |
+| `technographics.technologies[].categories`, `technographics.technologies[].sources`, `technographics.technologies[].posting_count`, `technographics.technologies[].evidence`, `technographics.updated_at` | — |   | none | No categories or detection evidence. |
+
+### Other sections
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `people` | — |   | none | Not part of the company record. Search people at the company's domain with `seniority` of `c-suite`, `founder`, or `vp`. |
+| `hiring`, `followers`, `seo`, `web_traffic`, `competitors`, `employee_reviews`, `software_reviews`, `reviews`, `news`, `public_launches`, `market_intel`, `social_posts` | — |   | none | For competitors, a lookalike search on the company's domain returns similar companies, which is a different list. |
+
+{/* end generated */}
+
+## Person fields
+
+Fields under **Current job** come from the person's current experiences. Crustdata splits jobs into `current` and `past` lists. CompanyEnrich returns one `experiences` list, and marks current jobs with `isCurrent`. A person can have more than one current job. After an email lookup, the experience at the email's company has `isMatched` set to `true`.
+
+Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), a separate call.
+
+{/* generated: crustdata fields:person */}
+
+### Identity
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `crustdata_person_id` | `id` |   | lossy | A separate ID space. CompanyEnrich person IDs are 64-bit integers, so do not store both in one column without a source marker. |
+| `basic_profile.name` | `name` |   | same |   |
+| `basic_profile.first_name` | `firstName` |   | renamed |   |
+| `basic_profile.last_name` | `lastName` |   | renamed |   |
+| `basic_profile.profile_picture_permalink`, `professional_network.profile_picture_url` | `imageUrl` |   | transformed |   |
+| `basic_profile.headline`, `basic_profile.summary`, `basic_profile.languages`, `basic_profile.professional_network_name` | — |   | none |   |
+
+### Current job
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `basic_profile.current_title` | `position` |   | renamed |   |
+| `experience.employment_details.current[].title` | `experiences[].position` |   | renamed | From experiences with `isCurrent` set. |
+| `experience.employment_details.current[].name` | `experiences[].company.name` or `experiences[].companyName` |   | transformed | `companyName` is set when no company record matched. |
+| `experience.employment_details.current[].company_website_domain` | `experiences[].company.domain` |   | renamed |   |
+| `experience.employment_details.current[].crustdata_company_id` | `experiences[].company.id` |   | lossy | A CompanyEnrich company UUID. |
+| `experience.employment_details.current[].seniority_level` | `seniority` or `experiences[].seniority` |   | transformed | See [Seniority](#seniority). |
+| `experience.employment_details.current[].function_category`, `basic_profile.normalized_title.department` | `department` or `experiences[].department` |   | transformed | CompanyEnrich departments can include a sub-department, such as `sales/customer-success`. See [Function and department](#function-and-department). |
+| `experience.employment_details.current[].start_date` | `experiences[].startDate` |   | renamed |   |
+| `experience.employment_details.current[].is_default` | `experiences[].isMatched` |   | lossy | No primary-role flag. A person can have several current experiences. `isMatched` marks the one that matched your email lookup or search. When none or several qualify, choose a rule and apply it explicitly. |
+| `experience.employment_details.current[].company_professional_network_profile_url` | `experiences[].company.socials.linkedinUrl` | `company` | transformed |   |
+| `experience.employment_details.current[].company_website` | `experiences[].company.website` | `company` | transformed |   |
+| `experience.employment_details.current[].company_headcount_range` | `experiences[].company.employees` | `company` | lossy | Calculated range, not the self-reported one. See [Company size](#company-size). |
+| `experience.employment_details.current[].company_industries`, `experience.employment_details.current[].company_professional_network_industry` | `experiences[].company.industries` | `company` | lossy |   |
+| `experience.employment_details.current[].company_type` | `experiences[].company.type` | `company` | renamed | See [Company type](#company-type). |
+| `experience.employment_details.current[].company_headquarters_country` | `experiences[].company.location.country.name` | `company` | transformed |   |
+| `experience.employment_details.current[].company_hq_location` | `experiences[].company.location.address` | `company` | lossy |   |
+| `experience.employment_details.current[].company_headcount_latest`, `experience.employment_details.current[].description`, `experience.employment_details.current[].location`, `experience.employment_details.current[].employment_type`, `experience.employment_details.current[].years_at_company`, `experience.employment_details.current[].position_id`, `experience.employment_details.current[].business_email_verified` | — |   | none |   |
+
+### Work history
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `experience.employment_details.past` | `experiences` |   | transformed | One list for current and past jobs. Past jobs have `isCurrent` set to `false`. The same field mappings apply to each past job. |
+| `experience.employment_details.past[].end_date` | `experiences[].endDate` |   | renamed |   |
+| `experience.years_of_experience`, `experience.years_of_experience_raw` | — |   | none | Work it out from `experiences[].startDate` and `endDate`. |
+
+### Education
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `education.schools` | `education` | `education` | transformed |   |
+| `education.schools[].school` | `education[].institutionName` | `education` | renamed |   |
+| `education.schools[].degree`, `education.schools[].field_of_study` | `education[].degree` | `education` | lossy | One array holds the degree and field of study. |
+| `education.schools[].start_year` | `education[].startYear` | `education` | renamed |   |
+| `education.schools[].end_year` | `education[].endYear` | `education` | renamed |   |
+| `education.schools[].description`, `education.schools[].location`, `education.schools[].activities_and_societies` | — |   | none |   |
+
+### Location
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `basic_profile.location.country` | `location.country.name` or `location.country.code` |   | transformed |   |
+| `basic_profile.location.city`, `basic_profile.location.state`, `basic_profile.location.raw` | `location.address` |   | lossy | A single text field, such as a city and country. |
+
+### Social profiles
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `social_handles.professional_network_identifier.profile_url` | `socials.linkedinUrl` |   | transformed | Normalize both URLs before comparing. |
+| `social_handles.twitter_identifier`, `social_handles.dev_platform_identifier` | — |   | none |   |
+
+### Contact
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `contact.business_emails[].email` | `email` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | transformed | One work email instead of a list. |
+| `contact.business_emails[].status` | `certainty` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | lossy | `certainty` is `very-high`, `high`, `medium`, or `unknown`. A deliverability status such as `catch_all` has no direct counterpart. |
+| `contact.personal_emails`, `contact.phone_numbers`, `contact.phone_numbers_info`, `contact.websites` | — |   | none |   |
+
+### Other
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `skills`, `certifications`, `honors`, `dev_platform_profiles`, `research_profiles`, `social_posts`, `professional_network.connections`, `professional_network.followers`, `professional_network.open_to_cards`, `assessment` | — |   | none |   |
+
+{/* end generated */}
+
+## Account fields
+
+These come from [`GET /v2/me`](/api-reference/v2/get-me), which replaces `GET /account/credits` and is free.
+
+{/* generated: crustdata fields:account */}
+
+### Credits
+
+| Crustdata | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `account.credits` | `credits.total` |   | transformed | Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional. |
+| `account.recurring_credits`, `account.recurring_credits_frequency`, `account.recurring_credits_refresh_date`, `account.wallets`, `account.credit_topups` | — |   | none |   |
+
+{/* end generated */}
+
+## Value translations
+
+These tables translate fixed values. Values not listed have no counterpart. Use them to convert stored values and search filters, and keep the original Crustdata value when you store converted data.
+
+{/* generated: crustdata values */}
+
+### Company size
+
+Crustdata `basic_info.employee_count_range`, `company_headcount_range` → CompanyEnrich `employees`, `reportedEmployees`. Crustdata ranges are self-reported, so search them with `reportedEmployees`. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range.
+
+| Crustdata | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `myself only`, `2-10` | `1-10` | lossy | One range covers both. |
+| `11-50` | `11-50` | same |   |
+| `51-200` | `51-200` | same |   |
+| `201-500` | `201-500` | same |   |
+| `501-1000` | `501-1K` | renamed |   |
+| `1001-5000` | `1K-5K` | renamed |   |
+| `5001-10000` | `5K-10K` | renamed |   |
+| `10001+` | `over-10K` | renamed |   |
+
+### Company type
+
+Crustdata `basic_info.company_type` → CompanyEnrich `type`. The same eight types, renamed.
+
+| Crustdata | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Privately Held` | `private` | renamed |   |
+| `Public Company` | `public` | renamed |   |
+| `Nonprofit` | `nonprofit` | renamed |   |
+| `Educational Institution` | `educational` | renamed |   |
+| `Government Agency` | `government` | renamed |   |
+| `Self-Employed` | `self-employed` | renamed |   |
+| `Sole Proprietorship` | `self-owned` | renamed |   |
+| `Partnership` | `partnership` | renamed |   |
+
+### Seniority
+
+Crustdata `seniority_level` → CompanyEnrich `seniority`. Crustdata values are case-insensitive in filters. CompanyEnrich values are lowercase.
+
+| Crustdata | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `CXO` | `c-suite` | renamed | CompanyEnrich files founders under `founder`. Add it to find founder-CEOs. |
+| `Vice President` | `vp` | renamed |   |
+| `Director` | `director` | renamed |   |
+| `Owner / Partner` | `owner`, `partner`, `founder` | lossy | Search all three. CompanyEnrich keeps founders apart. |
+| `Experienced Manager`, `Entry Level Manager` | `manager` | lossy | One value covers both. |
+| `Senior` | `senior` | renamed |   |
+| `Entry Level` | `entry` | renamed |   |
+| `In Training` | `intern` | lossy |   |
+| `Strategic` | — | none | Not mapped automatically. Filter on `position` phrases instead. |
+
+### Function and department
+
+Crustdata `function_category` → CompanyEnrich `department`. A department filter includes its sub-departments.
+
+| Crustdata | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Engineering` | `engineering-technical` | renamed |   |
+| `Sales` | `sales` | renamed |   |
+| `Marketing` | `marketing` | renamed |   |
+| `Operations` | `operations` | renamed |   |
+| `Finance` | `finance` | renamed |   |
+| `Consulting` | `consulting` | renamed |   |
+| `Human Resources` | `human-resources` | renamed |   |
+| `Legal` | `legal` | renamed |   |
+| `Product Management` | `product-management` | renamed |   |
+| `Arts and Design` | `design` | lossy |   |
+| `Customer Success and Support` | `sales/customer-success`, `operations/customer-service-support` | lossy | Split across two sub-departments. Search both. |
+| `Research` | — | none | No single department. `engineering-technical/research-development` and `medical-health/medical-research` overlap. |
+
+### Funding round
+
+Crustdata `funding.last_round_type` → CompanyEnrich `fundingRounds`. These are search filter values. Company records return labels such as `Series A` in `financial.fundingStage`.
+
+| Crustdata | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `seed` | `seed` | same |   |
+| `angel` | `angel` | same |   |
+| `series_a`, `series_b`, `series_c`, `series_d`, `series_e`, `series_f`, `series_g`, `series_h` | `series_a`, `series_b`, `series_c`, `series_d`, `series_e`, `series_f`, `series_g`, `series_h` | same | Same value for each round. |
+| `debt_financing` | `debt_financing` | same |   |
+| `pre_seed`, `series_i`, `series_j`, `series_unknown`, `convertible_note`, `corporate_round`, `equity_crowdfunding`, `grant`, `initial_coin_offering`, `non_equity_assistance`, `post_ipo_debt`, `post_ipo_equity`, `post_ipo_secondary`, `private_equity`, `product_crowdfunding`, `secondary_market`, `undisclosed` | — | none | No exact value. CompanyEnrich also has `venture` and `other`. |
+
+{/* end generated */}
+
+### Country
+
+Crustdata returns full country names, such as `United States`. Its company filters also take ISO 3166-1 alpha-3 codes, such as `USA`. CompanyEnrich returns `location.country.code`, an ISO 3166-1 alpha-2 code such as `US`, and `location.country.name`, and filters on the alpha-2 code. To convert stored names or alpha-3 codes, look up the codes with [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries), which is free.
+
+### Growth periods
+
+Crustdata enrichment keys headcount growth by `mom`, `qoq`, `six_months`, `yoy`, and `two_years`, and search uses `1m`, `3m`, `6m`, and `12m`. CompanyEnrich filters on growth with `workforceGrowth` periods `m6`, `y1`, and `y2`, as a ratio: 20% growth is `0.2`. To read growth for one company, compare two points from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce).
+
+## CompanyEnrich fields Crustdata does not return
+
+### Company
+
+{/* generated: crustdata ceOnly:company */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `legalName` |   | The registered legal name. |
+| `categories` |   | Business model, such as `saas` or `b2b`. |
+| `location.country.code` |   | ISO 3166-1 alpha-2 country code. |
+| `socials.facebookUrl`, `socials.instagramUrl`, `socials.youtubeUrl`, `socials.githubUrl`, `socials.angellistUrl`, `socials.g2Url` |   | Other social profiles. |
+| `financial.stockExchange` | `financial` | The stock exchange for public companies. |
+
+{/* end generated */}
+
+### Person
+
+{/* generated: crustdata ceOnly:person */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `experiences[].isMatched` |   | Which experience matched your search filters or your email lookup. |
+| `education[].institution` | `education` | The school as a company summary. |
+| `updatedAt` |   | When the record was last updated. |
+
+{/* end generated */}
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-crustdata">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-crustdata-search">
+    Translate company and person search filters.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a CompanyEnrich company record.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a CompanyEnrich person record.
+  </Card>
+</CardGroup>

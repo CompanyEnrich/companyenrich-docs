@@ -1,0 +1,512 @@
+---
+title: "Migrate from Crustdata to CompanyEnrich"
+sidebarTitle: "Overview"
+description: "Move Crustdata company and person API calls, CLI scripts, and MCP setups to the CompanyEnrich V2 API: endpoint mapping, request and response differences, and a parity check on your own data."
+---
+
+{/* Tables between "generated" markers come from migrations/crustdata.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This guide is for engineers whose code, scripts, or AI agents call the Crustdata API and are moving some or all of those calls to the CompanyEnrich V2 API. It maps each Crustdata endpoint, lists the behavior that changes in your code, and shows how to check the result on records you already have before you switch traffic.
+
+<Note>
+  Crustdata behavior on these pages was checked against Crustdata's public documentation for API version `2025-11-01` on November 23, 2026. The legacy `/screener` and `/data_lab` endpoints are not covered. CompanyEnrich behavior comes from the [V2 API reference](/api-reference/v2/overview). The full mapping is also available as JSON at [/migrations/crustdata.json](https://docs.companyenrich.com/migrations/crustdata.json).
+</Note>
+
+<CardGroup cols={3}>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-crustdata-field-mapping">
+    Every Crustdata company and person field, with its CompanyEnrich counterpart.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-crustdata-search">
+    Translate company and person search conditions.
+  </Card>
+  <Card title="With a coding agent" icon="robot" href="/docs/migrate-from-crustdata-agent">
+    Instructions a coding agent follows to migrate your codebase.
+  </Card>
+</CardGroup>
+
+## Check the fit first
+
+| Workload | Status | Start here |
+| --- | --- | --- |
+| Company enrichment by domain | Moves directly | [Switch company enrichment](#switch-company-enrichment-in-five-minutes) |
+| Company enrichment or identify by name or company profile URL | Moves, without a confidence score | [Match confidence](#match-confidence) |
+| Bulk company enrichment by domain | Moves, in batches of 50 or as a background job | [Endpoint mapping](#company) |
+| Headcount, headcount history, funding, and technologies | Move as expansions or the workforce endpoint, with fewer fields | [Field mapping](/docs/migrate-from-crustdata-field-mapping) |
+| Company and person search | Rewrite each condition. Ranked queries move to semantic search. | [Search filters](/docs/migrate-from-crustdata-search) |
+| Person identify by work email | Moves | [Endpoint mapping](#people) |
+| Business email for a person | Moves, by CompanyEnrich person ID | [Endpoint mapping](#people) |
+| MCP server and CLI | Move to the CompanyEnrich MCP server and CLI | [Move your MCP setup](#move-your-mcp-setup) |
+| Person enrichment by profile URL, personal emails, and phone numbers | No equivalent | [When to keep Crustdata](#when-to-keep-crustdata) |
+| Jobs, social posts, web search, watches, agent search, and live endpoints | No equivalent | [When to keep Crustdata](#when-to-keep-crustdata) |
+
+## Switch company enrichment in five minutes
+
+This is the shortest path: one enrichment call by domain, moved to the V2 API with the Python SDK.
+
+<Steps>
+  <Step title="Get an API key">
+    Create a key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys) and export it as `COMPANYENRICH_API_KEY`. Check it with [`GET /v2/me`](/api-reference/v2/get-me), which is free:
+
+    ```bash
+    curl https://api.companyenrich.com/v2/me \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+  </Step>
+  <Step title="Install the SDK">
+    ```bash
+    pip install companyenrich
+    ```
+
+    The [Python SDK](/docs/python-sdk) needs Python 3.10 or later. There are also SDKs for [JavaScript](/docs/javascript-typescript-sdk), [Ruby](/docs/ruby-sdk), and [PHP](/docs/php-sdk), and a [CLI](/docs/cli).
+  </Step>
+  <Step title="Replace the call">
+    <CodeGroup>
+
+    ```python Before (Crustdata)
+    import os
+
+    import requests
+
+    response = requests.post(
+        "https://api.crustdata.com/company/enrich",
+        headers={
+            "authorization": f"Bearer {os.environ['CRUSTDATA_API_KEY']}",
+            "x-api-version": "2025-11-01",
+        },
+        json={"domains": ["stripe.com"], "fields": ["basic_info", "headcount"]},
+    )
+    matches = response.json()[0]["matches"]
+    if matches:
+        company = matches[0]["company_data"]
+        info = company["basic_info"]
+        print(info["name"], company["headcount"]["total"], info["professional_network_url"])
+    ```
+
+    ```python After (CompanyEnrich)
+    from companyenrich import CompanyEnrich, NotFoundError
+
+    client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+    try:
+        company = client.companies.enrich("stripe.com")
+        socials = company.get("socials") or {}
+        print(company.get("name"), company.get("employees"), socials.get("linkedinUrl"))
+    except NotFoundError:
+        company = None  # no match, not charged
+    ```
+
+    ```bash cURL
+    curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Update the fields you read">
+    | Crustdata field | CompanyEnrich field | Change |
+    | --- | --- | --- |
+    | `basic_info.name` | `name` | Renamed |
+    | `basic_info.primary_domain` | `domain` | Renamed |
+    | `basic_info.year_founded` | `foundedYear` | Renamed |
+    | `headcount.total` | `employees`, or `workforce.observedEmployeeCount` with `expand=workforce` | A range such as `1K-5K`, or a count with the expansion |
+    | `locations.country` | `location.country.name` or `location.country.code` | Name in source casing, or an ISO alpha-2 code |
+    | `basic_info.professional_network_url` | `socials.linkedinUrl` | Renamed |
+
+    The [field mapping](/docs/migrate-from-crustdata-field-mapping) covers every other field.
+  </Step>
+  <Step title="Handle no match">
+    Crustdata returns `200` with an empty `matches` array. CompanyEnrich returns `404`, and the SDK raises `NotFoundError`. Neither API charges for it.
+  </Step>
+</Steps>
+
+## What takes longer
+
+| Workload | Why | Guide |
+| --- | --- | --- |
+| Search filters | Crustdata takes a tree of conditions with `and` and `or`. CompanyEnrich takes a flat `filter` in which every filter must match, with no sorting. | [Search filters](/docs/migrate-from-crustdata-search) |
+| Person lookups | CompanyEnrich enriches a person by work email, not by profile URL. Search results are full records, so a search-then-enrich flow becomes one search. | [People](#people) |
+| Stored records | Crustdata IDs do not carry over, and value labels change, such as `Privately Held` to `private`. | [Field mapping](/docs/migrate-from-crustdata-field-mapping) |
+| Field selection | Crustdata `fields` lists the sections to return. CompanyEnrich returns the base record and adds paid expansions. | [Field selection](#field-selection) |
+| Contact data | CompanyEnrich finds work emails only, one person at a time, by CompanyEnrich person ID. | [People](#people) |
+| AI agents and scripts | MCP tools and CLI commands change. | [Move your MCP setup](#move-your-mcp-setup) |
+
+## Migrate with a coding agent
+
+A coding agent can do the inventory, the rewrite, and the tests. Give it this prompt in your repository:
+
+```text
+Migrate this codebase from Crustdata to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-crustdata-agent.md and use the mapping at https://docs.companyenrich.com/migrations/crustdata.json. Show me the migration report before changing any code.
+```
+
+See [Migrate with a coding agent](/docs/migrate-from-crustdata-agent) for what the agent does and the rules it follows.
+
+## Move your MCP setup
+
+If your agent uses the Crustdata MCP server, add the CompanyEnrich server. The hosted server is at `https://mcp.companyenrich.com/mcp`. For example, in Claude Code:
+
+```bash
+claude mcp add --transport http companyenrich https://mcp.companyenrich.com/mcp
+```
+
+The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code, and other clients, and lists the credits each tool uses. Then update any prompts or code that name Crustdata tools:
+
+{/* generated: crustdata mcp */}
+
+| Crustdata tool | CompanyEnrich tool | Notes |
+| --- | --- | --- |
+| Identify or enrich a company | `enrich_company` or `enrich_company_by_properties` | By domain, or by name or social profile. The record includes technologies, keywords, and funding. |
+| Company headcount and growth | `get_company_workforce` | Headcount by department, with monthly history. |
+| Search companies | `search_companies` or `find_similar_companies` | Filters, a plain-language description, or 1 to 10 seed domains for lookalikes. |
+| Search people | `search_people` | By name, title, seniority, department, country, and employer. |
+| Enrich a person or identify one from an email | `lookup_person_by_email` or `get_person_by_id` | By work email, or by a CompanyEnrich person ID from search. No lookup by profile URL. |
+| Contact enrichment | `enrich_person_email` | Work email only. No personal emails or phone numbers. |
+| Credit balance | `get_current_user` | Free. |
+| Jobs, social posts, web search and fetch, watches, and batch jobs | None | No equivalent tools. |
+
+{/* end generated */}
+
+CompanyEnrich tools take plain values, such as a domain or a job title, so your agent does not need to look up autocomplete values first.
+
+### Scripts that use the Crustdata CLI
+
+The [CompanyEnrich CLI](/docs/cli) covers the same company and people workflows. Its search flags are named after the CompanyEnrich filters, so rewrite each `--filter` as a flag, or send the full request body with `companyenrich api`.
+
+| Crustdata CLI | CompanyEnrich CLI |
+| --- | --- |
+| `crustdata company enrich --domains stripe.com` | `companyenrich company enrich stripe.com` |
+| `crustdata company identify` | `companyenrich company enrich --name "..."`, or `company autocomplete <domain prefix>` |
+| `crustdata company search --filter '...'` | `companyenrich company search` with flags such as `--country US`, or `--semantic "..."` |
+| `crustdata person search` | `companyenrich people search` |
+| `crustdata person contacts` | `companyenrich people email <id>`, for a work email |
+| `crustdata batch company enrich` | `companyenrich company bulk-enrich -f domains.txt --wait` |
+| `crustdata account credits` | `companyenrich me` |
+| `--jq` | `--fields`, or `--format json` piped to `jq` |
+
+A CompanyEnrich lookup that finds nothing exits with code 4, where Crustdata prints an empty `matches` array. Handle that code in scripts that use `set -e`, or the script stops at the first unknown domain.
+
+## Endpoint mapping
+
+Crustdata enrichment and identify take arrays of one identifier type. CompanyEnrich takes one company or person per request, except batch enrichment, which takes up to 50 domains. Where a Crustdata call takes `crustdata_company_ids`, send the company's domain, or the CompanyEnrich ID, instead. Crustdata IDs cannot be converted.
+
+### Company
+
+{/* generated: crustdata endpoints:company */}
+
+| Crustdata | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `POST /company/enrich`, with one domain in `domains` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `domains[]` → `domain`; `fields` → `expand`. Drop `exact_match`: domain lookups are exact. The company record is the response body, with no `matches` array or `confidence_score`. No match returns `404` and is not charged. The base record covers `basic_info`, `locations`, and `social_profiles`; `funding`, `technographics`, part of `taxonomy`, and `headcount` become expansions, and the other sections have no equivalent. See the field mapping. |
+| `POST /company/enrich`, with several domains in `domains` | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | `domains` → `domains`; `fields` → `expand`. Drop `exact_match`: domain lookups are exact. Up to 50 domains per request, so send longer lists in chunks of 50. `items` come back in request order, each with the input `domain` in place of `matched_on`, a `status` of `found`, `not-found`, `invalid-domain`, or `pending`, and `company` when `status` is `found`. For up to 10,000 domains in the background, use `POST /v2/companies/enrich/bulk`. |
+| `POST /company/enrich` with `names`, `professional_network_profile_urls` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `names[]` → `name`; `professional_network_profile_urls[]` → `linkedinUrl`; `fields` → `expand`. Drop `exact_match`: matching rules are fixed. One company per request. Every property you send must match. When several companies match, the highest-ranked one is returned, with no `confidence_score` and no other candidates. No match returns `404` and is not charged. |
+| `POST /company/enrich` with `crustdata_company_ids` | None | Crustdata IDs do not carry over. Enrich by the domain stored with the record, or store the CompanyEnrich `id` and use `GET /v2/companies/{companyId}`. |
+| `POST /company/identify` with `domains` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `domains[]` → `domain`. Drop `fields`: the response is always the full base record. Drop `exact_match`: domain lookups are exact. There is no separate identify step. Enrichment returns the full company record, or `404` when there is none. One domain per request. |
+| `POST /company/identify` with `professional_network_profile_urls` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `professional_network_profile_urls[]` → `linkedinUrl`. Drop `fields`: the response is always the full base record. Drop `exact_match`: matching rules are fixed. Returns the full company record, or `404` when there is none. One profile URL per request. |
+| `POST /company/identify` with `names` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `names[]` → `name`. Drop `fields`: the response is always the full base record. Drop `exact_match`: matching rules are fixed. One name per request. Returns the full record of the highest-ranked match, with no `confidence_score` and no other candidates, or `404`. Read `domain` from the record. |
+| `POST /company/identify` with `crustdata_company_ids` | None | Crustdata IDs do not carry over. |
+| `POST /company/search` with `filters` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `filters` → `filter`; `limit` → `pageSize`; `cursor` → `cursor`. Drop `fields`: results are always full company records. Rework `sorts`: results come in relevance order, so sort in your code. Rewrite each filter. See [Translate search filters](/docs/migrate-from-crustdata-search). `pageSize` goes up to 100, against 1,000 for `limit`. Search results carry the same fields as enrichment, so you may not need to enrich them afterwards. |
+| `POST /company/search` with `search` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `search.query` → `semantic.query`; `filters` → `filter`; `limit` → `pageSize`; `cursor` → `cursor`. Drop `search.mode`: semantic search has no mode. For a `lexical` query that must match exact words, use `filter.keywords` or `filter.query` instead. Drop `fields`: results are always full company records. Send the query as `semantic.query`, with any filters as hard constraints. Results are ranked by relevance, as in Crustdata. By default, the query also sets inferred filters such as location and size; set `semantic.autoFilter` to `false` to rank by it alone. A cursor lasts 24 hours, against 20 minutes for a ranked Crustdata search. |
+| `POST /company/search`, reading `total_count` | [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count) | `filters` → `filter`. Free. Search responses carry no total, so send the same filter to the count endpoint. |
+| `POST /company/search/autocomplete` | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete) | `query` → `query`. Free. Company autocomplete suggests companies for a domain prefix or URL, so it covers `basic_info.primary_domain` only. For other fields, use `GET /v2/technologies/autocomplete`, `GET /v2/keywords/autocomplete`, `GET /v2/industries`, or the geo endpoints. Company names have no lookup. |
+| `POST /batch/company/enrich` with `domains` | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk) | `domains` → `domains`; `fields` → `expand`. Drop `chunk_size`: processing is managed for you. Rework `webhook_url`: there are no webhooks. Poll `GET /v2/batches/{id}` until the job completes. Background job for up to 10,000 domains. Domains only. Download the results as JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports). For up to 50 domains, `POST /v2/companies/enrich/batch` answers in the same request. |
+| `POST /batch/company/enrich` with `names`, `professional_network_profile_urls`, `crustdata_company_ids` | None | Bulk jobs take domains only. Call `POST /v2/companies/enrich` per name or profile URL within your rate limit. |
+| `POST /batch/company/search` | [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export) | `filters` → `filter`; `limit` → `limit`. Drop `fields`: exports hold full company records. Rework `webhook_url`: there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes. Exports every result of a search as a background job. Poll the batch, then download JSON, NDJSON, or CSV. |
+| `POST /company/professional_network/search/live` | None | No live search. Search the CompanyEnrich index with `POST /v2/companies/search`. Live filter names such as `REGION` need a full rewrite. |
+
+{/* end generated */}
+
+### People
+
+{/* generated: crustdata endpoints:people */}
+
+| Crustdata | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `POST /person/search` with `filters` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `filters` → `filter` or `company`; `limit` → `pageSize`; `count` → `pageSize`; `cursor` → `cursor`. Drop `fields`: results are always full person records. Drop `return_query`: a debug flag. Drop `explain`: a debug flag. Use the free count endpoint to test conditions one at a time. Rework `sorts`: results come in relevance order, so sort in your code. Rework `post_processing`: drop excluded profiles or names from the results in your code. Rework `preview`: use the free `POST /v2/people/search/preview` or count endpoint instead. Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-crustdata-search#people-search-patterns). Results are full person records, so you do not need to enrich them by profile URL afterwards. |
+| `POST /person/search` with `search` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `search.query` → `semantic.query`; `filters` → `filter` or `company`; `limit` → `pageSize`; `cursor` → `cursor`. Drop `search.mode`: semantic search has no mode. Drop `mode`: semantic search has no recall mode. The plain-language query infers person filters and employers, such as `marketing leaders at Series B fintech startups in London`. There is no relevance `fit` tier per result. |
+| `POST /person/search`, reading `total_count` | [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count) | `filters` → `filter` or `company`. Free. Search responses carry no total. |
+| `POST /person/enrich` with `professional_network_profile_urls` | None | No person lookup by profile URL. With a work email, use `POST /v2/people/enrich`. Without one, search by name at the employer's domain with `POST /v2/people/search`, which returns candidates without a confidence score. If your code searches and then enriches each result, drop the enrich step: search results are full records. |
+| `POST /person/identify` with `emails` | [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich) | `emails[]` → `email`. One work email per request. The API resolves the company from the email domain, then matches the person. The full person record is the response body. No match returns `404` and is not charged, in place of a `match_status` of `not_found` or `redacted`. Personal emails have no equivalent, so a call whose callers can send personal emails needs redesign. |
+| `POST /person/identify` with `professional_network_profile_urls`, `research_profile_urls` | None | No lookup by profile URL or Google Scholar URL. |
+| `POST /person/contact/enrich`, with `fields` of `contact.business_emails` | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) | Takes a CompanyEnrich person ID, not a profile URL or a business email. After a people search or `POST /v2/people/enrich`, pass each person's `id`. A call that has only a profile URL has no equivalent. One person per request. Returns one work email with a `status` and `certainty`. Costs 10 credits only when it finds an email your account has not accessed before. |
+| `POST /person/contact/enrich`, with `fields` of `contact.personal_emails`, `contact.phone_numbers`, `contact.websites` | None | No personal emails, phone numbers, or websites. |
+| `POST /person/search/autocomplete` | [`GET /v2/positions/autocomplete`](/api-reference/v2/get-positions-autocomplete) | `query` → `query`. Free. Suggests job titles for the `position` filter. Seniority and department take fixed values, listed in the field mapping. Other fields have no lookup. |
+| `POST /batch/person/search` | [`POST /v2/people/search/export`](/api-reference/v2/post-people-search-export) | `filters` → `filter` or `company`; `limit` → `limit`. Rework `webhook_url`: there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes. Exports every result of a people search as a background job. |
+| `POST /batch/person/enrich`, `POST /batch/person/identify`, `POST /batch/person/contact/enrich` | None | No bulk person enrichment. Call `POST /v2/people/enrich` per work email within your rate limit, or export a people search. |
+| `POST /person/professional_network/search/live`, `POST /person/professional_network/enrich/live`, `POST /professional_network/search/autocomplete` | None | No live search or live profile retrieval. |
+| `POST /batch/person/verify` | None | No work-history verification. |
+
+{/* end generated */}
+
+### Supporting APIs
+
+{/* generated: crustdata endpoints:supporting */}
+
+| Crustdata | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `GET /batch/{batch_id}`, `GET /batch/` | [`GET /v2/batches/{id}`](/api-reference/v2/get-batches-id) | `batch_id` → `id`. List jobs with `GET /v2/batches` and cancel one with `POST /v2/batches/{id}/cancel`. Download the results of a bulk enrichment or an export from its own results endpoint, such as `GET /v2/companies/enrich/bulk/{id}/results`, as JSON, NDJSON, or CSV, instead of a gzipped JSONL file. |
+| `GET /account/credits` | [`GET /v2/me`](/api-reference/v2/get-me) | Free. Returns your credit totals and plan capabilities. See [Account fields](/docs/migrate-from-crustdata-field-mapping#account-fields). Each paid response also carries `x-credit-cost` and `x-credit-remaining` headers, in place of `X-Credits-Used`. |
+| `GET /account/endpoints`, `GET /account/usage/summary`, `GET /account/usage/events`, `GET /account/usage/errors` | None | No usage or permissions API. Log `x-credit-cost` per call, and read plan limits from `capabilities` on `GET /v2/me`. |
+| `POST /job/search`, `POST /job/search/autocomplete`, `POST /batch/job/search` | None | No job postings. Workforce history is headcount by department, not postings. |
+| `POST /social_post/search`, `POST /social_post/professional_network/search/live` | None | No social posts. |
+| `POST /web/search/live`, `POST /web/enrich/live` | None | No web search or page fetch. |
+| `POST /watch/{dataset}`, `POST /watch/{dataset}/search` | None | No watches, notifications, or webhooks. To track changes, re-enrich the companies you follow on a schedule and compare `updatedAt`, headcount, or funding. To find new matches, re-run a search and compare IDs. |
+| `POST /agent/searches` | None | No agent search. Semantic company and people search take a plain-language query, and the MCP server lets your own agent chain calls. |
+
+{/* end generated */}
+
+## Request and response differences
+
+### Authentication
+
+| | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| Headers | `authorization: Bearer YOUR_CRUSTDATA_API_KEY` and `x-api-version: 2025-11-01` | `Authorization: Bearer YOUR_API_TOKEN`. There is no version header; the version is in the path, `/v2`. |
+| SDK | None. Calls use HTTP directly, or the `crustdata` CLI. | `CompanyEnrich()` reads `COMPANYENRICH_API_KEY`, or takes the key as its first argument |
+
+### Response shape
+
+| Call | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| Enrichment and identify | A top-level array, one entry per identifier, each with `matched_on`, `match_type`, and `matches`, where each match has a `confidence_score` and `company_data` or `person_data` | The record is the body |
+| Several domains at once | One enrichment request with several `domains`, one array entry each | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) with up to 50 domains. `items` come back in request order, each with `domain`, `status`, and `company` when `status` is `found`. |
+| Search | `companies` or `profiles`, `next_cursor`, and `total_count` | `items` and `nextCursor`. Get totals from the free count endpoint. |
+| Bulk jobs | `GET /batch/{batch_id}` with `status` and a `download_url` for a gzipped JSONL file | `GET /v2/batches/{id}`, then results as JSON, NDJSON, or CSV |
+| Errors | `error` with `type`, `message`, and `metadata` | A problem document with `type`, `title`, `status`, and `detail`. `422` adds `errors` per field. The `x-trace-id` header identifies the request. |
+
+### Field selection
+
+Crustdata returns only the sections you list in `fields`. Company enrichment defaults to `basic_info`, and search defaults to every field. CompanyEnrich always returns the base record. The company base record includes name, domain, description, industry, size and revenue ranges, location, and social profiles. Add `financial`, `keywords`, `naicsCodes`, `technologies`, or `workforce` with `expand`, and `company` or `education` on a person.
+
+When you rewrite a call, turn its `fields` list into an `expand` list that holds only the expansions your code reads. Each expansion adds credits.
+
+### Match confidence
+
+Crustdata returns candidate matches for each identifier, each with a `confidence_score`, and an empty `matches` array when there is none. Person lookups also report a `match_status` of `matched`, `not_found`, or `redacted`.
+
+CompanyEnrich has no score:
+
+* Enrichment by domain looks up that domain.
+* Enrichment by properties requires every property you send to match. If several companies match, it returns the highest-ranked one.
+* A person lookup by work email returns the person, or `404`.
+
+Code that accepts or rejects a match by `confidence_score` needs a new rule, because there is no score to check. For name lookups, send a domain instead, or add a profile URL as `linkedinUrl` to the name so that both must match.
+
+### Status codes
+
+| Status | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| `200` | A match, an enrichment with an empty `matches` array, or a search that ran | A match, or a search that ran |
+| `400` | Invalid request, including an unknown field, a wrong operator, or a stale cursor | Malformed request |
+| `401` | Missing or invalid key | Missing or invalid key |
+| `402` | Out of credits | Out of credits, or the plan does not include the request. Do not retry. |
+| `403` | The key may not call this endpoint, or a requested field is not enabled | The key may not perform this request |
+| `404` | Defined, but a missed match usually returns `200` | No match. Not charged. |
+| `422` | Not documented | Validation failed. `errors` lists the messages per field. |
+| `429` | Rate limit hit, or too many active batch jobs | Rate limit hit. Wait for the time the response gives. |
+| `5xx` | Server error | Server error |
+
+The change that needs code is the missed match: Crustdata reports it inside a `200` response, while CompanyEnrich returns `404`. The SDK raises a typed exception for each non-2xx status, such as `NotFoundError`, `PaymentRequiredError`, and `RateLimitError`.
+
+### Billing behavior that affects your code
+
+These differences change how you write retries, guards, and tests. Prices for each endpoint are in [Credits](/docs/credits).
+
+* **No match is free on both APIs.** CompanyEnrich enrichment that finds nothing returns `404` and is not charged.
+* **An empty search is charged.** Crustdata charges per result, so a search with no results costs nothing. CompanyEnrich charges one result's base price, such as 1 credit for a filter search. Check a new filter with the free [count endpoint](/api-reference/v2/post-companies-search-count) first.
+* **Extra company fields are expansions.** Each one you request adds 1 credit per company returned, so request only the ones your code reads.
+* **Work emails are a separate call.** [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) costs 10 credits only when it finds an email your account has not accessed before.
+* **Responses report their cost.** Read `x-credit-cost` and `x-credit-remaining` from the response headers, in place of `X-Credits-Used`.
+
+### Pagination
+
+| | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| Page size | `limit`, up to 1,000 for a filter search and 100 for a ranked search | `pageSize`, 1 to 100 |
+| Next page | Send the `next_cursor` from the last response as `cursor`, until it is `null` | Send the `nextCursor` from the last response as `cursor`, until it is omitted |
+| Cursor lifetime | 20 minutes for a ranked search | 24 hours after the first page |
+
+Crustdata asks for `sorts` to keep filter-search pages stable. CompanyEnrich has no sorting, so page with the cursor. If your code needs a sorted list, fetch every page, then sort. The Python SDK pages for you with `search_all()`. A cursor from one API does not work in the other, so restart any paging job from the first page.
+
+### Rate limits
+
+Crustdata limits each endpoint by requests per minute, set by your plan, and reports `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-reset`. CompanyEnrich applies a global limit of 500 requests per minute per IP address and a per-route limit from your plan, reported in `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-window`. A batch of 50 domains is one request. The SDKs wait and retry on `429`. See [Rate limits](/docs/rate-limit).
+
+### Values and URLs
+
+| | Crustdata | CompanyEnrich |
+| --- | --- | --- |
+| Countries | Full names, such as `United States`. Company filters also take ISO alpha-3 codes, such as `USA`. | `code` (ISO 3166-1 alpha-2, such as `US`) and `name` |
+| Company types | Labels such as `Privately Held` | Values such as `private` |
+| Size ranges | `myself only`, `2-10`, through `10001+` | `1-10` through `over-10K` |
+| Seniority and function | Labels such as `Vice President` and `Engineering` | Values such as `vp` and `engineering-technical` |
+| Headcount | A count, `headcount.total` | A range, `employees`, or a count with `expand=workforce` |
+
+The [value translations](/docs/migrate-from-crustdata-field-mapping#value-translations) list every value.
+
+### IDs
+
+Crustdata IDs and CompanyEnrich IDs are separate. Crustdata company and person IDs are integers. CompanyEnrich company IDs are UUIDs, and person IDs are 64-bit integers, so keep them in separate columns. Store the CompanyEnrich ID next to the Crustdata ID, and re-key company data on its domain.
+
+## Verify parity on your own data
+
+Before you move production traffic, measure CompanyEnrich on records you already have. This makes no Crustdata requests.
+
+<Steps>
+  <Step title="Check your key and plan">
+    Call [`GET /v2/me`](/api-reference/v2/get-me). It is free and returns your balance and plan capabilities.
+  </Step>
+  <Step title="Size your searches for free">
+    Send each translated filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint and compare `total` with Crustdata's `total_count`.
+  </Step>
+  <Step title="Pick a sample">
+    Take 100 to 200 `company_data` records you already stored from Crustdata. Using stored records means you spend no Crustdata credits. CompanyEnrich charges 1 credit per company found.
+  </Step>
+  <Step title="Compare the fields you read">
+    Run the script below on the sample. It enriches the domains in batches of 50 and sorts each field into `equal`, `differ`, `only Crustdata`, `only CompanyEnrich`, or `both empty`. Fields marked `lossy` in the [field mapping](/docs/migrate-from-crustdata-field-mapping) differ by definition, so leave them out or compare them by hand.
+  </Step>
+  <Step title="Check searches and people">
+    For each translated search, run the count, then a [preview](/api-reference/v2/post-companies-search-preview) if your plan includes it, then one page. For person lookups, test work emails you already know.
+  </Step>
+</Steps>
+
+<Accordion title="compare.py" icon="code">
+
+```python compare.py
+"""compare.py: compare stored Crustdata company records with CompanyEnrich on the same domains.
+
+Usage: python compare.py crustdata_companies.jsonl   (one stored company_data object per line)
+Costs 1 CompanyEnrich credit per company found. Makes no Crustdata requests.
+"""
+
+import json
+import sys
+from collections import Counter
+
+from companyenrich import CompanyEnrich
+
+TYPES = {"Privately Held": "private", "Public Company": "public", "Nonprofit": "nonprofit",
+         "Educational Institution": "educational", "Government Agency": "government",
+         "Self-Employed": "self-employed", "Sole Proprietorship": "self-owned", "Partnership": "partnership"}
+
+# Crustdata path -> (how to read the comparable CompanyEnrich value, how to convert the Crustdata value)
+FIELDS = {
+    "basic_info.name": (lambda c: c.get("name"), None),
+    "basic_info.primary_domain": (lambda c: c.get("domain"), None),
+    "basic_info.year_founded": (lambda c: c.get("foundedYear"), None),
+    "basic_info.company_type": (lambda c: c.get("type"), TYPES.get),
+    "basic_info.professional_network_url": (lambda c: (c.get("socials") or {}).get("linkedinUrl"), None),
+    "locations.country": (lambda c: ((c.get("location") or {}).get("country") or {}).get("name"), None),
+    "locations.state": (lambda c: ((c.get("location") or {}).get("state") or {}).get("name"), None),
+}
+
+
+def crustdata_value(record, path):
+    for key in path.split("."):
+        record = (record or {}).get(key)
+    return record
+
+
+def normalize(value):
+    if isinstance(value, str):
+        value = value.lower().removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+    return value or None
+
+
+def outcome(crustdata, ce):
+    if crustdata is None and ce is None:
+        return "both empty"
+    if ce is None:
+        return "only Crustdata"
+    if crustdata is None:
+        return "only CompanyEnrich"
+    return "equal" if crustdata == ce else "differ"
+
+
+def main(path, client=None):
+    records = [json.loads(line) for line in open(path) if line.strip()]
+    records = [record for record in records if crustdata_value(record, "basic_info.primary_domain")]
+    client = client or CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+    results = Counter()
+    for start in range(0, len(records), 50):
+        chunk = records[start:start + 50]
+        batch = client.companies.enrich_batch([record["basic_info"]["primary_domain"] for record in chunk])
+        for record, item in zip(chunk, batch["items"], strict=True):
+            if item["status"] != "found":
+                results[f"lookup: {item['status']}"] += 1
+                continue
+            for field, (read, convert) in FIELDS.items():
+                value = crustdata_value(record, field)
+                if convert and value is not None:
+                    value = convert(value)
+                results[f"{field}: {outcome(normalize(value), normalize(read(item['company'])))}"] += 1
+    for key, count in sorted(results.items()):
+        print(f"{key:55} {count}")
+    return results
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
+```
+
+</Accordion>
+
+## Cut over
+
+* Put the CompanyEnrich path behind a feature flag and keep Crustdata as the fallback until the parity results meet the thresholds you set.
+* Store CompanyEnrich IDs next to Crustdata IDs.
+* Log `x-credit-cost` per call while both paths run.
+* Move reads first, then writes to stored records, then remove the Crustdata calls, keys, and MCP configuration you no longer use.
+
+## When to keep Crustdata
+
+Keep Crustdata, or another source, for these workloads:
+
+* Person enrichment and identify by profile URL, and lookups by Google Scholar URL.
+* Personal emails, phone numbers, and bulk contact enrichment.
+* Live search, live profile retrieval, and work-history verification.
+* Job postings, social posts, web search and fetch, watches and webhooks, and agent search.
+* Company sections such as web traffic, SEO, reviews, news, followers, hiring, and key people inside the company record.
+* Searches that need OR across different fields, sorting, radius or polygon areas, person locations below country level, SIC codes, skills, or technology categories.
+
+You can run both APIs side by side and route each call by the [endpoint mapping](#endpoint-mapping).
+
+## What you can add after migrating
+
+<CardGroup cols={2}>
+  <Card title="Semantic company search" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Search companies with a plain-language description instead of filters.
+  </Card>
+  <Card title="Similar companies" icon="clone" href="/docs/similar-companies-api">
+    Find lookalikes of up to 10 seed domains.
+  </Card>
+  <Card title="Company headcount" icon="chart-line" href="/docs/company-headcount-api">
+    Headcount by department, with monthly history.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Give AI agents access to the same data.
+  </Card>
+</CardGroup>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="Can I keep using my Crustdata IDs?">
+    No. Store the CompanyEnrich ID alongside the Crustdata ID, and re-key company data on its domain.
+  </Accordion>
+  <Accordion title="Can I enrich a person by profile URL?">
+    No. CompanyEnrich enriches a person by work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich), and people search returns full records. Keep Crustdata for profile URL lookups.
+  </Accordion>
+  <Accordion title="Do I need to list fields?">
+    No. The base record always comes back. List only the paid expansions your code reads in `expand`.
+  </Accordion>
+  <Accordion title="Is there a confidence score?">
+    No. See [Match confidence](#match-confidence).
+  </Accordion>
+  <Accordion title="How do I get the total number of results?">
+    Send the same filter to the free count endpoint. Search responses do not include a total.
+  </Accordion>
+  <Accordion title="Can I sort search results?">
+    No. Results come in relevance order. Sort them in your code.
+  </Accordion>
+  <Accordion title="Do batch and bulk enrichment need a specific plan?">
+    No. Batch and bulk enrichment work on every plan.
+  </Accordion>
+</AccordionGroup>

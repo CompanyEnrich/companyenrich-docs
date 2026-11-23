@@ -1,0 +1,173 @@
+---
+title: "Migrate from Crustdata with a coding agent"
+sidebarTitle: "With a coding agent"
+description: "Instructions a coding agent such as Claude Code, Codex, or Cursor follows to migrate a codebase, its CLI scripts, and its MCP setup from the Crustdata API to the CompanyEnrich V2 API, using the published mapping file."
+---
+
+A coding agent can find every Crustdata API call, CLI command, MCP server entry, and stored Crustdata value in your codebase, rewrite the calls to the official CompanyEnrich SDK, and list what should stay on Crustdata. This page holds the instructions it follows. The agent reads them together with the [mapping file](https://docs.companyenrich.com/migrations/crustdata.json), the same data behind the [field mapping](/docs/migrate-from-crustdata-field-mapping) and [search filter](/docs/migrate-from-crustdata-search) tables.
+
+The instructions work in any language and cover Crustdata API version `2025-11-01`.
+
+## Start the migration
+
+Open your agent in the repository and give it this prompt:
+
+```text
+Migrate this codebase from Crustdata to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-crustdata-agent.md and use the mapping at https://docs.companyenrich.com/migrations/crustdata.json. Show me the migration report before changing any code.
+```
+
+The URL ends in `.md`, which serves this page as plain Markdown for the agent to read.
+
+If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/crustdata.json) and the [API specification](https://docs.companyenrich.com/openapi/v2.json) into the repository, and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then tell it where the files are and ask it to follow the instructions.
+
+## What the agent does
+
+| Step | The agent | You |
+| --- | --- | --- |
+| 1. Inventory | Finds Crustdata HTTP calls, CLI commands, MCP configuration, prompts that name Crustdata tools, keys, field reads, stored Crustdata data, and tests | Nothing |
+| 2. Report | Writes `crustdata-migration-report.md`, classifying each call site as moves, needs redesign, or keep Crustdata. Then it stops. | Approve, change, or exclude call sites |
+| 3. Rewrite | Replaces approved calls with SDK calls behind a feature flag | Name the flag, if you have a convention |
+| 4. Searches | Translates searches whose conditions all map, and marks the rest | Decide on searches that need a redesign |
+| 5. MCP and CLI | Adds the CompanyEnrich MCP server, updates tool names in prompts, and rewrites approved CLI commands | Sign in to the server, or set its key |
+| 6. Stored data | Writes migration files for new ID columns and converted values, without running them | Review and run them |
+| 7. Tests | Adds tests with mocked HTTP and runs your suite | Review the diff |
+| 8. Final report | Lists what moved, what stays on Crustdata, open TODOs, and the expansions each call requests | Run the [parity check](/docs/migrate-from-crustdata#verify-parity-on-your-own-data) |
+
+## Guardrails
+
+The instructions tell the agent to:
+
+* **Stop for review.** No code changes before you approve the report.
+* **Spend nothing.** No paid CompanyEnrich requests and no Crustdata requests. Tests use mocked HTTP. With your key, the agent may call only free endpoints: `GET /v2/me`, the counts, and the lookups for filter values.
+* **Keep Crustdata working.** The Crustdata path stays behind the flag until you remove it.
+* **Not guess.** Any field, input, or condition without an entry in the mapping file gets a TODO and a line in the report.
+* **Protect keys.** Keys come from environment variables and are never printed or committed.
+
+Review the diff as you would any other change. Pay most attention to the `lossy` fields your code depends on, the searches the agent marked for redesign, and the call sites it kept on Crustdata.
+
+## Instructions
+
+Copy this block if you want to keep the instructions in your repository.
+
+````markdown
+# Migrate from Crustdata to CompanyEnrich V2
+
+You are migrating this codebase from the Crustdata API, version `2025-11-01`, its CLI, and its MCP server to the CompanyEnrich V2 API, CLI, and MCP server. Crustdata keeps running, so a call site with no CompanyEnrich equivalent stays on Crustdata.
+
+## Sources
+
+Read the mapping file first. It is authoritative for endpoints, inputs, fields, values, search patterns, and MCP tools.
+
+- Mapping: https://docs.companyenrich.com/migrations/crustdata.json
+- Guide: https://docs.companyenrich.com/docs/migrate-from-crustdata.md
+- Field mapping: https://docs.companyenrich.com/docs/migrate-from-crustdata-field-mapping.md
+- Search translation: https://docs.companyenrich.com/docs/migrate-from-crustdata-search.md
+- Credits: https://docs.companyenrich.com/docs/credits.md
+- MCP server: https://docs.companyenrich.com/docs/mcp-server.md
+- CLI: https://docs.companyenrich.com/docs/cli.md
+- API specification: https://docs.companyenrich.com/openapi/v2.json
+- SDKs: https://docs.companyenrich.com/docs/python-sdk.md (methods: https://github.com/CompanyEnrich/companyenrich-python-sdk#readme), https://docs.companyenrich.com/docs/javascript-typescript-sdk.md, https://docs.companyenrich.com/docs/ruby-sdk.md, https://docs.companyenrich.com/docs/php-sdk.md
+
+If you cannot read the mapping file, stop and ask the user to add it to the repository.
+
+## Rules
+
+1. Use only the mappings in the mapping file and the endpoints in the API specification. If a Crustdata field, input, search condition, or tool has no entry, do not guess: leave the Crustdata code in place, add a `TODO(companyenrich-migration)` comment that names it, and list it in the report.
+2. Do not change code until the user approves the migration report from step 2.
+3. Do not make Crustdata requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, `POST /v2/people/search/count`, and the lookups for filter values (autocomplete, the industry list, and the `geo` endpoints), which are free. Any other live call needs the user's explicit approval and a credit budget.
+4. Read the CompanyEnrich key from the `COMPANYENRICH_API_KEY` environment variable. Never hardcode, print, log, or commit an API key.
+5. Keep the Crustdata integration and its configuration. Put each CompanyEnrich path behind a feature flag or configuration switch, using the project's existing convention if there is one.
+6. Request only the expansions for fields the code reads. Each expansion adds credits per record. A Crustdata `fields` list does not carry over as is.
+7. Translate a search only when every condition has a pattern. Never drop a condition, and never replace conditions with a semantic query, unless the user approves it.
+8. Use the official CompanyEnrich SDK for the repository's language. Use HTTP only when no SDK exists for it.
+9. Do not run database migrations or backfills. Write migration files for the user to review.
+
+## Step 1: Inventory
+
+Find every use of Crustdata:
+
+- HTTP requests to `api.crustdata.com` and wrappers around them, usually with an `x-api-version` header. Crustdata has no official SDK, so look for the paths in the mapping file's `endpoints`. Calls to the legacy `/screener` or `/data_lab` paths are not covered by the mapping: list them as unmapped.
+- Shell scripts, Makefiles, CI jobs, and code that run the `crustdata` CLI.
+- MCP configuration that points at `install.crustdata.com/mcp`, in files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, or agent code.
+- Prompts, tool lists, and agent code that name Crustdata MCP tools, which usually start with `crustdata_`. The mapping file's `mcp` lists the capabilities they cover.
+- Configuration: Crustdata API keys, environment variables such as `CRUSTDATA_API_KEY`, and settings.
+- Reads of Crustdata response fields: every `crustdata` path in the mapping file's `fields`, plus `matches`, `matched_on`, `match_type`, `match_status`, `confidence_score`, `company_data`, `person_data`, `companies`, `profiles`, `next_cursor`, and `total_count`.
+- Batch jobs, watches, and webhook handlers.
+- Stored Crustdata data: models, columns, and serializers with Crustdata field names, IDs, or values such as size ranges, company types, seniority levels, and function categories.
+- Tests, fixtures, and mocks for Crustdata.
+
+## Step 2: Write the migration report, then stop
+
+Write `crustdata-migration-report.md` at the repository root, unless the user names another place. Include:
+
+1. A table of call sites with: file and line, Crustdata endpoint, command, or tool and its inputs, fields read, classification, CompanyEnrich replacement, expansions needed, and notes. Classify each call site as:
+   - **moves**: the endpoint or tool has a mapping other than `none`, every input the call sends has a mapping in `inputs` or is listed in `drop`, every field the code reads has a mapping other than `none`, and every search condition has a pattern. `lossy` and `transformed` mappings still move. List them in the notes.
+   - **needs redesign**: the call can move, but behavior the code relies on changes. This applies when the call sends an input listed in the endpoint's `redesign`, such as `sorts` or `webhook_url`, or when the code branches on `confidence_score` or compares, scores, or stores values whose labels or definitions change, such as size ranges or seniority levels. A search with a condition that has no pattern, or with an `or` group across different fields, also needs redesign: list the conditions that translate and the ones that do not, and the call stays on Crustdata until the user decides.
+   - **keep Crustdata**: the endpoint has no equivalent, the call sends an input that is not a search condition and has no entry in `inputs`, `drop`, or `redesign`, or the code needs a field whose fidelity is `none`.
+
+   Response wrappers are not fields. Checking for an empty `matches` array or a `match_status` becomes a not-found check, reading `matches[0]` becomes reading the record, and `matched_on`, `companies`, `profiles`, `next_cursor`, `total_count`, and `batch_id` change as step 3 describes. None of these alone makes a call site need a redesign. A `lossy` number that the code stores, such as `headcount.total`, still moves: store it in a new column, as step 6 describes. A people search followed by `POST /person/enrich` or `POST /person/contact/enrich` on its results is one call site. CompanyEnrich search results are full person records, so the enrich step goes away, and business emails come from `GET /v2/people/{personId}/email` for each result. The call site moves when the search translates and every field the code reads afterwards maps.
+2. Billing behavior that changes for each call: empty searches are charged one result's base price, each expansion adds credits, and work emails are a separate call.
+3. Stored data that changes, and the ID plan: add CompanyEnrich ID columns next to Crustdata IDs and re-key company data on its domain.
+4. Open questions, such as which current job to use when a person has several, and the feature flag name.
+
+Stop and ask the user to approve, change, or exclude call sites.
+
+## Step 3: Rewrite approved call sites
+
+- Replace each call with the CompanyEnrich endpoint from `endpoints`, and map its inputs with `inputs`. Leave out inputs listed in `drop`, and rework inputs listed in `redesign` the way the user approved. Remove the `x-api-version` header.
+- Crustdata enrichment takes an array of identifiers and returns one entry per identifier. CompanyEnrich takes one company or person per request. Enrich lists of domains with `POST /v2/companies/enrich/batch`, 50 per request, or a bulk job for up to 10,000. For names and profile URLs, call `POST /v2/companies/enrich` once per company within the rate limit.
+- Convert field reads with `fields`. A row with `in: workEmail` comes from `GET /v2/people/{personId}/email`, a separate call that takes a CompanyEnrich person ID. A row with `expand` needs that expansion in the request.
+- Convert enum values with `values`.
+- A person can have several current experiences, marked with `isCurrent`. Use the one with `isMatched` set: after an email lookup, that is the job at the email's company. If none or several qualify, follow the policy the user approved. Do not silently take the first one.
+- CompanyEnrich returns the record as the response body, with no `matches` array, `company_data`, or `person_data` wrapper. Batch enrichment returns `items` in request order, each with the input `domain` in place of `matched_on`. Search returns `items` in place of `companies` or `profiles`, and `nextCursor` in place of `next_cursor`. Totals come from the free count endpoints in place of `total_count`. Bulk jobs return an `id` in place of `batch_id`.
+- No match returns `404` and is not charged, instead of a `200` with an empty `matches` array or a `match_status` of `not_found` or `redacted`. The SDKs raise a not-found error. `402` can also mean a plan without the feature, so do not retry it.
+- Page searches with `pageSize` (1 to 100) and `cursor`, taken from `nextCursor`. `nextCursor` is omitted on the last page.
+- CompanyEnrich returns ISO alpha-2 country codes and lowercase enum values such as `private` and `vp`. Normalize explicitly where the code compares strings.
+
+## Step 4: Translate searches
+
+For each search, flatten its condition tree and map each condition with the `search` patterns. A pattern applies to its field whatever the operator's shape: `=` with one value and `in` with a list translate the same way, and `!=` and `not_in` become `notIn`. Text operators such as `(.)` and ranges such as `=>` follow the pattern for that field. If any condition has no pattern, or its pattern maps to `null`, leave the Crustdata search in place, add a TODO, and list it in the report as needs redesign. Patterns with `STATE_ID`, `CITY_ID`, or `COMPANY_ID` need an ID from the free lookup endpoints. Without a key, leave a TODO that names the value to look up. An `or` across different fields becomes separate searches only if the user approves, because each search is charged. Conditions on a person's employer that the people `filter` has no key for, such as its size, industry, or headquarters country, go in the `company` query, as the patterns show. Add a test that asserts the exact filter your code builds.
+
+## Step 5: MCP and CLI
+
+- Add the CompanyEnrich MCP server, `https://mcp.companyenrich.com/mcp`, next to each Crustdata MCP server entry, following the MCP server guide for that client. Remove the Crustdata entry only if the user approves. Do not put a key in a committed file; use the client's sign-in or an environment variable.
+- Update prompts, tool allow-lists, and agent code that name Crustdata tools, using `mcp` in the mapping file.
+- Rewrite approved `crustdata` CLI commands with the `companyenrich` CLI, using the command table in the guide's "Scripts that use the Crustdata CLI" section. Its search flags are named after CompanyEnrich filters, so translate each `--filter` with the `search` patterns. A lookup that finds nothing exits with code 4, so handle that code in scripts that use `set -e`.
+
+## Step 6: Stored data
+
+Write, but do not run, migrations that add columns for CompanyEnrich IDs and values next to the Crustdata columns. Keep the original Crustdata values, and do not overwrite Crustdata columns with CompanyEnrich data. A stored Crustdata value converted with `values` has a CompanyEnrich label but is still Crustdata data. Keep it apart from values the API returns, or record where each value came from. Crustdata IDs and CompanyEnrich person IDs are both integers, so never store them in the same column. Do not backfill records through the API without approval.
+
+## Step 7: Tests
+
+- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Start from the records under `fixtures` in the mapping file, and build other responses from the response schemas in the API specification.
+- Cover a match, `404`, `402`, `429`, and an empty search.
+- Run the project's test suite. Tests must not call live APIs.
+
+## Step 8: Final report
+
+Update `crustdata-migration-report.md` with the files changed, the call sites that moved, the ones kept on Crustdata, the remaining TODOs, the expansions each call requests, how to switch the feature flag, the MCP and CLI changes, and a link to the parity check: https://docs.companyenrich.com/docs/migrate-from-crustdata.md#verify-parity-on-your-own-data
+````
+
+## Limitations
+
+* The mapping covers Crustdata API version `2025-11-01` as documented on November 23, 2026. Check the `checkedAt` date in the mapping file.
+* The agent cannot decide whether a `lossy` field is good enough for your product. The report lists those fields for you.
+* Search translations change results by design, because the two APIs rank and match differently. Compare totals with the free count endpoints before you switch.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-crustdata">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-crustdata-field-mapping">
+    The human-readable version of the mapping file.
+  </Card>
+  <Card title="Search filters" icon="magnifying-glass" href="/docs/migrate-from-crustdata-search">
+    How Crustdata search conditions become CompanyEnrich filters.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Connect your AI client to CompanyEnrich.
+  </Card>
+</CardGroup>

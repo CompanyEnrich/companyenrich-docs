@@ -57,29 +57,6 @@
             ]
           },
           {
-            "group": "Migration guides",
-            "pages": [
-              {
-                "group": "From People Data Labs",
-                "pages": [
-                  "docs/migrate-from-people-data-labs",
-                  "docs/migrate-from-people-data-labs-field-mapping",
-                  "docs/migrate-from-people-data-labs-search",
-                  "docs/migrate-from-people-data-labs-agent"
-                ]
-              },
-              {
-                "group": "From Explorium",
-                "pages": [
-                  "docs/migrate-from-explorium",
-                  "docs/migrate-from-explorium-field-mapping",
-                  "docs/migrate-from-explorium-search",
-                  "docs/migrate-from-explorium-agent"
-                ]
-              }
-            ]
-          },
-          {
             "group": "Company Enrichment API",
             "pages": [
               "docs/company-enrichment-api",
@@ -139,6 +116,38 @@
               "docs/person-schema",
               "docs/field-values",
               "docs/data-sources"
+            ]
+          },
+          {
+            "group": "Migration guides",
+            "pages": [
+              {
+                "group": "From People Data Labs",
+                "pages": [
+                  "docs/migrate-from-people-data-labs",
+                  "docs/migrate-from-people-data-labs-field-mapping",
+                  "docs/migrate-from-people-data-labs-search",
+                  "docs/migrate-from-people-data-labs-agent"
+                ]
+              },
+              {
+                "group": "From Explorium",
+                "pages": [
+                  "docs/migrate-from-explorium",
+                  "docs/migrate-from-explorium-field-mapping",
+                  "docs/migrate-from-explorium-search",
+                  "docs/migrate-from-explorium-agent"
+                ]
+              },
+              {
+                "group": "From Crustdata",
+                "pages": [
+                  "docs/migrate-from-crustdata",
+                  "docs/migrate-from-crustdata-field-mapping",
+                  "docs/migrate-from-crustdata-search",
+                  "docs/migrate-from-crustdata-agent"
+                ]
+              }
             ]
           },
           {
