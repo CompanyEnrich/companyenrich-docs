@@ -133,7 +133,7 @@
       "explorium": ["GET /v2/autocomplete", "GET /v1/businesses/autocomplete"],
       "companyEnrich": "GET /v2/companies/autocomplete",
       "status": "partial",
-      "note": "Free. Company autocomplete suggests companies by name. For filter values, use technology, keyword, or position autocomplete, the industry list, or the geo endpoints."
+      "note": "Free. Company autocomplete suggests companies for a domain prefix. For filter values, use technology, keyword, or position autocomplete, the industry list, or the geo endpoints."
     },
     {
       "group": "company",

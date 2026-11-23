@@ -222,6 +222,8 @@ function table(headers, rows) {
 const anchor = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function reference(endpoint) {
+  // Unknown endpoints are reported by validate(); render them unlinked so every error is listed.
+  if (!operation(endpoint)) return code(endpoint);
   const { method, path } = operation(endpoint);
   const slug = `${method}-${path.replace(/^\/v2\//, '').replaceAll('/', '-').replace(/[{}]/g, '').toLowerCase()}`;
   return `[${code(endpoint)}](/api-reference/v2/${slug})`;
@@ -253,7 +255,9 @@ const renderers = {
       const inputs = Object.entries(endpoint.inputs ?? {})
         .map(([from, to]) => `${code(from)} → ${codes(to, ' or ')}`);
       const drops = Object.entries(endpoint.drop ?? {}).map(([from, why]) => `Drop ${code(from)}: ${text(why)}`);
-      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', ...drops, text(endpoint.note ?? '')]
+      // Inputs with a workaround but no equivalent: the call moves only after a redesign.
+      const reworks = Object.entries(endpoint.redesign ?? {}).map(([from, why]) => `Rework ${code(from)}: ${text(why)}`);
+      const notes = [inputs.length ? `${inputs.join('; ')}.` : '', ...drops, ...reworks, text(endpoint.note ?? '')]
         .filter(Boolean).join(' ');
       return [from, endpoint.companyEnrich ? reference(endpoint.companyEnrich) : 'None', notes || ' '];
     }),
@@ -292,7 +296,10 @@ const renderers = {
   mcp: (mapping) => table(
     [`${mapping.vendor.name} tool`, 'CompanyEnrich tool', 'Notes'],
     mapping.mcp.map((row) => [
-      row[source(mapping)] ? codes(row[source(mapping)]) : 'None',
+      // A vendor without public tool names lists capabilities instead, as plain text.
+      row[source(mapping)]
+        ? list(row[source(mapping)]).map((value) => (/\s/.test(value) ? text(value) : code(value))).join(', ')
+        : 'None',
       row.ce ? codes(row.ce, ' or ') : 'None',
       text(row.note ?? ' '),
     ]),

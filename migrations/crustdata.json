@@ -1,0 +1,2776 @@
+{
+  "$comment": "Crustdata API (version 2025-11-01) to CompanyEnrich V2 migration mapping. Source of truth for the tables in docs/migrate-from-crustdata*.mdx. Validated against openapi/v2.json by scripts/sync-migrations.mjs. Crustdata names come from its public API documentation and OpenAPI reference as checked on checkedAt.",
+  "version": 1,
+  "checkedAt": "2026-11-23",
+  "vendor": {
+    "key": "crustdata",
+    "name": "Crustdata",
+    "searchLabel": "filter",
+    "slug": "crustdata",
+    "api": "2025-11-01",
+    "baseUrl": "https://api.crustdata.com",
+    "docs": "https://docs.crustdata.com",
+    "auth": "Authorization: Bearer YOUR_CRUSTDATA_API_KEY, plus x-api-version: 2025-11-01",
+    "mcp": "https://install.crustdata.com/mcp",
+    "cli": "crustdata",
+    "legacy": "The legacy /screener and /data_lab endpoints, which Crustdata replaced with API version 2025-11-01 in May 2026, are not covered."
+  },
+  "companyEnrich": {
+    "api": "v2",
+    "baseUrl": "https://api.companyenrich.com",
+    "spec": "https://docs.companyenrich.com/openapi/v2.json",
+    "auth": "Authorization: Bearer YOUR_API_TOKEN",
+    "apiKeyEnv": "COMPANYENRICH_API_KEY",
+    "mcp": "https://mcp.companyenrich.com/mcp",
+    "cli": "companyenrich",
+    "guides": {
+      "overview": "https://docs.companyenrich.com/docs/migrate-from-crustdata",
+      "fieldMapping": "https://docs.companyenrich.com/docs/migrate-from-crustdata-field-mapping",
+      "search": "https://docs.companyenrich.com/docs/migrate-from-crustdata-search",
+      "agent": "https://docs.companyenrich.com/docs/migrate-from-crustdata-agent"
+    },
+    "sdks": {
+      "python": "https://docs.companyenrich.com/docs/python-sdk",
+      "javascript": "https://docs.companyenrich.com/docs/javascript-typescript-sdk",
+      "ruby": "https://docs.companyenrich.com/docs/ruby-sdk",
+      "php": "https://docs.companyenrich.com/docs/php-sdk",
+      "cli": "https://docs.companyenrich.com/docs/cli"
+    }
+  },
+  "fidelity": {
+    "same": "Same meaning and format.",
+    "renamed": "Same meaning and values under a different name or label.",
+    "transformed": "Same information in a different format, casing, or structure. Convert it in code.",
+    "lossy": "Related but not equivalent. Values can differ, so check the fields your code depends on.",
+    "none": "No CompanyEnrich equivalent."
+  },
+  "endpoints": [
+    {
+      "group": "company",
+      "crustdata": "POST /company/enrich",
+      "crustdataInput": "with one domain in `domains`",
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "domains[]": [
+          "domain"
+        ],
+        "fields": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "exact_match": "domain lookups are exact."
+      },
+      "note": "The company record is the response body, with no `matches` array or `confidence_score`. No match returns `404` and is not charged. The base record covers `basic_info`, `locations`, and `social_profiles`; `funding`, `technographics`, part of `taxonomy`, and `headcount` become expansions, and the other sections have no equivalent. See the field mapping."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/enrich",
+      "crustdataInput": "with several domains in `domains`",
+      "companyEnrich": "POST /v2/companies/enrich/batch",
+      "status": "partial",
+      "inputs": {
+        "domains": [
+          "domains"
+        ],
+        "fields": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "exact_match": "domain lookups are exact."
+      },
+      "note": "Up to 50 domains per request, so send longer lists in chunks of 50. `items` come back in request order, each with the input `domain` in place of `matched_on`, a `status` of `found`, `not-found`, `invalid-domain`, or `pending`, and `company` when `status` is `found`. For up to 10,000 domains in the background, use `POST /v2/companies/enrich/bulk`."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/enrich",
+      "crustdataInput": [
+        "names",
+        "professional_network_profile_urls"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "names[]": [
+          "name"
+        ],
+        "professional_network_profile_urls[]": [
+          "linkedinUrl"
+        ],
+        "fields": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "exact_match": "matching rules are fixed."
+      },
+      "note": "One company per request. Every property you send must match. When several companies match, the highest-ranked one is returned, with no `confidence_score` and no other candidates. No match returns `404` and is not charged."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/enrich",
+      "crustdataInput": [
+        "crustdata_company_ids"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Crustdata IDs do not carry over. Enrich by the domain stored with the record, or store the CompanyEnrich `id` and use `GET /v2/companies/{companyId}`."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/identify",
+      "crustdataInput": [
+        "domains"
+      ],
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "domains[]": [
+          "domain"
+        ]
+      },
+      "drop": {
+        "fields": "the response is always the full base record.",
+        "exact_match": "domain lookups are exact."
+      },
+      "note": "There is no separate identify step. Enrichment returns the full company record, or `404` when there is none. One domain per request."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/identify",
+      "crustdataInput": [
+        "professional_network_profile_urls"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "professional_network_profile_urls[]": [
+          "linkedinUrl"
+        ]
+      },
+      "drop": {
+        "fields": "the response is always the full base record.",
+        "exact_match": "matching rules are fixed."
+      },
+      "note": "Returns the full company record, or `404` when there is none. One profile URL per request."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/identify",
+      "crustdataInput": [
+        "names"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "names[]": [
+          "name"
+        ]
+      },
+      "drop": {
+        "fields": "the response is always the full base record.",
+        "exact_match": "matching rules are fixed."
+      },
+      "note": "One name per request. Returns the full record of the highest-ranked match, with no `confidence_score` and no other candidates, or `404`. Read `domain` from the record."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/identify",
+      "crustdataInput": [
+        "crustdata_company_ids"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Crustdata IDs do not carry over."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/search",
+      "crustdataInput": [
+        "filters"
+      ],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "filters": [
+          "filter"
+        ],
+        "limit": [
+          "pageSize"
+        ],
+        "cursor": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "fields": "results are always full company records."
+      },
+      "redesign": {
+        "sorts": "results come in relevance order, so sort in your code."
+      },
+      "note": "Rewrite each filter. See [Translate search filters](/docs/migrate-from-crustdata-search). `pageSize` goes up to 100, against 1,000 for `limit`. Search results carry the same fields as enrichment, so you may not need to enrich them afterwards."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/search",
+      "crustdataInput": [
+        "search"
+      ],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "search.query": [
+          "semantic.query"
+        ],
+        "filters": [
+          "filter"
+        ],
+        "limit": [
+          "pageSize"
+        ],
+        "cursor": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "search.mode": "semantic search has no mode. For a `lexical` query that must match exact words, use `filter.keywords` or `filter.query` instead.",
+        "fields": "results are always full company records."
+      },
+      "note": "Send the query as `semantic.query`, with any filters as hard constraints. Results are ranked by relevance, as in Crustdata. By default, the query also sets inferred filters such as location and size; set `semantic.autoFilter` to `false` to rank by it alone. A cursor lasts 24 hours, against 20 minutes for a ranked Crustdata search."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/search",
+      "crustdataInput": "reading `total_count`",
+      "companyEnrich": "POST /v2/companies/search/count",
+      "status": "mapped",
+      "inputs": {
+        "filters": [
+          "filter"
+        ]
+      },
+      "note": "Free. Search responses carry no total, so send the same filter to the count endpoint."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/search/autocomplete",
+      "companyEnrich": "GET /v2/companies/autocomplete",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "query"
+        ]
+      },
+      "note": "Free. Company autocomplete suggests companies for a domain prefix or URL, so it covers `basic_info.primary_domain` only. For other fields, use `GET /v2/technologies/autocomplete`, `GET /v2/keywords/autocomplete`, `GET /v2/industries`, or the geo endpoints. Company names have no lookup."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /batch/company/enrich",
+      "crustdataInput": [
+        "domains"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich/bulk",
+      "status": "partial",
+      "inputs": {
+        "domains": [
+          "domains"
+        ],
+        "fields": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "chunk_size": "processing is managed for you."
+      },
+      "redesign": {
+        "webhook_url": "there are no webhooks. Poll `GET /v2/batches/{id}` until the job completes."
+      },
+      "note": "Background job for up to 10,000 domains. Domains only. Download the results as JSON, NDJSON, or CSV. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports). For up to 50 domains, `POST /v2/companies/enrich/batch` answers in the same request."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /batch/company/enrich",
+      "crustdataInput": [
+        "names",
+        "professional_network_profile_urls",
+        "crustdata_company_ids"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Bulk jobs take domains only. Call `POST /v2/companies/enrich` per name or profile URL within your rate limit."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /batch/company/search",
+      "companyEnrich": "POST /v2/companies/search/export",
+      "status": "partial",
+      "inputs": {
+        "filters": [
+          "filter"
+        ],
+        "limit": [
+          "limit"
+        ]
+      },
+      "drop": {
+        "fields": "exports hold full company records."
+      },
+      "redesign": {
+        "webhook_url": "there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes."
+      },
+      "note": "Exports every result of a search as a background job. Poll the batch, then download JSON, NDJSON, or CSV."
+    },
+    {
+      "group": "company",
+      "crustdata": "POST /company/professional_network/search/live",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No live search. Search the CompanyEnrich index with `POST /v2/companies/search`. Live filter names such as `REGION` need a full rewrite."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/search",
+      "crustdataInput": [
+        "filters"
+      ],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "filters": [
+          "filter",
+          "company"
+        ],
+        "limit": [
+          "pageSize"
+        ],
+        "count": [
+          "pageSize"
+        ],
+        "cursor": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "fields": "results are always full person records.",
+        "return_query": "a debug flag.",
+        "explain": "a debug flag. Use the free count endpoint to test conditions one at a time."
+      },
+      "redesign": {
+        "sorts": "results come in relevance order, so sort in your code.",
+        "post_processing": "drop excluded profiles or names from the results in your code.",
+        "preview": "use the free `POST /v2/people/search/preview` or count endpoint instead."
+      },
+      "note": "Rewrite person conditions as `filter` and employer conditions as a `company` query. See [Translate search filters](/docs/migrate-from-crustdata-search#people-search-patterns). Results are full person records, so you do not need to enrich them by profile URL afterwards."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/search",
+      "crustdataInput": [
+        "search"
+      ],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "search.query": [
+          "semantic.query"
+        ],
+        "filters": [
+          "filter",
+          "company"
+        ],
+        "limit": [
+          "pageSize"
+        ],
+        "cursor": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "search.mode": "semantic search has no mode.",
+        "mode": "semantic search has no recall mode."
+      },
+      "note": "The plain-language query infers person filters and employers, such as `marketing leaders at Series B fintech startups in London`. There is no relevance `fit` tier per result."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/search",
+      "crustdataInput": "reading `total_count`",
+      "companyEnrich": "POST /v2/people/search/count",
+      "status": "mapped",
+      "inputs": {
+        "filters": [
+          "filter",
+          "company"
+        ]
+      },
+      "note": "Free. Search responses carry no total."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/enrich",
+      "crustdataInput": [
+        "professional_network_profile_urls"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No person lookup by profile URL. With a work email, use `POST /v2/people/enrich`. Without one, search by name at the employer's domain with `POST /v2/people/search`, which returns candidates without a confidence score. If your code searches and then enriches each result, drop the enrich step: search results are full records."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/identify",
+      "crustdataInput": [
+        "emails"
+      ],
+      "companyEnrich": "POST /v2/people/enrich",
+      "status": "partial",
+      "inputs": {
+        "emails[]": [
+          "email"
+        ]
+      },
+      "note": "One work email per request. The API resolves the company from the email domain, then matches the person. The full person record is the response body. No match returns `404` and is not charged, in place of a `match_status` of `not_found` or `redacted`. Personal emails have no equivalent, so a call whose callers can send personal emails needs redesign."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/identify",
+      "crustdataInput": [
+        "professional_network_profile_urls",
+        "research_profile_urls"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No lookup by profile URL or Google Scholar URL."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/contact/enrich",
+      "crustdataInput": "with `fields` of `contact.business_emails`",
+      "companyEnrich": "GET /v2/people/{personId}/email",
+      "status": "partial",
+      "note": "Takes a CompanyEnrich person ID, not a profile URL or a business email. After a people search or `POST /v2/people/enrich`, pass each person's `id`. A call that has only a profile URL has no equivalent. One person per request. Returns one work email with a `status` and `certainty`. Costs 10 credits only when it finds an email your account has not accessed before."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/contact/enrich",
+      "crustdataInput": "with `fields` of `contact.personal_emails`, `contact.phone_numbers`, `contact.websites`",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No personal emails, phone numbers, or websites."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /person/search/autocomplete",
+      "companyEnrich": "GET /v2/positions/autocomplete",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "query"
+        ]
+      },
+      "note": "Free. Suggests job titles for the `position` filter. Seniority and department take fixed values, listed in the field mapping. Other fields have no lookup."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /batch/person/search",
+      "companyEnrich": "POST /v2/people/search/export",
+      "status": "partial",
+      "inputs": {
+        "filters": [
+          "filter",
+          "company"
+        ],
+        "limit": [
+          "limit"
+        ]
+      },
+      "redesign": {
+        "webhook_url": "there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes."
+      },
+      "note": "Exports every result of a people search as a background job."
+    },
+    {
+      "group": "people",
+      "crustdata": [
+        "POST /batch/person/enrich",
+        "POST /batch/person/identify",
+        "POST /batch/person/contact/enrich"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No bulk person enrichment. Call `POST /v2/people/enrich` per work email within your rate limit, or export a people search."
+    },
+    {
+      "group": "people",
+      "crustdata": [
+        "POST /person/professional_network/search/live",
+        "POST /person/professional_network/enrich/live",
+        "POST /professional_network/search/autocomplete"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No live search or live profile retrieval."
+    },
+    {
+      "group": "people",
+      "crustdata": "POST /batch/person/verify",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No work-history verification."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "GET /batch/{batch_id}",
+        "GET /batch/"
+      ],
+      "companyEnrich": "GET /v2/batches/{id}",
+      "status": "partial",
+      "inputs": {
+        "batch_id": [
+          "id"
+        ]
+      },
+      "note": "List jobs with `GET /v2/batches` and cancel one with `POST /v2/batches/{id}/cancel`. Download the results of a bulk enrichment or an export from its own results endpoint, such as `GET /v2/companies/enrich/bulk/{id}/results`, as JSON, NDJSON, or CSV, instead of a gzipped JSONL file."
+    },
+    {
+      "group": "supporting",
+      "crustdata": "GET /account/credits",
+      "companyEnrich": "GET /v2/me",
+      "status": "partial",
+      "note": "Free. Returns your credit totals and plan capabilities. See [Account fields](/docs/migrate-from-crustdata-field-mapping#account-fields). Each paid response also carries `x-credit-cost` and `x-credit-remaining` headers, in place of `X-Credits-Used`."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "GET /account/endpoints",
+        "GET /account/usage/summary",
+        "GET /account/usage/events",
+        "GET /account/usage/errors"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No usage or permissions API. Log `x-credit-cost` per call, and read plan limits from `capabilities` on `GET /v2/me`."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "POST /job/search",
+        "POST /job/search/autocomplete",
+        "POST /batch/job/search"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No job postings. Workforce history is headcount by department, not postings."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "POST /social_post/search",
+        "POST /social_post/professional_network/search/live"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No social posts."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "POST /web/search/live",
+        "POST /web/enrich/live"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No web search or page fetch."
+    },
+    {
+      "group": "supporting",
+      "crustdata": [
+        "POST /watch/{dataset}",
+        "POST /watch/{dataset}/search"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No watches, notifications, or webhooks. To track changes, re-enrich the companies you follow on a schedule and compare `updatedAt`, headcount, or funding. To find new matches, re-run a search and compare IDs."
+    },
+    {
+      "group": "supporting",
+      "crustdata": "POST /agent/searches",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No agent search. Semantic company and people search take a plain-language query, and the MCP server lets your own agent chain calls."
+    }
+  ],
+  "mcp": [
+    {
+      "crustdata": "Identify or enrich a company",
+      "ce": [
+        "enrich_company",
+        "enrich_company_by_properties"
+      ],
+      "note": "By domain, or by name or social profile. The record includes technologies, keywords, and funding."
+    },
+    {
+      "crustdata": "Company headcount and growth",
+      "ce": [
+        "get_company_workforce"
+      ],
+      "note": "Headcount by department, with monthly history."
+    },
+    {
+      "crustdata": "Search companies",
+      "ce": [
+        "search_companies",
+        "find_similar_companies"
+      ],
+      "note": "Filters, a plain-language description, or 1 to 10 seed domains for lookalikes."
+    },
+    {
+      "crustdata": "Search people",
+      "ce": [
+        "search_people"
+      ],
+      "note": "By name, title, seniority, department, country, and employer."
+    },
+    {
+      "crustdata": "Enrich a person or identify one from an email",
+      "ce": [
+        "lookup_person_by_email",
+        "get_person_by_id"
+      ],
+      "note": "By work email, or by a CompanyEnrich person ID from search. No lookup by profile URL."
+    },
+    {
+      "crustdata": "Contact enrichment",
+      "ce": [
+        "enrich_person_email"
+      ],
+      "note": "Work email only. No personal emails or phone numbers."
+    },
+    {
+      "crustdata": "Credit balance",
+      "ce": [
+        "get_current_user"
+      ],
+      "note": "Free."
+    },
+    {
+      "crustdata": "Jobs, social posts, web search and fetch, watches, and batch jobs",
+      "ce": null,
+      "note": "No equivalent tools."
+    }
+  ],
+  "fields": {
+    "company": [
+      {
+        "group": "Identity",
+        "crustdata": [
+          "crustdata_company_id",
+          "basic_info.crustdata_company_id"
+        ],
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A separate ID space. Crustdata IDs are integers and CompanyEnrich IDs are UUIDs. Store the CompanyEnrich ID next to the Crustdata ID, and re-key on the domain."
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.name",
+        "ce": "name",
+        "fidelity": "same"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.primary_domain",
+        "ce": "domain",
+        "fidelity": "same"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.all_domains",
+        "ce": null,
+        "fidelity": "none",
+        "note": "One domain per company."
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.website",
+        "ce": "website",
+        "fidelity": "transformed",
+        "note": "Both are full URLs. Normalize the scheme, `www.`, and trailing slash before comparing."
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.logo_permalink",
+        "ce": "logoUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.description",
+        "ce": "description",
+        "fidelity": "transformed",
+        "note": "Written from different sources, so the text differs."
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.company_type",
+        "ce": "type",
+        "fidelity": "renamed",
+        "values": "companyType"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_info.year_founded",
+        "ce": "foundedYear",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "updated_at",
+        "ce": "updatedAt",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": [
+          "basic_info.profile_name",
+          "basic_info.status",
+          "basic_info.markets",
+          "indexed_at",
+          "metadata"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": "basic_info.employee_count_range",
+        "ce": "employees",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "Crustdata returns the self-reported range from the company profile. CompanyEnrich `employees` is calculated from its employee data, and the self-reported range is a search filter only, `reportedEmployees`."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": "headcount.total",
+        "ce": "workforce.observedEmployeeCount",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "Employees observed in CompanyEnrich data. Without the expansion, read the `employees` range."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": "headcount.timeseries[].employee_count",
+        "ce": "workforce.history[].observedEmployeeCount",
+        "fidelity": "transformed",
+        "note": "From `GET /v2/companies/workforce`, one point per month."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": "headcount.timeseries[].date",
+        "ce": "workforce.history[].date",
+        "fidelity": "transformed",
+        "note": "From `GET /v2/companies/workforce`."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": [
+          "headcount.growth_percent",
+          "headcount.growth_absolute"
+        ],
+        "ce": "workforce.history[].observedEmployeeCount",
+        "fidelity": "transformed",
+        "note": "Not returned. Compare two history points from `GET /v2/companies/workforce`. To filter on growth, use the `workforceGrowth` search filter."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": [
+          "headcount.by_role_absolute",
+          "headcount.by_role_percent"
+        ],
+        "ce": "workforce.departmentHeadcount",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "Counts for 14 departments instead of Crustdata's functions. Divide by `workforce.observedEmployeeCount` for shares."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": "headcount.by_function_timeseries.CURRENT_FUNCTION",
+        "ce": "workforce.history[].departmentHeadcount",
+        "fidelity": "lossy",
+        "note": "From `GET /v2/companies/workforce`, by department."
+      },
+      {
+        "group": "Size and headcount",
+        "crustdata": [
+          "headcount.largest_headcount_country",
+          "headcount.by_region_absolute",
+          "headcount.by_region_percent",
+          "headcount.by_skill_absolute",
+          "headcount.by_skill_percent",
+          "headcount.by_function_timeseries.GEO_REGION"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Revenue",
+        "crustdata": [
+          "revenue.estimated.lower_bound_usd",
+          "revenue.estimated.upper_bound_usd"
+        ],
+        "ce": "revenue",
+        "fidelity": "lossy",
+        "note": "A range label, such as `10m-50m`, instead of two bounds. Crustdata returns `0` for no estimate; CompanyEnrich returns `null`."
+      },
+      {
+        "group": "Revenue",
+        "crustdata": "revenue.public_markets.stock_symbols",
+        "ce": "financial.stockSymbol",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "One symbol instead of a list. `financial.stockExchange` holds the exchange."
+      },
+      {
+        "group": "Revenue",
+        "crustdata": [
+          "revenue.estimated.timeseries",
+          "revenue.public_markets.ipo_date",
+          "revenue.public_markets.fiscal_year_end",
+          "revenue.acquisition_status"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.total_investment_usd",
+        "ce": "financial.totalFunding",
+        "expand": "financial",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.last_round_type",
+        "ce": "financial.fundingStage",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A label such as `Series A`, where Crustdata returns `series_a`. The labels are not a fixed list, so map them to your own values if your code compares them."
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.last_fundraise_date",
+        "ce": "financial.fundingDate",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A date-time instead of a date."
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.last_round_amount_usd",
+        "ce": "financial.fundingRounds[].amount",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Take the latest round by `date`. The amount is a string."
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.milestones",
+        "ce": "financial.fundingRounds",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Each round has `type`, `date`, `amount`, `investors`, and `url`."
+      },
+      {
+        "group": "Funding",
+        "crustdata": "funding.investors",
+        "ce": "financial.fundingRounds[].investors",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Listed per round, as text."
+      },
+      {
+        "group": "Funding",
+        "crustdata": [
+          "funding.investors_detailed",
+          "funding.acquisitions",
+          "funding.acquired_by"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.country",
+        "ce": [
+          "location.country.name",
+          "location.country.code"
+        ],
+        "fidelity": "transformed",
+        "note": "A country name in source casing, or an ISO 3166-1 alpha-2 code. Crustdata filters take alpha-3 codes, such as `USA`."
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.state",
+        "ce": "location.state.name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.city",
+        "ce": "location.city.name",
+        "fidelity": "renamed",
+        "note": "Crustdata returns the city in search results only."
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.street_address",
+        "ce": "location.address",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.headquarters",
+        "ce": "location.address",
+        "fidelity": "lossy",
+        "note": "Crustdata holds a full location string. Build one from the city, state, and country objects if you need it."
+      },
+      {
+        "group": "Location",
+        "crustdata": "locations.all_office_addresses",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Headquarters only."
+      },
+      {
+        "group": "Industry",
+        "crustdata": [
+          "taxonomy.professional_network_industry",
+          "taxonomy.professional_network_industries"
+        ],
+        "ce": "industries",
+        "fidelity": "lossy",
+        "note": "A list of industries. Values can differ."
+      },
+      {
+        "group": "Industry",
+        "crustdata": "taxonomy.primary_naics_detail.naics_code",
+        "ce": "naicsCodes",
+        "expand": "naicsCodes",
+        "fidelity": "transformed",
+        "note": "A list of codes instead of one primary code. Crustdata codes come from the 2022 NAICS edition, and a few codes changed between editions."
+      },
+      {
+        "group": "Industry",
+        "crustdata": "taxonomy.primary_naics_detail.industry",
+        "ce": "industry",
+        "fidelity": "lossy",
+        "note": "CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`."
+      },
+      {
+        "group": "Industry",
+        "crustdata": [
+          "taxonomy.categories",
+          "taxonomy.professional_network_specialities"
+        ],
+        "ce": "keywords",
+        "expand": "keywords",
+        "fidelity": "lossy",
+        "note": "Keywords that describe what the company does, from different sources."
+      },
+      {
+        "group": "Industry",
+        "crustdata": [
+          "taxonomy.primary_naics_detail.sector",
+          "taxonomy.primary_naics_detail.sub_sector",
+          "taxonomy.primary_naics_detail.industry_group",
+          "taxonomy.primary_naics_detail.year",
+          "taxonomy.sic_detail_list"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No SIC codes or NAICS level titles. The first two, three, or four digits of a NAICS code give its sector, sub-sector, or industry group."
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": [
+          "basic_info.professional_network_url",
+          "social_profiles.professional_network"
+        ],
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "Normalize the scheme, `www.`, and trailing slash before comparing."
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": "basic_info.professional_network_id",
+        "ce": "socials.linkedinId",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": "social_profiles.twitter_url",
+        "ce": "socials.twitterUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": "social_profiles.crunchbase.url",
+        "ce": "socials.crunchbaseUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": "social_profiles.crunchbase.uuid",
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Technographics",
+        "crustdata": [
+          "technographics.technologies[].name",
+          "technographics.top_technologies"
+        ],
+        "ce": "technologies",
+        "expand": "technologies",
+        "fidelity": "lossy",
+        "note": "One flat list of technology names from different detection."
+      },
+      {
+        "group": "Technographics",
+        "crustdata": "technographics.total_technologies",
+        "ce": "technologies",
+        "expand": "technologies",
+        "fidelity": "transformed",
+        "note": "Count the list."
+      },
+      {
+        "group": "Technographics",
+        "crustdata": [
+          "technographics.technologies[].categories",
+          "technographics.technologies[].sources",
+          "technographics.technologies[].posting_count",
+          "technographics.technologies[].evidence",
+          "technographics.updated_at"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No categories or detection evidence."
+      },
+      {
+        "group": "Other sections",
+        "crustdata": "people",
+        "ce": null,
+        "fidelity": "none",
+        "note": "Not part of the company record. Search people at the company's domain with `seniority` of `c-suite`, `founder`, or `vp`."
+      },
+      {
+        "group": "Other sections",
+        "crustdata": [
+          "hiring",
+          "followers",
+          "seo",
+          "web_traffic",
+          "competitors",
+          "employee_reviews",
+          "software_reviews",
+          "reviews",
+          "news",
+          "public_launches",
+          "market_intel",
+          "social_posts"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "For competitors, a lookalike search on the company's domain returns similar companies, which is a different list."
+      }
+    ],
+    "person": [
+      {
+        "group": "Identity",
+        "crustdata": "crustdata_person_id",
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A separate ID space. CompanyEnrich person IDs are 64-bit integers, so do not store both in one column without a source marker."
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_profile.name",
+        "ce": "name",
+        "fidelity": "same"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_profile.first_name",
+        "ce": "firstName",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": "basic_profile.last_name",
+        "ce": "lastName",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": [
+          "basic_profile.profile_picture_permalink",
+          "professional_network.profile_picture_url"
+        ],
+        "ce": "imageUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Identity",
+        "crustdata": [
+          "basic_profile.headline",
+          "basic_profile.summary",
+          "basic_profile.languages",
+          "basic_profile.professional_network_name"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "basic_profile.current_title",
+        "ce": "position",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].title",
+        "ce": "experiences[].position",
+        "fidelity": "renamed",
+        "note": "From experiences with `isCurrent` set."
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].name",
+        "ce": [
+          "experiences[].company.name",
+          "experiences[].companyName"
+        ],
+        "fidelity": "transformed",
+        "note": "`companyName` is set when no company record matched."
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_website_domain",
+        "ce": "experiences[].company.domain",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].crustdata_company_id",
+        "ce": "experiences[].company.id",
+        "fidelity": "lossy",
+        "note": "A CompanyEnrich company UUID."
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].seniority_level",
+        "ce": [
+          "seniority",
+          "experiences[].seniority"
+        ],
+        "fidelity": "transformed",
+        "values": "seniority"
+      },
+      {
+        "group": "Current job",
+        "crustdata": [
+          "experience.employment_details.current[].function_category",
+          "basic_profile.normalized_title.department"
+        ],
+        "ce": [
+          "department",
+          "experiences[].department"
+        ],
+        "fidelity": "transformed",
+        "values": "department",
+        "note": "CompanyEnrich departments can include a sub-department, such as `sales/customer-success`."
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].start_date",
+        "ce": "experiences[].startDate",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].is_default",
+        "ce": "experiences[].isMatched",
+        "fidelity": "lossy",
+        "note": "No primary-role flag. A person can have several current experiences. `isMatched` marks the one that matched your email lookup or search. When none or several qualify, choose a rule and apply it explicitly."
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_professional_network_profile_url",
+        "ce": "experiences[].company.socials.linkedinUrl",
+        "expand": "company",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_website",
+        "ce": "experiences[].company.website",
+        "expand": "company",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_headcount_range",
+        "ce": "experiences[].company.employees",
+        "expand": "company",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "Calculated range, not the self-reported one."
+      },
+      {
+        "group": "Current job",
+        "crustdata": [
+          "experience.employment_details.current[].company_industries",
+          "experience.employment_details.current[].company_professional_network_industry"
+        ],
+        "ce": "experiences[].company.industries",
+        "expand": "company",
+        "fidelity": "lossy"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_type",
+        "ce": "experiences[].company.type",
+        "expand": "company",
+        "fidelity": "renamed",
+        "values": "companyType"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_headquarters_country",
+        "ce": "experiences[].company.location.country.name",
+        "expand": "company",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Current job",
+        "crustdata": "experience.employment_details.current[].company_hq_location",
+        "ce": "experiences[].company.location.address",
+        "expand": "company",
+        "fidelity": "lossy"
+      },
+      {
+        "group": "Current job",
+        "crustdata": [
+          "experience.employment_details.current[].company_headcount_latest",
+          "experience.employment_details.current[].description",
+          "experience.employment_details.current[].location",
+          "experience.employment_details.current[].employment_type",
+          "experience.employment_details.current[].years_at_company",
+          "experience.employment_details.current[].position_id",
+          "experience.employment_details.current[].business_email_verified"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Work history",
+        "crustdata": "experience.employment_details.past",
+        "ce": "experiences",
+        "fidelity": "transformed",
+        "note": "One list for current and past jobs. Past jobs have `isCurrent` set to `false`. The same field mappings apply to each past job."
+      },
+      {
+        "group": "Work history",
+        "crustdata": "experience.employment_details.past[].end_date",
+        "ce": "experiences[].endDate",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Work history",
+        "crustdata": [
+          "experience.years_of_experience",
+          "experience.years_of_experience_raw"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "Work it out from `experiences[].startDate` and `endDate`."
+      },
+      {
+        "group": "Education",
+        "crustdata": "education.schools",
+        "ce": "education",
+        "expand": "education",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Education",
+        "crustdata": "education.schools[].school",
+        "ce": "education[].institutionName",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "crustdata": [
+          "education.schools[].degree",
+          "education.schools[].field_of_study"
+        ],
+        "ce": "education[].degree",
+        "expand": "education",
+        "fidelity": "lossy",
+        "note": "One array holds the degree and field of study."
+      },
+      {
+        "group": "Education",
+        "crustdata": "education.schools[].start_year",
+        "ce": "education[].startYear",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "crustdata": "education.schools[].end_year",
+        "ce": "education[].endYear",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "crustdata": [
+          "education.schools[].description",
+          "education.schools[].location",
+          "education.schools[].activities_and_societies"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Location",
+        "crustdata": "basic_profile.location.country",
+        "ce": [
+          "location.country.name",
+          "location.country.code"
+        ],
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Location",
+        "crustdata": [
+          "basic_profile.location.city",
+          "basic_profile.location.state",
+          "basic_profile.location.raw"
+        ],
+        "ce": "location.address",
+        "fidelity": "lossy",
+        "note": "A single text field, such as a city and country."
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": "social_handles.professional_network_identifier.profile_url",
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "Normalize both URLs before comparing."
+      },
+      {
+        "group": "Social profiles",
+        "crustdata": [
+          "social_handles.twitter_identifier",
+          "social_handles.dev_platform_identifier"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Contact",
+        "in": "workEmail",
+        "crustdata": "contact.business_emails[].email",
+        "ce": "email",
+        "fidelity": "transformed",
+        "note": "One work email instead of a list."
+      },
+      {
+        "group": "Contact",
+        "in": "workEmail",
+        "crustdata": "contact.business_emails[].status",
+        "ce": "certainty",
+        "fidelity": "lossy",
+        "note": "`certainty` is `very-high`, `high`, `medium`, or `unknown`. A deliverability status such as `catch_all` has no direct counterpart."
+      },
+      {
+        "group": "Contact",
+        "crustdata": [
+          "contact.personal_emails",
+          "contact.phone_numbers",
+          "contact.phone_numbers_info",
+          "contact.websites"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Other",
+        "crustdata": [
+          "skills",
+          "certifications",
+          "honors",
+          "dev_platform_profiles",
+          "research_profiles",
+          "social_posts",
+          "professional_network.connections",
+          "professional_network.followers",
+          "professional_network.open_to_cards",
+          "assessment"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      }
+    ],
+    "account": [
+      {
+        "group": "Credits",
+        "crustdata": "account.credits",
+        "ce": "credits.total",
+        "fidelity": "transformed",
+        "note": "Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional."
+      },
+      {
+        "group": "Credits",
+        "crustdata": [
+          "account.recurring_credits",
+          "account.recurring_credits_frequency",
+          "account.recurring_credits_refresh_date",
+          "account.wallets",
+          "account.credit_topups"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      }
+    ]
+  },
+  "ceOnly": {
+    "company": [
+      {
+        "ce": "legalName",
+        "note": "The registered legal name."
+      },
+      {
+        "ce": "categories",
+        "note": "Business model, such as `saas` or `b2b`."
+      },
+      {
+        "ce": "location.country.code",
+        "note": "ISO 3166-1 alpha-2 country code."
+      },
+      {
+        "ce": [
+          "socials.facebookUrl",
+          "socials.instagramUrl",
+          "socials.youtubeUrl",
+          "socials.githubUrl",
+          "socials.angellistUrl",
+          "socials.g2Url"
+        ],
+        "note": "Other social profiles."
+      },
+      {
+        "ce": "financial.stockExchange",
+        "expand": "financial",
+        "note": "The stock exchange for public companies."
+      }
+    ],
+    "person": [
+      {
+        "ce": "experiences[].isMatched",
+        "note": "Which experience matched your search filters or your email lookup."
+      },
+      {
+        "ce": "education[].institution",
+        "expand": "education",
+        "note": "The school as a company summary."
+      },
+      {
+        "ce": "updatedAt",
+        "note": "When the record was last updated."
+      }
+    ]
+  },
+  "values": {
+    "companySize": {
+      "title": "Company size",
+      "crustdata": "basic_info.employee_count_range, company_headcount_range",
+      "ce": "employees, reportedEmployees",
+      "enum": "CompanySearchFilter.employees",
+      "note": "Crustdata ranges are self-reported, so search them with `reportedEmployees`. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range.",
+      "rows": [
+        {
+          "crustdata": [
+            "myself only",
+            "2-10"
+          ],
+          "ce": "1-10",
+          "fidelity": "lossy",
+          "note": "One range covers both."
+        },
+        {
+          "crustdata": "11-50",
+          "ce": "11-50",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": "51-200",
+          "ce": "51-200",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": "201-500",
+          "ce": "201-500",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": "501-1000",
+          "ce": "501-1K",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "1001-5000",
+          "ce": "1K-5K",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "5001-10000",
+          "ce": "5K-10K",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "10001+",
+          "ce": "over-10K",
+          "fidelity": "renamed"
+        }
+      ]
+    },
+    "companyType": {
+      "title": "Company type",
+      "crustdata": "basic_info.company_type",
+      "ce": "type",
+      "enum": "CompanySearchFilter.type",
+      "note": "The same eight types, renamed.",
+      "rows": [
+        {
+          "crustdata": "Privately Held",
+          "ce": "private",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Public Company",
+          "ce": "public",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Nonprofit",
+          "ce": "nonprofit",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Educational Institution",
+          "ce": "educational",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Government Agency",
+          "ce": "government",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Self-Employed",
+          "ce": "self-employed",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Sole Proprietorship",
+          "ce": "self-owned",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Partnership",
+          "ce": "partnership",
+          "fidelity": "renamed"
+        }
+      ]
+    },
+    "seniority": {
+      "title": "Seniority",
+      "crustdata": "seniority_level",
+      "ce": "seniority",
+      "enum": "PersonSearchFilter.seniority",
+      "note": "Crustdata values are case-insensitive in filters. CompanyEnrich values are lowercase.",
+      "rows": [
+        {
+          "crustdata": "CXO",
+          "ce": "c-suite",
+          "fidelity": "renamed",
+          "note": "CompanyEnrich files founders under `founder`. Add it to find founder-CEOs."
+        },
+        {
+          "crustdata": "Vice President",
+          "ce": "vp",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Director",
+          "ce": "director",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Owner / Partner",
+          "ce": [
+            "owner",
+            "partner",
+            "founder"
+          ],
+          "fidelity": "lossy",
+          "note": "Search all three. CompanyEnrich keeps founders apart."
+        },
+        {
+          "crustdata": [
+            "Experienced Manager",
+            "Entry Level Manager"
+          ],
+          "ce": "manager",
+          "fidelity": "lossy",
+          "note": "One value covers both."
+        },
+        {
+          "crustdata": "Senior",
+          "ce": "senior",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Entry Level",
+          "ce": "entry",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "In Training",
+          "ce": "intern",
+          "fidelity": "lossy"
+        },
+        {
+          "crustdata": "Strategic",
+          "ce": null,
+          "fidelity": "none",
+          "note": "Not mapped automatically. Filter on `position` phrases instead."
+        }
+      ]
+    },
+    "department": {
+      "title": "Function and department",
+      "crustdata": "function_category",
+      "ce": "department",
+      "enum": "PersonSearchFilter.department",
+      "note": "A department filter includes its sub-departments.",
+      "rows": [
+        {
+          "crustdata": "Engineering",
+          "ce": "engineering-technical",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Sales",
+          "ce": "sales",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Marketing",
+          "ce": "marketing",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Operations",
+          "ce": "operations",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Finance",
+          "ce": "finance",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Consulting",
+          "ce": "consulting",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Human Resources",
+          "ce": "human-resources",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Legal",
+          "ce": "legal",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Product Management",
+          "ce": "product-management",
+          "fidelity": "renamed"
+        },
+        {
+          "crustdata": "Arts and Design",
+          "ce": "design",
+          "fidelity": "lossy"
+        },
+        {
+          "crustdata": "Customer Success and Support",
+          "ce": [
+            "sales/customer-success",
+            "operations/customer-service-support"
+          ],
+          "fidelity": "lossy",
+          "note": "Split across two sub-departments. Search both."
+        },
+        {
+          "crustdata": "Research",
+          "ce": null,
+          "fidelity": "none",
+          "note": "No single department. `engineering-technical/research-development` and `medical-health/medical-research` overlap."
+        }
+      ]
+    },
+    "fundingRound": {
+      "title": "Funding round",
+      "crustdata": "funding.last_round_type",
+      "ce": "fundingRounds",
+      "enum": "CompanySearchFilter.fundingRounds",
+      "note": "These are search filter values. Company records return labels such as `Series A` in `financial.fundingStage`.",
+      "rows": [
+        {
+          "crustdata": "seed",
+          "ce": "seed",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": "angel",
+          "ce": "angel",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": [
+            "series_a",
+            "series_b",
+            "series_c",
+            "series_d",
+            "series_e",
+            "series_f",
+            "series_g",
+            "series_h"
+          ],
+          "ce": [
+            "series_a",
+            "series_b",
+            "series_c",
+            "series_d",
+            "series_e",
+            "series_f",
+            "series_g",
+            "series_h"
+          ],
+          "fidelity": "same",
+          "note": "Same value for each round."
+        },
+        {
+          "crustdata": "debt_financing",
+          "ce": "debt_financing",
+          "fidelity": "same"
+        },
+        {
+          "crustdata": [
+            "pre_seed",
+            "series_i",
+            "series_j",
+            "series_unknown",
+            "convertible_note",
+            "corporate_round",
+            "equity_crowdfunding",
+            "grant",
+            "initial_coin_offering",
+            "non_equity_assistance",
+            "post_ipo_debt",
+            "post_ipo_equity",
+            "post_ipo_secondary",
+            "private_equity",
+            "product_crowdfunding",
+            "secondary_market",
+            "undisclosed"
+          ],
+          "ce": null,
+          "fidelity": "none",
+          "note": "No exact value. CompanyEnrich also has `venture` and `other`."
+        }
+      ]
+    }
+  },
+  "search": {
+    "company": [
+      {
+        "crustdata": {
+          "field": "basic_info.primary_domain",
+          "type": "in",
+          "value": [
+            "acme.example",
+            "globex.example"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "domain": [
+              "acme.example",
+              "globex.example"
+            ]
+          }
+        },
+        "fidelity": "same"
+      },
+      {
+        "crustdata": {
+          "field": "basic_info.name",
+          "type": "(.)",
+          "value": "acme"
+        },
+        "ce": {
+          "filter": {
+            "query": "acme"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches company names, keywords, or domain prefixes."
+      },
+      {
+        "crustdata": {
+          "field": "locations.country",
+          "type": "in",
+          "value": [
+            "USA",
+            "CAN"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "country": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "fidelity": "transformed",
+        "note": "ISO 3166-1 alpha-2 codes instead of alpha-3 codes or names. Look up codes with `POST /v2/geo/countries`."
+      },
+      {
+        "crustdata": {
+          "field": "locations.country",
+          "type": "not_in",
+          "value": [
+            "CHN"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "country": {
+              "notIn": [
+                "CN"
+              ]
+            }
+          }
+        },
+        "fidelity": "transformed"
+      },
+      {
+        "crustdata": {
+          "field": "locations.state",
+          "type": "=",
+          "value": "California"
+        },
+        "ce": {
+          "filter": {
+            "state": "STATE_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`."
+      },
+      {
+        "crustdata": {
+          "field": "locations.city",
+          "type": "=",
+          "value": "Austin"
+        },
+        "ce": {
+          "filter": {
+            "city": "CITY_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`."
+      },
+      {
+        "crustdata": {
+          "field": "locations.headquarters",
+          "type": "geo_distance",
+          "value": {
+            "location": "Palo Alto, CA",
+            "distance": 50,
+            "unit": "km"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No radius or polygon search. Filter by the cities or states in the area."
+      },
+      {
+        "crustdata": {
+          "field": "basic_info.employee_count_range",
+          "type": "in",
+          "value": [
+            "51-200",
+            "201-500"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "reportedEmployees": [
+              "51-200",
+              "201-500"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the company size table. `employees` filters on the calculated range instead."
+      },
+      {
+        "crustdata": {
+          "op": "and",
+          "conditions": [
+            {
+              "field": "headcount.total",
+              "type": "=>",
+              "value": 50
+            },
+            {
+              "field": "headcount.total",
+              "type": "=<",
+              "value": 500
+            }
+          ]
+        },
+        "ce": {
+          "filter": {
+            "workforceSize": [
+              {
+                "department": "overall",
+                "min": 50,
+                "max": 500
+              }
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Counts from CompanyEnrich employee data. `min` and `max` are inclusive, so `>` 50 becomes `min` 51."
+      },
+      {
+        "crustdata": {
+          "field": "headcount.growth_percent.12m",
+          "type": ">",
+          "value": 20
+        },
+        "ce": {
+          "filter": {
+            "workforceGrowth": {
+              "period": "y1",
+              "department": "overall",
+              "min": 0.2
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "A ratio instead of a percentage: divide by 100. Growth comes from CompanyEnrich employee data. `min` is inclusive, so it also matches exactly 20%. `6m` becomes `m6`. There is no one-month or three-month period, and `y2` covers two years."
+      },
+      {
+        "crustdata": {
+          "field": "roles.distribution.engineering",
+          "type": ">",
+          "value": 50
+        },
+        "ce": {
+          "filter": {
+            "workforceSize": [
+              {
+                "department": "engineering_technical",
+                "min": 51
+              }
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "14 departments instead of Crustdata's functions."
+      },
+      {
+        "crustdata": {
+          "field": "taxonomy.professional_network_industry",
+          "type": "in",
+          "value": [
+            "Software Development"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "naicsCodes": [
+              "5112"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "No industry-label filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search."
+      },
+      {
+        "crustdata": {
+          "field": "taxonomy.primary_naics_detail.naics_code",
+          "type": "=",
+          "value": "541511"
+        },
+        "ce": {
+          "filter": {
+            "naicsCodes": [
+              "541511"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Codes have 2 to 6 digits, so `industry_group` and `sub_sector` filters become shorter codes. Crustdata uses the 2022 edition. Some codes changed between editions, such as software publishers, so check yours against `GET /v2/industries`."
+      },
+      {
+        "crustdata": {
+          "field": "taxonomy.sic_detail_list.sic_code",
+          "type": "=",
+          "value": "7372"
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No SIC filter. Use NAICS codes."
+      },
+      {
+        "crustdata": {
+          "field": "taxonomy.categories",
+          "type": "(.)",
+          "value": "fintech"
+        },
+        "ce": {
+          "filter": {
+            "keywords": "fintech"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Check the keyword with `GET /v2/keywords/autocomplete`."
+      },
+      {
+        "crustdata": {
+          "field": "technographics.technologies.name",
+          "type": "has_all",
+          "value": [
+            "React",
+            "Stripe"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "technologies": [
+              "react",
+              "stripe"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "An array requires every technology, as `has_all` does. Look up names with `GET /v2/technologies/autocomplete`."
+      },
+      {
+        "crustdata": {
+          "field": "technographics.technologies.name",
+          "type": "in",
+          "value": [
+            "Salesforce",
+            "HubSpot"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "technologies": {
+              "in": [
+                "salesforce",
+                "hubspot"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Use `in` to match any of them."
+      },
+      {
+        "crustdata": {
+          "field": "technographics.technologies.category",
+          "type": "=",
+          "value": "crm"
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No technology category filter. List the technologies instead."
+      },
+      {
+        "crustdata": {
+          "field": "funding.last_round_type",
+          "type": "in",
+          "value": [
+            "series_a",
+            "series_b"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "fundingRounds": [
+              "series_a",
+              "series_b"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "See the funding round table. Crustdata matches the latest round only. To check the latest round of a result, read `financial.fundingStage`."
+      },
+      {
+        "crustdata": {
+          "field": "funding.total_investment_usd",
+          "type": "=>",
+          "value": 10000000
+        },
+        "ce": {
+          "filter": {
+            "fundingAmount": {
+              "min": 10000000
+            }
+          }
+        },
+        "fidelity": "renamed"
+      },
+      {
+        "crustdata": {
+          "field": "funding.last_fundraise_date",
+          "type": "=>",
+          "value": "2025-01-01"
+        },
+        "ce": {
+          "filter": {
+            "fundingYear": {
+              "min": 2025
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Year of the latest funding, not a date."
+      },
+      {
+        "crustdata": {
+          "field": "funding.total_investment_usd",
+          "type": "is_not_null"
+        },
+        "ce": {
+          "filter": {
+            "require": "anyFunding"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "`require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`."
+      },
+      {
+        "crustdata": {
+          "field": "basic_info.year_founded",
+          "type": "=>",
+          "value": 2018
+        },
+        "ce": {
+          "filter": {
+            "foundedYear": {
+              "min": 2018
+            }
+          }
+        },
+        "fidelity": "renamed"
+      },
+      {
+        "crustdata": {
+          "field": "basic_info.company_type",
+          "type": "=",
+          "value": "Privately Held"
+        },
+        "ce": {
+          "filter": {
+            "type": "private"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the company type table."
+      },
+      {
+        "crustdata": {
+          "field": "revenue.estimated.lower_bound_usd",
+          "type": "=>",
+          "value": 10000000
+        },
+        "ce": {
+          "filter": {
+            "revenue": [
+              "10m-50m",
+              "50m-100m",
+              "100m-200m",
+              "200m-1b",
+              "over-1b"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Revenue is a set of ranges. List every range above the bound."
+      },
+      {
+        "crustdata": {
+          "field": "competitors.websites",
+          "type": "=",
+          "value": "stripe.com"
+        },
+        "ce": {
+          "lookalike": {
+            "domains": [
+              "stripe.com"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Lookalikes of the company, ranked by similarity, rather than its listed competitors."
+      },
+      {
+        "crustdata": {
+          "field": "followers.count",
+          "type": ">",
+          "value": 1000
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No follower, hiring, review, or traffic filters."
+      },
+      {
+        "crustdata": {
+          "search": {
+            "query": "developer tooling companies building observability products",
+            "mode": "hybrid"
+          }
+        },
+        "ce": {
+          "semantic": {
+            "query": "developer tooling companies building observability products"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Add a `filter` to apply hard constraints, as with Crustdata `filters`. By default, CompanyEnrich also infers filters such as location and size from the query. Set `semantic.autoFilter` to `false` to rank by the query alone."
+      },
+      {
+        "crustdata": {
+          "op": "or",
+          "conditions": [
+            {
+              "field": "taxonomy.professional_network_industry",
+              "type": "=",
+              "value": "Software Development"
+            },
+            {
+              "field": "funding.total_investment_usd",
+              "type": ">",
+              "value": 5000000
+            }
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No OR across different filters. Run one search per branch and merge the results on `id`. OR within one filter works: send an array."
+      },
+      {
+        "crustdata": {
+          "sorts": [
+            {
+              "field": "headcount.total",
+              "order": "desc"
+            }
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No sorting. Results come in relevance order. To reproduce a top list by a field, count the matches for free, fetch every page, then sort in your code."
+      },
+      {
+        "crustdata": {
+          "limit": 1000,
+          "cursor": "NEXT_CURSOR"
+        },
+        "ce": {
+          "pageSize": 100,
+          "cursor": "NEXT_CURSOR"
+        },
+        "fidelity": "transformed",
+        "note": "Up to 100 per page. Send `nextCursor` from the last response as `cursor`."
+      }
+    ],
+    "person": [
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_website_domain",
+          "type": "in",
+          "value": [
+            "stripe.com"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "domain": [
+              "stripe.com"
+            ]
+          }
+        },
+        "fidelity": "same"
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_name",
+          "type": "in",
+          "value": [
+            "Stripe"
+          ]
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "query": "Stripe"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "`query` matches company names, keywords, or domain prefixes, so it can match more than one employer. Filter by `domain` when you know it."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_professional_network_profile_url",
+          "type": "=",
+          "value": "https://www.linkedin.com/company/stripe"
+        },
+        "ce": {
+          "filter": {
+            "companyLinkedinHandle": "https://www.linkedin.com/company/stripe"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Takes a handle or a URL."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_id",
+          "type": "in",
+          "value": [
+            123456
+          ]
+        },
+        "ce": {
+          "filter": {
+            "companyId": [
+              "COMPANY_ID"
+            ]
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Crustdata IDs do not carry over. Filter by domain, or by CompanyEnrich company IDs."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.title",
+          "type": "(.)",
+          "value": "head of growth"
+        },
+        "ce": {
+          "filter": {
+            "position": "head of growth"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches the phrase in current positions. Check titles with `GET /v2/positions/autocomplete`."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.title",
+          "type": "in",
+          "value": [
+            "CTO",
+            "VP Engineering"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "position": [
+              "CTO",
+              "VP Engineering"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "An array matches any phrase. Crustdata `in` matches the whole stored title; CompanyEnrich matches the phrase inside it."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.seniority_level",
+          "type": "in",
+          "value": [
+            "CXO",
+            "Vice President"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "seniority": [
+              "c-suite",
+              "vp"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the seniority table."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.function_category",
+          "type": "=",
+          "value": "Engineering"
+        },
+        "ce": {
+          "filter": {
+            "department": "engineering-technical"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the department table."
+      },
+      {
+        "crustdata": {
+          "field": "basic_profile.location.country",
+          "type": "in",
+          "value": [
+            "United States",
+            "Canada"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "country": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "fidelity": "transformed",
+        "note": "ISO 3166-1 alpha-2 codes instead of full names."
+      },
+      {
+        "crustdata": {
+          "field": "basic_profile.location.city",
+          "type": "=",
+          "value": "San Francisco"
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "People search filters by country only. Check `location.address` in your code."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.start_date",
+          "type": "=>",
+          "value": "2026-08-01"
+        },
+        "ce": {
+          "filter": {
+            "currentPositionStartDate": {
+              "after": "2026-08-01"
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "For the date the person joined the company rather than started the role, use `currentCompanyStartDate`."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.past.company_website_domain",
+          "type": "=",
+          "value": "google.com"
+        },
+        "ce": {
+          "filter": {
+            "pastExperience": {
+              "domain": "google.com"
+            }
+          }
+        },
+        "fidelity": "renamed"
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.past.title",
+          "type": "(.)",
+          "value": "product manager"
+        },
+        "ce": {
+          "filter": {
+            "pastExperience": {
+              "position": "product manager"
+            }
+          }
+        },
+        "fidelity": "lossy"
+      },
+      {
+        "crustdata": {
+          "field": "education.schools.school",
+          "type": "(.)",
+          "value": "Stanford University"
+        },
+        "ce": {
+          "filter": {
+            "education": {
+              "institutionName": "Stanford University"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Or match the school's LinkedIn page with `institutionLinkedinHandle`. Degree and year filters have no equivalent."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_headcount_range",
+          "type": "in",
+          "value": [
+            "51-200"
+          ]
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "reportedEmployees": "51-200"
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Employer conditions go in a `company` query, which takes any company search filter."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_headquarters_country",
+          "type": "=",
+          "value": "USA"
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "country": "US"
+            }
+          }
+        },
+        "fidelity": "transformed",
+        "note": "The employer's country, not the person's."
+      },
+      {
+        "crustdata": {
+          "field": "experience.employment_details.current.company_industries",
+          "type": "in",
+          "value": [
+            "Financial Services"
+          ]
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "naicsCodes": [
+                "5221"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Pick NAICS codes from `GET /v2/industries`, or put a `semantic` query in the `company` query."
+      },
+      {
+        "crustdata": {
+          "field": "basic_profile.name",
+          "type": "=",
+          "value": "Jane Doe"
+        },
+        "ce": {
+          "filter": {
+            "query": "Jane Doe"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches person names. Combine it with `domain` to find one person at a company."
+      },
+      {
+        "crustdata": {
+          "field": "skills.professional_network_skills",
+          "type": "in",
+          "value": [
+            "Python"
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No skill, certification, connection, follower, or contact-availability filters."
+      },
+      {
+        "crustdata": {
+          "search": {
+            "query": "founding engineers at developer tools startups"
+          }
+        },
+        "ce": {
+          "semantic": {
+            "query": "founding engineers at developer tools startups"
+          }
+        },
+        "fidelity": "transformed"
+      },
+      {
+        "crustdata": {
+          "op": "or",
+          "conditions": [
+            {
+              "field": "experience.employment_details.current.title",
+              "type": "[.]",
+              "value": "developer"
+            },
+            {
+              "field": "experience.employment_details.current.function_category",
+              "type": "=",
+              "value": "Engineering"
+            }
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No OR across different filters. Run one search per branch and merge on `id`."
+      },
+      {
+        "crustdata": {
+          "post_processing": {
+            "exclude_profiles": [
+              "https://www.linkedin.com/in/jane-doe"
+            ]
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "Drop excluded people in your code."
+      }
+    ]
+  },
+  "fixtures": {
+    "$comment": "Fictional records for offline tests. Shapes follow each provider's documented schema.",
+    "company": {
+      "crustdata": [
+        {
+          "matched_on": "acme-analytics.example",
+          "match_type": "domain",
+          "matches": [
+            {
+              "confidence_score": 1.0,
+              "company_data": {
+                "crustdata_company_id": 7340218,
+                "basic_info": {
+                  "crustdata_company_id": 7340218,
+                  "name": "Acme Analytics",
+                  "primary_domain": "acme-analytics.example",
+                  "website": "https://acme-analytics.example",
+                  "professional_network_url": "https://www.linkedin.com/company/acme-analytics-example",
+                  "description": "Acme Analytics builds a product analytics platform.",
+                  "company_type": "Privately Held",
+                  "year_founded": 2016,
+                  "employee_count_range": "201-500"
+                },
+                "headcount": {
+                  "total": 312
+                },
+                "locations": {
+                  "country": "United States",
+                  "state": "California",
+                  "headquarters": "San Francisco, California, United States"
+                },
+                "funding": {
+                  "total_investment_usd": 48000000,
+                  "last_round_type": "series_b",
+                  "last_fundraise_date": "2024-05-14"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "companyEnrich": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "website": "https://acme-analytics.example",
+        "logoUrl": "https://logo.example/acme-analytics.example.png",
+        "description": "Acme Analytics builds a product analytics platform.",
+        "type": "private",
+        "foundedYear": 2016,
+        "employees": "201-500",
+        "revenue": "10m-50m",
+        "industry": "Software Publishers",
+        "location": {
+          "country": {
+            "code": "US",
+            "name": "United States"
+          },
+          "state": {
+            "id": 1416,
+            "name": "California",
+            "code": "US-CA"
+          },
+          "city": {
+            "id": 125634,
+            "name": "San Francisco"
+          },
+          "postalCode": "94105"
+        },
+        "socials": {
+          "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+        },
+        "financial": {
+          "totalFunding": 48000000,
+          "fundingStage": "Series B",
+          "fundingDate": "2024-05-14T00:00:00Z"
+        },
+        "updatedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    "notFound": {
+      "crustdata": [
+        {
+          "matched_on": "missing.example",
+          "match_type": "domain",
+          "matches": []
+        }
+      ],
+      "companyEnrich": {
+        "status": 404,
+        "title": "Not Found"
+      }
+    }
+  }
+}

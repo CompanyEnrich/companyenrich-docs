@@ -138,6 +138,15 @@
                   "docs/migrate-from-explorium-search",
                   "docs/migrate-from-explorium-agent"
                 ]
+              },
+              {
+                "group": "From Crustdata",
+                "pages": [
+                  "docs/migrate-from-crustdata",
+                  "docs/migrate-from-crustdata-field-mapping",
+                  "docs/migrate-from-crustdata-search",
+                  "docs/migrate-from-crustdata-agent"
+                ]
               }
             ]
           },

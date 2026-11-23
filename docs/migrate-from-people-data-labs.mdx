@@ -169,7 +169,7 @@ See [Migrate with a coding agent](/docs/migrate-from-people-data-labs-agent) for
 | People Data Labs | CompanyEnrich V2 | Notes |
 | --- | --- | --- |
 | `/v5/autocomplete` | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete) | Free. For `field=title`, `industry`, `country`, or `region`, use position autocomplete, the industry list, or the geo endpoints. There is no school, major, or skill lookup. |
-| `/v5/company/clean` | None | No name or URL cleaner. Company autocomplete suggests domains for a partial name. |
+| `/v5/company/clean` | None | No name or URL cleaner. Company autocomplete suggests companies for a domain prefix or URL. |
 | `/v5/location/clean` | None | No address parser. The free geo endpoints find country, state, and city IDs by name. |
 | `/v5/school/clean` | None | No equivalent. |
 | `/v5/ip/enrich` | None | No IP-to-company lookup. |
