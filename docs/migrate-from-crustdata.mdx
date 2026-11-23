@@ -287,7 +287,7 @@ CompanyEnrich has no score:
 * Enrichment by properties requires every property you send to match. If several companies match, it returns the highest-ranked one.
 * A person lookup by work email returns the person, or `404`.
 
-Remove `confidence_score` checks from your code. Where you relied on them for name lookups, send a domain, or add a profile URL as `linkedinUrl` to the name.
+Code that accepts or rejects a match by `confidence_score` needs a new rule, because there is no score to check. For name lookups, send a domain instead, or add a profile URL as `linkedinUrl` to the name so that both must match.
 
 ### Status codes
 
@@ -323,7 +323,7 @@ These differences change how you write retries, guards, and tests. Prices for ea
 | Next page | Send the `next_cursor` from the last response as `cursor`, until it is `null` | Send the `nextCursor` from the last response as `cursor`, until it is omitted |
 | Cursor lifetime | 20 minutes for a ranked search | 24 hours after the first page |
 
-Crustdata asks for `sorts` to keep filter-search pages stable. CompanyEnrich has no sorting, so drop `sorts` and page with the cursor. The Python SDK pages for you with `search_all()`. A cursor from one API does not work in the other, so restart any paging job from the first page.
+Crustdata asks for `sorts` to keep filter-search pages stable. CompanyEnrich has no sorting, so page with the cursor. If your code needs a sorted list, fetch every page, then sort. The Python SDK pages for you with `search_all()`. A cursor from one API does not work in the other, so restart any paging job from the first page.
 
 ### Rate limits
 

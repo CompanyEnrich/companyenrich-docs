@@ -2157,7 +2157,8 @@
             }
           }
         },
-        "fidelity": "renamed"
+        "fidelity": "renamed",
+        "note": "`min` is inclusive, as `=>` is. For a strict `>`, raise `min` by the smallest amount you care about, such as 1."
       },
       {
         "crustdata": {

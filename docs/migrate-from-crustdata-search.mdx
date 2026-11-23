@@ -125,7 +125,7 @@ Crustdata's `fields` list has no counterpart, because results are full company r
 | `{"field": "technographics.technologies.name", "type": "in", "value": ["Salesforce", "HubSpot"]}` | `{"filter": {"technologies": {"in": ["salesforce", "hubspot"]}}}` | lossy | Use `in` to match any of them. |
 | `{"field": "technographics.technologies.category", "type": "=", "value": "crm"}` | None | none | No technology category filter. List the technologies instead. |
 | `{"field": "funding.last_round_type", "type": "in", "value": ["series_a", "series_b"]}` | `{"filter": {"fundingRounds": ["series_a", "series_b"]}}` | lossy | See the funding round table. Crustdata matches the latest round only. To check the latest round of a result, read `financial.fundingStage`. |
-| `{"field": "funding.total_investment_usd", "type": "=>", "value": 10000000}` | `{"filter": {"fundingAmount": {"min": 10000000}}}` | renamed |   |
+| `{"field": "funding.total_investment_usd", "type": "=>", "value": 10000000}` | `{"filter": {"fundingAmount": {"min": 10000000}}}` | renamed | `min` is inclusive, as `=>` is. For a strict `>`, raise `min` by the smallest amount you care about, such as 1. |
 | `{"field": "funding.last_fundraise_date", "type": "=>", "value": "2025-01-01"}` | `{"filter": {"fundingYear": {"min": 2025}}}` | lossy | Year of the latest funding, not a date. |
 | `{"field": "funding.total_investment_usd", "type": "is_not_null"}` | `{"filter": {"require": "anyFunding"}}` | renamed | `require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`. |
 | `{"field": "basic_info.year_founded", "type": "=>", "value": 2018}` | `{"filter": {"foundedYear": {"min": 2018}}}` | renamed |   |
