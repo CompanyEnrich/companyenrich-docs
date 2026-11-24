@@ -138,6 +138,31 @@ curl https://api.companyenrich.com/v2/me \
 
 You can also see your balance and manage your plan in the [dashboard](https://app.companyenrich.com).
 
+## Credit rollover
+
+What happens to the credits you have not used by the end of a billing period depends on your plan.
+
+| Plan          | Unused credits at the end of a billing period |
+| ------------- | --------------------------------------------- |
+| Starter       | Expire                                        |
+| Pro and Scale | Roll over to the next month, up to a limit    |
+
+On the Pro and Scale plans:
+
+* Credits roll over only while your subscription is active.
+* Your balance can hold up to twice your plan's monthly credits.
+* Unused credits above that limit expire.
+
+For example, on a plan with 50,000 credits per month:
+
+| Unused at the end of the month | Rolls over | Balance after renewal |
+| ------------------------------ | ---------- | --------------------- |
+| 10,000                         | 10,000     | 60,000                |
+| 50,000                         | 50,000     | 100,000               |
+| 80,000                         | 50,000     | 100,000               |
+
+See the [pricing page](https://companyenrich.com/pricing) for the credits each plan includes.
+
 ## When you run out
 
 If your balance cannot cover a paid request, the API returns `402 Payment Required`.
