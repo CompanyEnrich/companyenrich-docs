@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "Company Enrich API v2",
-    "description": "The Company Enrich API v2 provides programmatic access to company and person data for enrichment, search, and lead generation.\n\n## Key Features\n\n- **Company Enrichment** — Enrich company profiles by domain or identifying properties, and retrieve stored companies by ID.\n- **Company Search** — Search and filter companies with cursor pagination, counts, and previews.\n- **Semantic and Lookalike Search** — Find companies using natural-language queries or similar company domains.\n- **People Enrichment** — Retrieve people by ID, identify people from their email address, and find work email addresses.\n- **People Search** — Search people by position, seniority, department, location, education, and company with cursor pagination, counts, and previews.\n- **Reference Data** — Look up industries, geographic data, keywords, technologies, and job titles.\n\nV2 intentionally excludes saved company lists, list-based exports, and filtering searches by saved-list IDs. These features remain available in V1 and are not planned for V2.\n\n## Authentication\n\nAll API requests require a Bearer token passed in the `Authorization` header:\n\n```\nAuthorization: Bearer YOUR_API_TOKEN\n```\n\nYou can generate API tokens from your [dashboard](https://companyenrich.com/dashboard).\n\n## Credits\n\nMost API calls consume credits. The credit cost for each endpoint is documented in its description. You can check your remaining credit balance using the User endpoint.\n\n## Rate Limiting\n\nThe global API limiter allows **500 requests per minute** per IP address. Authenticated API routes also use a per-user route limiter based on plan capabilities.\nSupplementary lookup endpoints (such as keyword/technology/industry autocompletes) use a separate per-user route-level bucket.",
+    "description": "The Company Enrich API v2 provides programmatic access to company and person data for enrichment, search, and lead generation.\n\n## Key Features\n\n- **Company Enrichment** — Enrich company profiles by domain or identifying properties, and retrieve stored companies by ID.\n- **Company Search** — Search and filter companies with cursor pagination, counts, and previews.\n- **Semantic and Lookalike Search** — Find companies using natural-language queries or similar company domains.\n- **People Enrichment** — Retrieve people by ID, identify people from their email address, and find work email addresses.\n- **People Search** — Search people by position, seniority, department, location, education, and company with cursor pagination, counts, and previews.\n- **Reference Data** — Look up industries, geographic data, keywords, technologies, and job titles.\n\nV2 intentionally excludes saved company lists, list-based exports, and filtering searches by saved-list IDs. These features are not planned for V2. They remain available in V1, which is open to accounts created before December 1, 2026.\n\n## Authentication\n\nAll API requests require a Bearer token passed in the `Authorization` header:\n\n```\nAuthorization: Bearer YOUR_API_TOKEN\n```\n\nYou can generate API tokens from your [dashboard](https://companyenrich.com/dashboard).\n\n## Credits\n\nMost API calls consume credits. The credit cost for each endpoint is documented in its description. You can check your remaining credit balance using the User endpoint.\n\n## Rate Limiting\n\nThe global API limiter allows **500 requests per minute** per IP address. Authenticated API routes also use a per-user route limiter based on plan capabilities.\nSupplementary lookup endpoints (such as keyword/technology/industry autocompletes) use a separate per-user route-level bucket.",
     "termsOfService": "https://companyenrich.com/terms-and-conditions",
     "contact": {
       "url": "https://companyenrich.com/",
@@ -1569,7 +1569,7 @@
           "People / Search"
         ],
         "summary": "Search people",
-        "description": "Search people using person filters, a natural-language query, and an optional company query.\n\n**Cost:** 2 credits per returned person, plus requested paid expansions. Empty results cost one result's base price.\n\nThe `education` expansion adds 1 credit per returned person. Repeating an expansion does not multiply its cost.\n\nThe `company` expansion includes the standard company profile in `experiences[].company` for current and past experiences. It adds 1 credit per unique company successfully expanded across this response page, even when multiple people or experiences reference it. Unavailable companies retain their summary without an expansion charge. Companies on another page or request are charged again. Separately priced company expansions are not included.\n\nCompany expansion supports at most 500 unique available companies per response page. A page exceeding this limit returns `400` before company profiles are loaded or credits are charged. Reduce `pageSize` or remove `company` from `expand` and retry.\n\nPerson filters can be combined with a company query to find people whose current companies match. The company query accepts the same filters, semantic query, and lookalike seeds as company search. Company queries that use `query`, keyword, technology, funding, workforce, `reportedEmployees`, or required-feature filters, or a semantic or lookalike query, match people at the 1,000 best-matching companies.\n\nA semantic query infers person filters and a description of the current companies. For example, `VP of sales at Series A SaaS startups in Germany` filters VP-level sales people and searches their current companies with the semantic company query `Series A SaaS startups in Germany`. Inferred person names, positions, seniorities, departments, countries, current and past companies, schools, and recent company or position start dates filter results. Person locations are inferred at country level, so a city filters its country. Current company names and confidently equivalent aliases are OR alternatives in a company text query, matching names, keywords, and domain prefixes before finding current employees. Past company names resolve to domains. Request filters that include values take precedence over inferred values of the same kind, and request exclusions apply together with inferred values. A request `company.semantic` or `company.lookalike` query replaces the inferred company description. When the request includes specific current companies by id, domain, or LinkedIn handle in `filter`, or by id, domain, or query inclusions in `company.filter`, current companies are not inferred. A semantic query from which no filters can be inferred is rejected. The response `interpretation` reports what was inferred.\n\nTop-level company, seniority, department, position, and start date filters match current experiences. Use `filter.pastExperience` to find people by previous employment. Its inclusion rules must all match the same past experience, and people who still work at an included company are excluded. A past company exclusion removes people with any matching past experience. Past seniority, department, and position filters do not support exclusions.\n\nSend an empty object (`{}`) to search without filters.\n\nResults use cursor pagination. Omit `cursor` for the first page and pass a cursor returned by the previous response to continue. Numbered pagination is not supported. Keep the same query when continuing a search. Cursors expire 24 hours after the first page.\n\nExperiences that matched the search filters are marked with `isMatched`.\n\nA value filter supports these input forms:\n\n- match one value: `\"TR\"`\n- match several values: `[\"TR\", \"US\"]`\n- configure advanced matching rules: `{ \"in\": [\"TR\"], \"notIn\": [\"US\"] }`\n\nA single value or array matches any provided value. Use the object form to configure inclusion and exclusion rules together. Exclusions on current-experience fields (company, seniority, department, and position) remove a person when any of their current experiences matches.",
+        "description": "Search people using person filters, a natural-language query, and an optional company query.\n\n**Cost:** 2 credits per returned person, plus requested paid expansions. Empty results cost one result's base price.\n\nThe `education` expansion adds 1 credit per returned person. Repeating an expansion does not multiply its cost.\n\nThe `company` expansion includes the standard company profile in `experiences[].company` for current and past experiences. It adds 1 credit per unique company successfully expanded across this response page, even when multiple people or experiences reference it. Unavailable companies retain their summary without an expansion charge. Companies on another page or request are charged again. Separately priced company expansions are not included.\n\nCompany expansion supports at most 500 unique available companies per response page. A page exceeding this limit returns `400` before company profiles are loaded or credits are charged. Reduce `pageSize` or remove `company` from `expand` and retry.\n\nPerson filters can be combined with a company query to find people whose current companies match. The company query accepts the same filters, semantic query, and lookalike seeds as company search. Company queries that use `query`, keyword, technology, funding, workforce, `reportedEmployees`, or required-feature filters, or a semantic or lookalike query, match people at the 1,000 best-matching companies.\n\nA semantic query infers person filters and a description of the current companies. For example, `VP of sales at Series A SaaS startups in Germany` filters VP-level sales people and searches their current companies with the semantic company query `Series A SaaS startups in Germany`. Inferred person names, positions, seniorities, departments, countries, current and past companies, schools, and recent company or position start dates filter results. Person locations are inferred at country level, so a city filters its country; use the `state` and `city` filters to narrow further. A country is not inferred when the request includes a state or city. Current company names and confidently equivalent aliases are OR alternatives in a company text query, matching names, keywords, and domain prefixes before finding current employees. Past company names resolve to domains. Request filters that include values take precedence over inferred values of the same kind, and request exclusions apply together with inferred values. A request `company.semantic` or `company.lookalike` query replaces the inferred company description. When the request includes specific current companies by id, domain, or LinkedIn handle in `filter`, or by id, domain, or query inclusions in `company.filter`, current companies are not inferred. A semantic query from which no filters can be inferred is rejected. The response `interpretation` reports what was inferred.\n\nTop-level company, seniority, department, position, and start date filters match current experiences. Use `filter.pastExperience` to find people by previous employment. Its inclusion rules must all match the same past experience, and people who still work at an included company are excluded. A past company exclusion removes people with any matching past experience. Past seniority, department, and position filters do not support exclusions.\n\nThe `state` and `city` filters take the ids returned by the geo state and city searches, the same ids as `location.state.id` and `location.city.id` in the response. They match people whose reported location has been resolved to that state or city; people whose location is not resolved yet match neither filter.\n\nSend an empty object (`{}`) to search without filters.\n\nResults use cursor pagination. Omit `cursor` for the first page and pass a cursor returned by the previous response to continue. Numbered pagination is not supported. Keep the same query when continuing a search. Cursors expire 24 hours after the first page.\n\nExperiences that matched the search filters are marked with `isMatched`.\n\nA value filter supports these input forms:\n\n- match one value: `\"TR\"`\n- match several values: `[\"TR\", \"US\"]`\n- configure advanced matching rules: `{ \"in\": [\"TR\"], \"notIn\": [\"US\"] }`\n\nA single value or array matches any provided value. Use the object form to configure inclusion and exclusion rules together. Exclusions on current-experience fields (company, seniority, department, and position) remove a person when any of their current experiences matches.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4049,7 +4049,7 @@
           },
           "address": {
             "type": "string",
-            "description": "The company street address",
+            "description": "The company address. A full address written out in a regular form when one is available, otherwise as the company reports it.",
             "nullable": true
           },
           "postalCode": {
@@ -8649,7 +8649,7 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "The city ID accepted by company search filters",
+            "description": "The city ID accepted by company and people search filters",
             "format": "int32"
           },
           "name": {
@@ -8876,7 +8876,7 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "The state ID accepted by city and company search filters",
+            "description": "The state ID accepted by city, company, and people search filters",
             "format": "int32"
           },
           "name": {
@@ -9636,6 +9636,26 @@
         "description": "The seniority level associated with the experience",
         "nullable": true
       },
+      "PersonCityResponse": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The CompanyEnrich city ID",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The city name"
+          }
+        },
+        "description": "The city where the person is located. Present once the reported location has been resolved to a city.",
+        "nullable": true
+      },
       "PersonCompanyResponse": {
         "required": [
           "id"
@@ -10037,6 +10057,12 @@
         "properties": {
           "country": {
             "$ref": "#/components/schemas/PersonCountryResponse"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PersonStateResponse"
+          },
+          "city": {
+            "$ref": "#/components/schemas/PersonCityResponse"
           },
           "address": {
             "type": "string",
@@ -12655,6 +12681,104 @@
             "description": "The country codes to match. A single value or array matches any provided country.\n\nProvide a single value, multiple values, or advanced matching rules.",
             "nullable": true
           },
+          "state": {
+            "oneOf": [
+              {
+                "title": "Single value",
+                "type": "integer",
+                "description": "Include results that match this value.",
+                "format": "int32"
+              },
+              {
+                "title": "Multiple values",
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "description": "Include results that match at least one of these values."
+              },
+              {
+                "title": "Advanced matching rules",
+                "minProperties": 1,
+                "type": "object",
+                "properties": {
+                  "in": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Only match when the target value is one of the provided values"
+                  },
+                  "notIn": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Exclude results when the target value is one of the provided values"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configure values that may match or must be excluded."
+              }
+            ],
+            "description": "The state ids to match, as returned by the geo state search and in `location.state.id`. A single value or array matches any provided id. Only people whose location has been resolved to a state can match; an exclusion keeps people without one.\n\nProvide a single value, multiple values, or advanced matching rules.",
+            "nullable": true
+          },
+          "city": {
+            "oneOf": [
+              {
+                "title": "Single value",
+                "type": "integer",
+                "description": "Include results that match this value.",
+                "format": "int32"
+              },
+              {
+                "title": "Multiple values",
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "description": "Include results that match at least one of these values."
+              },
+              {
+                "title": "Advanced matching rules",
+                "minProperties": 1,
+                "type": "object",
+                "properties": {
+                  "in": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Only match when the target value is one of the provided values"
+                  },
+                  "notIn": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Exclude results when the target value is one of the provided values"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configure values that may match or must be excluded."
+              }
+            ],
+            "description": "The city ids to match, as returned by the geo city search and in `location.city.id`. A single value or array matches any provided id. Only people whose location has been resolved to a city can match; an exclusion keeps people without one.\n\nProvide a single value, multiple values, or advanced matching rules.",
+            "nullable": true
+          },
           "position": {
             "oneOf": [
               {
@@ -13942,6 +14066,104 @@
             "description": "The country codes to match. A single value or array matches any provided country.\n\nProvide a single value, multiple values, or advanced matching rules.",
             "nullable": true
           },
+          "state": {
+            "oneOf": [
+              {
+                "title": "Single value",
+                "type": "integer",
+                "description": "Include results that match this value.",
+                "format": "int32"
+              },
+              {
+                "title": "Multiple values",
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "description": "Include results that match at least one of these values."
+              },
+              {
+                "title": "Advanced matching rules",
+                "minProperties": 1,
+                "type": "object",
+                "properties": {
+                  "in": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Only match when the target value is one of the provided values"
+                  },
+                  "notIn": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Exclude results when the target value is one of the provided values"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configure values that may match or must be excluded."
+              }
+            ],
+            "description": "The state ids to match, as returned by the geo state search and in `location.state.id`. A single value or array matches any provided id. Only people whose location has been resolved to a state can match; an exclusion keeps people without one.\n\nProvide a single value, multiple values, or advanced matching rules.",
+            "nullable": true
+          },
+          "city": {
+            "oneOf": [
+              {
+                "title": "Single value",
+                "type": "integer",
+                "description": "Include results that match this value.",
+                "format": "int32"
+              },
+              {
+                "title": "Multiple values",
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "description": "Include results that match at least one of these values."
+              },
+              {
+                "title": "Advanced matching rules",
+                "minProperties": 1,
+                "type": "object",
+                "properties": {
+                  "in": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Only match when the target value is one of the provided values"
+                  },
+                  "notIn": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Exclude results when the target value is one of the provided values"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configure values that may match or must be excluded."
+              }
+            ],
+            "description": "The city ids to match, as returned by the geo city search and in `location.city.id`. A single value or array matches any provided id. Only people whose location has been resolved to a city can match; an exclusion keeps people without one.\n\nProvide a single value, multiple values, or advanced matching rules.",
+            "nullable": true
+          },
           "position": {
             "oneOf": [
               {
@@ -14255,6 +14477,31 @@
           }
         },
         "description": "The person social profiles"
+      },
+      "PersonStateResponse": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The CompanyEnrich state ID",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The state or province name"
+          },
+          "code": {
+            "type": "string",
+            "description": "The ISO 3166-2 subdivision code",
+            "nullable": true
+          }
+        },
+        "description": "The state or province where the person is located. Present once the reported location has been resolved to a state.",
+        "nullable": true
       },
       "ProblemDetails": {
         "type": "object",

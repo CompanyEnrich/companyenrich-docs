@@ -121,6 +121,8 @@ Fields under **Current job** come from the person's current experience. A Compan
 
 Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), a separate call.
 
+Person responses include structured `location.state` and `location.city` once the reported location has been resolved. Handle missing values; `location.address` remains the reported location text. The structured objects contain integer IDs you can reuse in [people search filters](/docs/migrate-from-explorium-search#person-states-and-cities).
+
 {/* generated: explorium fields:person */}
 
 ### Identity
@@ -157,7 +159,8 @@ Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-refe
 | Explorium | CompanyEnrich | Expand | Fidelity | Notes |
 | --- | --- | --- | --- | --- |
 | `country_name` | `location.country.name` |   | transformed |   |
-| `region_name`, `city` | `location.address` |   | lossy | A single text field, such as a city and country. |
+| `region_name` | `location.state.name` |   | transformed | Present once the reported location has been resolved to a state. `location.state.id` is the integer ID accepted by the people search `state` filter. |
+| `city` | `location.city.name` |   | transformed | Present once the reported location has been resolved to a city. `location.city.id` is the integer ID accepted by the people search `city` filter. `location.address` retains the reported location text. |
 
 ### Social
 

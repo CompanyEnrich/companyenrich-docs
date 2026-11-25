@@ -35,11 +35,18 @@ This page lists every field with its type and meaning. Field names are exactly a
 
 ## Location
 
-| Field                   | Type   | Description                          |
-| ----------------------- | ------ | ------------------------------------ |
-| `location.country.code` | string | The ISO 3166-1 alpha-2 country code. |
-| `location.country.name` | string | The country name.                    |
-| `location.address`      | string | The person's reported location.      |
+| Field                   | Type    | Description                          |
+| ----------------------- | ------- | ------------------------------------ |
+| `location.country.code` | string  | The ISO 3166-1 alpha-2 country code. |
+| `location.country.name` | string  | The country name.                    |
+| `location.state.id`     | integer | The CompanyEnrich state ID.          |
+| `location.state.name`   | string  | The state or province name.          |
+| `location.state.code`   | string  | The ISO 3166-2 subdivision code, when known. |
+| `location.city.id`      | integer | The CompanyEnrich city ID.           |
+| `location.city.name`    | string  | The city name.                       |
+| `location.address`      | string  | The person's reported location.      |
+
+The `state` and `city` objects are present only once the reported location has been resolved to that state or city. Their IDs are the same IDs returned by the [state lookup](/api-reference/v2/post-geo-states) and [city lookup](/api-reference/v2/post-geo-cities), and accepted by [people search filters](/docs/people-search-api-filters#location).
 
 ## Social profiles
 
@@ -121,6 +128,8 @@ This record is illustrative. It shows a fictional person with the `education` ex
   "department": "sales",
   "location": {
     "country": { "code": "US", "name": "United States" },
+    "state": { "id": 1416, "name": "California", "code": "US-CA" },
+    "city": { "id": 125634, "name": "San Francisco" },
     "address": "San Francisco, California"
   },
   "socials": {

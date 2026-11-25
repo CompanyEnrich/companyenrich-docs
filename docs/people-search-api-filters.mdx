@@ -1,7 +1,7 @@
 ---
 title: "People Search API filters"
 sidebarTitle: "Filters"
-description: "Every filter the People Search API accepts: job title, seniority, department, current and past employers, start dates, education, the company query, and semantic search options, with CLI flags and examples."
+description: "Every filter the People Search API accepts: location, job title, seniority, department, current and past employers, start dates, education, the company query, and semantic search options, with CLI flags and examples."
 ---
 
 Filters go in the `filter` object of a [people search](/docs/people-search-api) request. The same `filter` object works in count, preview, and export requests.
@@ -45,6 +45,23 @@ The CLI column shows the matching flag for `companyenrich people search`. Filter
 | --------- | ----------------------- | --------------- | ------------------------------------------------------------ |
 | `query`   | string                  | `--query`, `-q` | Matches person names. Up to 250 characters per entry.        |
 | `country` | two-letter country code | `--country`     | The person's country, such as `US` or `GB`.                  |
+
+### Location
+
+Use `filter.state` and `filter.city` in JSON requests to narrow a person's location beyond the country. Both take integer CompanyEnrich IDs from the [state lookup](/api-reference/v2/post-geo-states) and [city lookup](/api-reference/v2/post-geo-cities), also returned as `location.state.id` and `location.city.id` in person records. State names, subdivision codes, and city names are not accepted as filter values.
+
+Each filter accepts a single ID, an array of IDs, or an object with `in` and `notIn` arrays. For example, using an illustrative city ID:
+
+```json
+{
+  "filter": {
+    "city": { "in": [125634] },
+    "seniority": ["vp", "director"]
+  }
+}
+```
+
+Replace the example ID with an ID from the city lookup. Inclusions match only people whose location has been resolved to the requested state or city. An exclusion-only `notIn` filter keeps people without a resolved state or city. These filters describe the person's location; use `company.filter` for the employer's location.
 
 ### Current role
 
@@ -169,7 +186,7 @@ A semantic search takes a plain-language description in `semantic.query`, up to 
 For example, `VP of sales at Series A SaaS startups in Germany` filters on VP-level sales people and searches their current companies for `Series A SaaS startups in Germany`.
 
 * **What is inferred:** person names, job titles, seniority levels, departments, countries, current and past companies, schools, and recent start dates.
-* **Locations** are inferred at country level, so a city filters on its country.
+* **Locations** are inferred at country level, so a city mentioned in the query filters on its country. Use explicit `filter.state` or `filter.city` IDs to narrow further. When either is supplied, a country is not inferred.
 * **Your filters win.** A filter you send replaces the inferred value of the same kind. Exclusions you send apply together with the inferred values.
 * **Your company query wins.** A `company.semantic` or `company.lookalike` query replaces the inferred company description.
 * **A query needs something concrete.** A query from which no filters can be inferred is rejected.
@@ -190,6 +207,8 @@ The response's `interpretation` field reports what was inferred:
 | `seniority`               | [Seniority levels](/docs/field-values#seniority-levels)                             |
 | `department`              | [Departments](/docs/field-values#departments)                                       |
 | `country`                 | [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries)                    |
+| `state`                   | [`POST /v2/geo/states`](/api-reference/v2/post-geo-states)                          |
+| `city`                    | [`POST /v2/geo/cities`](/api-reference/v2/post-geo-cities)                          |
 | `domain`                  | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete)    |
 
 The lookup endpoints are free.

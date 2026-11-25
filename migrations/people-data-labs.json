@@ -1019,6 +1019,20 @@
       },
       {
         "group": "Location",
+        "pdl": "location_region",
+        "ce": "location.state.name",
+        "fidelity": "transformed",
+        "note": "Present only when the reported location has been resolved to a state. CompanyEnrich adds `location.state.id` and, when available, the ISO 3166-2 code in `location.state.code`."
+      },
+      {
+        "group": "Location",
+        "pdl": "location_locality",
+        "ce": "location.city.name",
+        "fidelity": "transformed",
+        "note": "Present only when the reported location has been resolved to a city. CompanyEnrich adds `location.city.id`."
+      },
+      {
+        "group": "Location",
         "pdl": "location_name",
         "ce": "location.address",
         "fidelity": "lossy",
@@ -1027,8 +1041,6 @@
       {
         "group": "Location",
         "pdl": [
-          "location_locality",
-          "location_region",
           "location_metro",
           "location_postal_code",
           "location_street_address",
@@ -1792,10 +1804,24 @@
         "fidelity": "transformed"
       },
       {
+        "pdl": "{\"term\": {\"location_region\": \"california\"}}",
+        "ce": {
+          "filter": {
+            "state": "STATE_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose location has been resolved to that state. An exclusion-only `state.notIn` rule keeps people without a resolved state."
+      },
+      {
         "pdl": "{\"term\": {\"location_locality\": \"berlin\"}}",
-        "ce": null,
-        "fidelity": "none",
-        "note": "People are filtered by country only."
+        "ce": {
+          "filter": {
+            "city": "CITY_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose location has been resolved to that city. An exclusion-only `city.notIn` rule keeps people without a resolved city."
       },
       {
         "pdl": "{\"term\": {\"experience.company.website\": \"google.com\"}}",

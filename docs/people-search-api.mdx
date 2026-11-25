@@ -1,7 +1,7 @@
 ---
 title: "People Search API"
 sidebarTitle: "Overview"
-description: "Find people by job title, seniority, department, employer, country, education, or a plain-language description. Covers search methods, your first request, pagination, pricing, and limits."
+description: "Find people by job title, seniority, department, employer, country, state, city, education, or a plain-language description. Covers search methods, your first request, pagination, pricing, and limits."
 ---
 
 The People Search API finds people in the CompanyEnrich dataset and returns a full [person record](/docs/person-schema) for each match: current position, seniority, department, location, LinkedIn URL, and work history. One endpoint, [`POST /v2/people/search`](/api-reference/v2/post-people-search), takes every kind of query.
@@ -12,7 +12,7 @@ A search costs 2 credits per person returned, whichever way you search.
 
 | Approach        | Request field | Use it to                                                                                   |
 | --------------- | ------------- | ------------------------------------------------------------------------------------------- |
-| Person filters  | `filter`      | Match job title, seniority, department, employer, country, school, or start dates.          |
+| Person filters  | `filter`      | Match job title, seniority, department, employer, country, state, city, school, or start dates. |
 | Semantic search | `semantic`    | Describe who you want in plain language, such as `VP of sales at Series A SaaS startups in Germany`. |
 | Company query   | `company`     | Keep only people who work at companies that match a company search: filters, a description, or lookalike seeds. |
 

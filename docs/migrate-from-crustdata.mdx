@@ -464,7 +464,9 @@ Keep Crustdata, or another source, for these workloads:
 * Live search, live profile retrieval, and work-history verification.
 * Job postings, social posts, web search and fetch, watches and webhooks, and agent search.
 * Company sections such as web traffic, SEO, reviews, news, followers, hiring, and key people inside the company record.
-* Searches that need OR across different fields, sorting, radius or polygon areas, person locations below country level, SIC codes, skills, or technology categories.
+* Searches that need OR across different fields, sorting, radius or polygon areas, SIC codes, skills, or technology categories.
+
+People searches support state and city IDs, but inclusion filters match only people whose reported location has been resolved to those places. Check coverage before replacing a location-based search. See [People search patterns](/docs/migrate-from-crustdata-search#people-search-patterns).
 
 You can run both APIs side by side and route each call by the [endpoint mapping](#endpoint-mapping).
 

@@ -120,6 +120,10 @@ for company in page["items"]:
 
 Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size or industry, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters).
 
+For the person's own location, map `location_region` to `filter.state` and `location_locality` to `filter.city`. Replace the placeholders below with integer IDs from the free [state](/api-reference/v2/post-geo-states) and [city](/api-reference/v2/post-geo-cities) lookups. These are the same IDs returned in `location.state.id` and `location.city.id`.
+
+State and city inclusions match only people whose reported location has been resolved to that place. An exclusion-only `notIn` rule keeps people without a resolved state or city, so it does not establish that their location is known. Compare coverage before replacing a PDL location query.
+
 {/* generated: people-data-labs search:person */}
 
 | People Data Labs query | CompanyEnrich request | Fidelity | Notes |
@@ -129,7 +133,8 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 | `{"term": {"job_title_role": "engineering"}}` | `{"filter": {"department": "engineering-technical"}}` | lossy | Translate values with the department table. A department includes its sub-departments. |
 | `{"match": {"job_title": "account executive"}}` | `{"filter": {"position": "account executive"}}` | lossy | Phrase matching on the current title. |
 | `{"term": {"location_country": "germany"}}` | `{"filter": {"country": "DE"}}` | transformed |   |
-| `{"term": {"location_locality": "berlin"}}` | None | none | People are filtered by country only. |
+| `{"term": {"location_region": "california"}}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose location has been resolved to that state. An exclusion-only `state.notIn` rule keeps people without a resolved state. |
+| `{"term": {"location_locality": "berlin"}}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose location has been resolved to that city. An exclusion-only `city.notIn` rule keeps people without a resolved city. |
 | `{"term": {"experience.company.website": "google.com"}}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | lossy | Past employers only. People who still work there are left out; add `domain` to match current employees. |
 | `{"range": {"job_start_date": {"gte": "2026-01"}}}` | `{"filter": {"currentPositionStartDate": {"after": "2026-01-01T00:00:00Z"}}}` | transformed | Use `currentCompanyStartDate` for the date the person joined the company. |
 | `{"term": {"education.school.name": "stanford university"}}` | `{"filter": {"education": {"institutionName": "stanford"}}}` | lossy | Phrase match on the school name. Matches schools in the person's history. |
@@ -145,7 +150,7 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 * **OR across different fields.** Run one search per branch and deduplicate the results by `id`. Each search is charged separately.
 * **Wildcards, prefixes, and suffixes** on fields other than names and domains. `query` matches company names, keywords, and domain prefixes.
 * **`exists` on any field.** The `require` filter covers 13 [company features](/docs/field-values#required-features). People search has no `require`.
-* **Person locations below country level**, and any filter on emails, phones, skills, or salary.
+* **Filters on emails, phones, skills, or salary.**
 * **The PDL `dataset` parameter.**
 
 ## Totals and pagination

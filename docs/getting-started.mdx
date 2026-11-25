@@ -29,7 +29,7 @@ You pay for results, not for requests: a lookup that finds nothing is usually fr
 Every API returns one of two records.
 
 * **Company record.** Name, domain, description, industry, employee range, revenue range, location, and social profiles. Paid expansions add funding, technologies, keywords, NAICS codes, and headcount. See the [company schema](/docs/company-schema).
-* **Person record.** Name, current position, seniority, department, country, LinkedIn URL, and work history. A paid expansion adds education. See the [person schema](/docs/person-schema).
+* **Person record.** Name, current position, seniority, department, location, LinkedIn URL, and work history. A paid expansion adds education. See the [person schema](/docs/person-schema).
 
 The [field values](/docs/field-values) page lists every value a field can take, such as employee ranges and seniority levels. [Data sources and compliance](/docs/data-sources) explains where the data comes from and how it is handled.
 
@@ -65,6 +65,8 @@ The SDKs and the CLI handle authentication, retries, pagination, and bulk job do
 ## API versions
 
 The guides, SDKs, and CLI use the V2 API, whose paths start with `/v2`. The V1 API is documented separately under [API V1](/api-reference/v1/overview). Prices and request formats can differ between the two, so check the reference for the version you call. The MCP server lists its own [tool prices](/docs/mcp-server#tools-and-credits), which differ from V2 in places.
+
+V1 is available only to accounts created before December 1, 2026. Accounts created on or after that date must use V2.
 
 ## Next steps
 

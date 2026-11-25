@@ -142,8 +142,8 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 | `{"company_country_code": {"values": ["us"]}}` | `{"company": {"filter": {"country": ["US"]}}}` | transformed | The employer's country, not the person's. |
 | `{"naics_category": {"values": ["5112"]}}` | `{"company": {"filter": {"naicsCodes": ["5112"]}}}` | renamed |   |
 | `{"current_role_months": {"lte": 6}}` | `{"filter": {"currentPositionStartDate": {"after": "2026-05-16T00:00:00Z"}}}` | transformed | Convert months to a date from today. |
-| `{"region_country_code": {"values": ["us-ca"]}}` | None | none | People search filters by country only. |
-| `{"city_region_country": {"values": ["berlin, be, de"]}}` | None | none | People search filters by country only. |
+| `{"region_country_code": {"values": ["us-ca"]}}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose reported location has been resolved to that state. For `negate`, use `notIn`; exclusions keep people without a resolved state. |
+| `{"city_region_country": {"values": ["berlin, be, de"]}}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose reported location has been resolved to that city. For `negate`, use `notIn`; exclusions keep people without a resolved city. |
 | `{"has_contact_details": {"value": "email"}}` | None | none | No contact availability filter. Find work emails per person with `GET /v2/people/{personId}/email`. |
 | `{"total_experience_months": {"gte": 60}}` | None | none |   |
 | `{"skills": {"values": ["python"]}}` | None | none |   |
@@ -152,9 +152,14 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 
 {/* end generated */}
 
+### Person states and cities
+
+Resolve Explorium's region codes and city names with the free [state search](/api-reference/v2/post-geo-states) and [city search](/api-reference/v2/post-geo-cities). Replace `STATE_ID` and `CITY_ID` in the table with the returned integer IDs; do not send the placeholder strings. These IDs also appear in `location.state.id` and `location.city.id` in person responses.
+
+State and city inclusions match only people whose reported location has been resolved to that state or city. A `notIn` exclusion keeps people whose corresponding location is unresolved. Compare coverage before replacing a filter that requires every person to have a known location.
+
 ## Filters that do not translate
 
-* **Person location below country level.** People search filters by country. Filter cities and regions in your code.
 * **Contact availability**, skills, interests, and total experience.
 * **Technology categories, Google categories, number of locations, intent topics, and events.** For Google categories, try a semantic search.
 * **`include_related_job_titles`.** List the related titles yourself, or look them up with position autocomplete.

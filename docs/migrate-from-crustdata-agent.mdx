@@ -128,6 +128,8 @@ Stop and ask the user to approve, change, or exclude call sites.
 
 For each search, flatten its condition tree and map each condition with the `search` patterns. A pattern applies to its field whatever the operator's shape: `=` with one value and `in` with a list translate the same way, and `!=` and `not_in` become `notIn`. Text operators such as `(.)` and ranges such as `=>` follow the pattern for that field. If any condition has no pattern, or its pattern maps to `null`, leave the Crustdata search in place, add a TODO, and list it in the report as needs redesign. Patterns with `STATE_ID`, `CITY_ID`, or `COMPANY_ID` need an ID from the free lookup endpoints. Without a key, leave a TODO that names the value to look up. An `or` across different fields becomes separate searches only if the user approves, because each search is charged. Conditions on a person's employer that the people `filter` has no key for, such as its size, industry, or headquarters country, go in the `company` query, as the patterns show. Add a test that asserts the exact filter your code builds.
 
+People state and city filters use CompanyEnrich geo IDs. Inclusion matches only resolved locations; `notIn` keeps people without a resolved state or city. Record this coverage difference in the report and preserve missing location fields when converting records. Do not treat a city name in `location.address` as proof that `location.city` is present.
+
 ## Step 5: MCP and CLI
 
 - Add the CompanyEnrich MCP server, `https://mcp.companyenrich.com/mcp`, next to each Crustdata MCP server entry, following the MCP server guide for that client. Remove the Crustdata entry only if the user approves. Do not put a key in a committed file; use the client's sign-in or an environment variable.

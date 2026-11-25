@@ -5,6 +5,10 @@ description: "Reference for existing V1 integrations, saved company lists, and V
 
 The V1 API uses `https://api.companyenrich.com` without a `/v1` path prefix. Every request requires [Bearer authentication](/authentication).
 
+<Note>
+V1 is available to accounts created before December 1, 2026. API keys for accounts created on or after that date receive a `403` response with `"reason": "api-v1-not-enabled"` on V1 routes. Use the [V2 API](/api-reference/v2/overview) for those accounts.
+</Note>
+
 V1 includes company enrichment, search, similar-company discovery, people search, saved company lists, and asynchronous job workflows. Its request formats, response formats, pagination, and credit costs can differ from V2. Use the endpoint's own schema when maintaining a V1 integration.
 
 <CardGroup cols={2}>

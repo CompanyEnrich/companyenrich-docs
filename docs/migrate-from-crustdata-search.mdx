@@ -144,6 +144,8 @@ Crustdata's `fields` list has no counterpart, because results are full company r
 
 Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size, industry, or headquarters country, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters). Past jobs go in `pastExperience`.
 
+Use `filter.state` and `filter.city` for the person's location. They take integer IDs from the free [state](/api-reference/v2/post-geo-states) and [city](/api-reference/v2/post-geo-cities) endpoints, also returned as `location.state.id` and `location.city.id`. A single ID, an array, or an `in` rule matches only people whose reported location has been resolved to those places. A `notIn` exclusion keeps people without a resolved state or city. Compare coverage before replacing a search that depends on location text.
+
 {/* generated: crustdata search:person */}
 
 | Crustdata filter | CompanyEnrich request | Fidelity | Notes |
@@ -157,7 +159,8 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 | `{"field": "experience.employment_details.current.seniority_level", "type": "in", "value": ["CXO", "Vice President"]}` | `{"filter": {"seniority": ["c-suite", "vp"]}}` | renamed | See the seniority table. |
 | `{"field": "experience.employment_details.current.function_category", "type": "=", "value": "Engineering"}` | `{"filter": {"department": "engineering-technical"}}` | renamed | See the department table. |
 | `{"field": "basic_profile.location.country", "type": "in", "value": ["United States", "Canada"]}` | `{"filter": {"country": ["US", "CA"]}}` | transformed | ISO 3166-1 alpha-2 codes instead of full names. |
-| `{"field": "basic_profile.location.city", "type": "=", "value": "San Francisco"}` | None | none | People search filters by country only. Check `location.address` in your code. |
+| `{"field": "basic_profile.location.state", "type": "=", "value": "California"}` | `{"filter": {"state": "STATE_ID"}}` | lossy | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose reported location has been resolved to that state. A `notIn` exclusion keeps people without a resolved state. |
+| `{"field": "basic_profile.location.city", "type": "=", "value": "San Francisco"}` | `{"filter": {"city": "CITY_ID"}}` | lossy | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose reported location has been resolved to that city. A `notIn` exclusion keeps people without a resolved city. |
 | `{"field": "experience.employment_details.current.start_date", "type": "=>", "value": "2026-08-01"}` | `{"filter": {"currentPositionStartDate": {"after": "2026-08-01"}}}` | renamed | For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. |
 | `{"field": "experience.employment_details.past.company_website_domain", "type": "=", "value": "google.com"}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | renamed |   |
 | `{"field": "experience.employment_details.past.title", "type": "(.)", "value": "product manager"}` | `{"filter": {"pastExperience": {"position": "product manager"}}}` | lossy |   |
@@ -178,7 +181,6 @@ Person filters such as `domain`, `position`, `seniority`, and `department` match
 * **OR across different fields.** Run one search per branch and merge the results on `id`. OR across values of one field works: send an array, or `in`.
 * **Sorting.** Sort the records in your code. To reproduce a top list, such as the largest companies, count the matches for free, fetch every page, then sort.
 * **Radius and polygon searches.** Filter by the countries, states, or cities in the area.
-* **Person location below country level.** Filter cities and regions in your code, on `location.address`.
 * **Followers, hiring, web traffic, reviews, SIC codes, and technology categories.**
 * **Skills, certifications, honors, connections, research and developer profiles, and contact availability.**
 * **Text operators on any field.** `(.)` and `[.]` translate only where CompanyEnrich has a text filter: `query` for names, `keywords`, and `position`.
