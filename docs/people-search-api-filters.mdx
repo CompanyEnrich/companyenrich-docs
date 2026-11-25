@@ -63,6 +63,35 @@ Each filter accepts a single ID, an array of IDs, or an object with `in` and `no
 
 Replace the example ID with an ID from the city lookup. Inclusions match only people whose location has been resolved to the requested state or city. An exclusion-only `notIn` filter keeps people without a resolved state or city. These filters describe the person's location; use `company.filter` for the employer's location.
 
+To leave a place out, use `notIn`. This search returns founders in the United States outside one state. It keeps founders whose state has not been resolved:
+
+```json
+{
+  "filter": {
+    "country": "US",
+    "state": { "notIn": [1416] },
+    "seniority": "founder"
+  }
+}
+```
+
+The person's location and the employer's location are separate filters, and you can send both. This search returns people located in one city who work for companies headquartered in Germany:
+
+```json
+{
+  "filter": { "city": 125634 },
+  "company": { "filter": { "country": "DE" } }
+}
+```
+
+The CLI has no flag for a person's state or city. Pass them in `--body`, a JSON request body that the other flags are applied on top of:
+
+```sh
+companyenrich people search --body '{"filter": {"city": 125634}}' --seniority vp,director
+```
+
+`--company-state` and `--company-city` filter on the employer's location. For the full lookup and search in every SDK, see [Find people in a city or state](/docs/people-search-api-examples#find-people-in-a-city-or-state).
+
 ### Current role
 
 | Filter                     | Value           | CLI flag                                                | Description                                                                                         |
@@ -190,6 +219,15 @@ For example, `VP of sales at Series A SaaS startups in Germany` filters on VP-le
 * **Your filters win.** A filter you send replaces the inferred value of the same kind. Exclusions you send apply together with the inferred values.
 * **Your company query wins.** A `company.semantic` or `company.lookalike` query replaces the inferred company description.
 * **A query needs something concrete.** A query from which no filters can be inferred is rejected.
+
+To keep a semantic search in one city, send the city ID as a filter next to the query:
+
+```json
+{
+  "semantic": { "query": "VP of sales at Series A SaaS startups" },
+  "filter": { "city": 125634 }
+}
+```
 
 The response's `interpretation` field reports what was inferred:
 

@@ -123,6 +123,7 @@ A few rules apply to every filter:
 * **Ranges** use `..`: `2015..2020`, `2020..` for 2020 or later, `..2010` for 2010 or earlier.
 * **Amounts** take suffixes: `500k`, `2.5M`, `1B`.
 * **Company filters on people** use a `company-` prefix: `--company-country US`, `--company-semantic "developer tools"`.
+* **Filters without a flag**, such as a person's state or city, go in `--body` as a JSON request body. Other flags are applied on top: `--body '{"filter": {"city": 125634}}' --seniority vp`. Get the IDs from `companyenrich geo states` and `companyenrich geo cities`.
 
 The CLI validates values before it sends anything, so a typo in a filter costs nothing.
 

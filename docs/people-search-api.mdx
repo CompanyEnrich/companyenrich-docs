@@ -124,7 +124,9 @@ The response holds the matching people and a cursor for the next page. This exam
       "seniority": "vp",
       "department": "sales",
       "location": {
-        "country": { "code": "US", "name": "United States" }
+        "country": { "code": "US", "name": "United States" },
+        "state": { "id": 1416, "name": "California", "code": "US-CA" },
+        "city": { "id": 125634, "name": "San Francisco" }
       },
       "socials": {
         "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
@@ -248,6 +250,10 @@ Filter on `currentCompanyStartDate` with an `after` date. See [Find recent hires
 ### How do I find former employees of a company?
 
 Put the company's domain in `filter.pastExperience.domain`. People who still work there are left out. See [Find former employees of a company](/docs/people-search-api-examples#find-former-employees-of-a-company).
+
+### How do I find people in a specific city or state?
+
+Look up the place's ID with the free [city](/api-reference/v2/post-geo-cities) or [state](/api-reference/v2/post-geo-states) lookup, then send it in `filter.city` or `filter.state`. Names are not accepted. See [Find people in a city or state](/docs/people-search-api-examples#find-people-in-a-city-or-state).
 
 ### How many companies can I search at once?
 
