@@ -1,0 +1,564 @@
+---
+title: "Migrate from Coresignal to CompanyEnrich"
+sidebarTitle: "Overview"
+description: "Move Coresignal Multi-source Company and Employee API calls, Bulk Collect jobs, and MCP setups to the CompanyEnrich V2 API: endpoint mapping, request and response differences, and a parity check on your own data."
+---
+
+{/* Tables between "generated" markers come from migrations/coresignal.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This guide is for engineers whose code, scripts, or AI agents call the Coresignal API and are moving some or all of those calls to the CompanyEnrich V2 API. It maps each Coresignal endpoint, lists the behavior that changes in your code, and shows how to check the result on records you already have before you switch traffic.
+
+<Note>
+  Coresignal behavior on these pages was checked against Coresignal's public documentation and OpenAPI specification on November 25, 2026. The mapping covers the Multi-source Company and Employee APIs, the Contact Enrichment API, and Bulk Collect. Base and Clean endpoints map to the same CompanyEnrich endpoints, but their record fields are not covered. CompanyEnrich behavior comes from the [V2 API reference](/api-reference/v2/overview). The full mapping is also available as JSON at [/migrations/coresignal.json](https://docs.companyenrich.com/migrations/coresignal.json).
+</Note>
+
+<CardGroup cols={3}>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-coresignal-field-mapping">
+    Every Coresignal company and employee field, with its CompanyEnrich counterpart.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-coresignal-search">
+    Translate Elasticsearch DSL queries and Search Filters.
+  </Card>
+  <Card title="With a coding agent" icon="robot" href="/docs/migrate-from-coresignal-agent">
+    Instructions a coding agent follows to migrate your codebase.
+  </Card>
+</CardGroup>
+
+## Check the fit first
+
+| Workload | Status | Start here |
+| --- | --- | --- |
+| Company enrichment by website | Moves directly | [Switch company enrichment](#switch-company-enrichment-in-five-minutes) |
+| Company enrichment by profile URL or shorthand name | Moves | [Endpoint mapping](#company) |
+| Search, then collect each ID | Becomes one search, because search results are full records | [Search, then collect](#search-then-collect) |
+| Bulk Collect by query | Moves to a search export | [Endpoint mapping](#company) |
+| Headcount, headcount history, funding, and technologies | Move as expansions or the workforce endpoint, with fewer fields | [Field mapping](/docs/migrate-from-coresignal-field-mapping) |
+| Elasticsearch DSL queries and Search Filters | Rewrite each clause | [Search queries](/docs/migrate-from-coresignal-search) |
+| Business email for an employee | Moves, by CompanyEnrich person ID | [Endpoint mapping](#people) |
+| MCP server | Moves to the CompanyEnrich MCP server | [Move your MCP setup](#move-your-mcp-setup) |
+| Collect by stored Coresignal IDs, and employee enrichment by profile URL | No equivalent | [When to keep Coresignal](#when-to-keep-coresignal) |
+| Jobs, posts, webhooks, real-time employee scrapes, and datasets | No equivalent | [When to keep Coresignal](#when-to-keep-coresignal) |
+
+## Switch company enrichment in five minutes
+
+This is the shortest path: one enrichment call by website, moved to the V2 API with the Python SDK.
+
+<Steps>
+  <Step title="Get an API key">
+    Create a key at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys) and export it as `COMPANYENRICH_API_KEY`. Check it with [`GET /v2/me`](/api-reference/v2/get-me), which is free:
+
+    ```bash
+    curl https://api.companyenrich.com/v2/me \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+  </Step>
+  <Step title="Install the SDK">
+    ```bash
+    pip install companyenrich
+    ```
+
+    The [Python SDK](/docs/python-sdk) needs Python 3.10 or later. There are also SDKs for [JavaScript](/docs/javascript-typescript-sdk), [Ruby](/docs/ruby-sdk), and [PHP](/docs/php-sdk), and a [CLI](/docs/cli).
+  </Step>
+  <Step title="Replace the call">
+    <CodeGroup>
+
+    ```python Before (Coresignal)
+    import os
+
+    import requests
+
+    response = requests.get(
+        "https://api.coresignal.com/cdapi/v2/company_multi_source/enrich",
+        headers={"apikey": os.environ["CORESIGNAL_API_KEY"]},
+        params={"website": "stripe.com"},
+    )
+    if response.status_code == 404:
+        company = None
+    else:
+        response.raise_for_status()
+        company = response.json()
+        print(company["company_name"], company["employees_count"], company["hq_country_iso2"])
+    ```
+
+    ```python After (CompanyEnrich)
+    from companyenrich import CompanyEnrich, NotFoundError
+
+    client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+    try:
+        company = client.companies.enrich("stripe.com")
+        country = (company.get("location") or {}).get("country") or {}
+        print(company.get("name"), company.get("employees"), country.get("code"))
+    except NotFoundError:
+        company = None  # no match, not charged
+    ```
+
+    ```bash cURL
+    curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+      -H "Authorization: Bearer $COMPANYENRICH_API_KEY"
+    ```
+
+    </CodeGroup>
+
+    Send a bare domain, such as `stripe.com`. Coresignal also accepts full URLs, so strip the scheme, `www.`, and any path from the values you pass.
+  </Step>
+  <Step title="Update the fields you read">
+    | Coresignal field | CompanyEnrich field | Change |
+    | --- | --- | --- |
+    | `company_name` | `name` | Renamed |
+    | `website_domain` | `domain` | Renamed |
+    | `founded_year` | `foundedYear` | An integer instead of a string |
+    | `employees_count` | `employees`, or `workforce.observedEmployeeCount` with `expand=workforce` | A range such as `1K-5K`, or a count with the expansion |
+    | `hq_country_iso2` | `location.country.code` | Renamed, same ISO code |
+    | `professional_network_url` or `linkedin_url` | `socials.linkedinUrl` | Renamed |
+
+    The [field mapping](/docs/migrate-from-coresignal-field-mapping) covers every other field.
+  </Step>
+  <Step title="Keep your not-found handling">
+    Both APIs return `404` when there is no match, and neither charges for it. The SDK raises `NotFoundError`.
+  </Step>
+</Steps>
+
+## What takes longer
+
+| Workload | Why | Guide |
+| --- | --- | --- |
+| Search, then collect | Coresignal search returns IDs, and you collect each record. CompanyEnrich search returns full records, up to 100 per page, and charges per result. | [Search, then collect](#search-then-collect) |
+| Search queries | An Elasticsearch `bool` query becomes a flat `filter` in which every filter must match, with no OR across fields and no sorting. | [Search queries](/docs/migrate-from-coresignal-search) |
+| Stored records | Coresignal IDs do not carry over, and value labels change, such as `51-200 employees` to `51-200` and `C-Level` to `c-suite`. | [Field mapping](/docs/migrate-from-coresignal-field-mapping) |
+| Bundles and fields | Coresignal returns the full record or the bundles you ask for. CompanyEnrich returns the base record and adds paid expansions. | [Field selection](#field-selection) |
+| Person lookups | CompanyEnrich enriches a person by work email, not by profile URL or shorthand name. | [People](#people) |
+| Contact data | CompanyEnrich finds work emails one person at a time, by CompanyEnrich person ID. | [People](#people) |
+| AI agents and scripts | MCP tools change, and scripts that call the API with `curl` can use the CompanyEnrich CLI. | [Move your MCP setup](#move-your-mcp-setup) |
+
+## Migrate with a coding agent
+
+A coding agent can do the inventory, the rewrite, and the tests. Give it this prompt in your repository:
+
+```text
+Migrate this codebase from Coresignal to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-coresignal-agent.md and use the mapping at https://docs.companyenrich.com/migrations/coresignal.json. Show me the migration report before changing any code.
+```
+
+See [Migrate with a coding agent](/docs/migrate-from-coresignal-agent) for what the agent does and the rules it follows.
+
+## Move your MCP setup
+
+If your agent uses the Coresignal MCP server, add the CompanyEnrich server. The hosted server is at `https://mcp.companyenrich.com/mcp`. For example, in Claude Code:
+
+```bash
+claude mcp add --transport http companyenrich https://mcp.companyenrich.com/mcp
+```
+
+The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code, and other clients, and lists the credits each tool uses. Then update any prompts or code that name Coresignal tools:
+
+{/* generated: coresignal mcp */}
+
+| Coresignal tool | CompanyEnrich tool | Notes |
+| --- | --- | --- |
+| `entity_search` | `search_companies` or `find_similar_companies` or `search_people` | Filters, a plain-language description, or 1 to 10 seed domains for lookalikes. Records come back in the response, with no separate preview or file step. Job searches have no equivalent. |
+| `entity_fetch` | `enrich_company` or `enrich_company_by_properties` or `get_company_by_id` or `lookup_person_by_email` or `get_person_by_id` | A company by domain, name, social profile, or CompanyEnrich ID, and a person by work email or CompanyEnrich ID. No person lookup by profile URL, and no job records. |
+| `email_enrich` | `enrich_person_email` | Work email for a CompanyEnrich person ID. |
+| None | `get_company_workforce` | Headcount by department, with monthly history, for one company. |
+| None | `get_current_user` | Credit balance. Free. |
+| `entity_fields`, `artifact_read` | None | No field discovery or file reading. Records have the fixed fields in the company and person schemas, and results come back in each response. |
+
+{/* end generated */}
+
+CompanyEnrich tools take plain values, such as a domain or a job title, and return records in the response, so your agent does not need a field discovery step or a file to read results from.
+
+### Scripts that call Coresignal
+
+Coresignal has no CLI, so scripts usually call the API with `curl`. The [CompanyEnrich CLI](/docs/cli) covers the same company and people workflows. Its search flags are named after the CompanyEnrich filters, so rewrite each clause as a flag, or send the full request body with `companyenrich api`.
+
+| Coresignal request | CompanyEnrich CLI |
+| --- | --- |
+| `GET /v2/company_multi_source/enrich?website=stripe.com` | `companyenrich company enrich stripe.com` |
+| `GET /v2/company_multi_source/enrich?social_url=...` | `companyenrich company enrich --linkedin-url "..."` |
+| `POST /v2/company_multi_source/search/es_dsl` or `/search/filter` | `companyenrich company search` with flags such as `--country US` |
+| Reading `x-total-results` | `companyenrich company count` with the same flags |
+| `POST /v2/employee_multi_source/search/es_dsl` or `/search/filter` | `companyenrich people search` |
+| `GET /enrichment/contacts?member_id=...` | `companyenrich people email <id>`, with a CompanyEnrich person ID |
+| `POST /v2/data_requests/company_multi_source/es_dsl` | `companyenrich company export` with filter flags and `--limit` |
+| Reading `x-credits-remaining` | `companyenrich me` |
+
+A CompanyEnrich lookup that finds nothing exits with code 4. Handle that code in scripts that use `set -e`, or the script stops at the first unknown domain.
+
+## Endpoint mapping
+
+### Search, then collect
+
+Most Coresignal integrations search first, which returns record IDs, then collect each ID, which returns the full record. CompanyEnrich search returns full records, so the two steps become one search call:
+
+<CodeGroup>
+
+```python Before (Coresignal)
+import os
+
+import requests
+
+BASE = "https://api.coresignal.com/cdapi/v2/company_multi_source"
+HEADERS = {"apikey": os.environ["CORESIGNAL_API_KEY"]}
+
+query = {"query": {"bool": {"must": [{"match": {"hq_country_iso2": "US"}}, {"term": {"is_saas": True}}]}}}
+ids = requests.post(f"{BASE}/search/es_dsl", headers=HEADERS, json=query).json()
+for company_id in ids[:20]:
+    company = requests.get(f"{BASE}/collect/{company_id}", headers=HEADERS).json()
+    print(company["company_name"], company["website_domain"])
+```
+
+```python After (CompanyEnrich)
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(filter={"country": "US", "categories": "saas"}, page_size=20)
+for company in page["items"]:
+    print(company["name"], company["domain"])
+```
+
+</CodeGroup>
+
+Treat the search and its collect calls as one call site when you migrate. Collect calls on IDs you stored earlier have no equivalent, because Coresignal IDs do not carry over: enrich those records by their stored domain instead.
+
+### Company
+
+{/* generated: coresignal endpoints:company */}
+
+| Coresignal | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `GET /v2/company_multi_source/enrich`, `GET /v2/company_clean/enrich`, with `website` | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | `website` → `domain`; `bundle` → `expand`. Drop `fields`: the base record always comes back. Request only the expansions for the fields your code reads. Send a bare domain, such as `stripe.com`: strip the scheme, `www.`, and any path, which Coresignal accepts. The company record is the response body on both APIs. No match returns `404` on both and is not charged. Bundles do not line up with expansions: `financial_information` fields become `financial`, and headcount fields need `workforce`. See the field mapping. Clean records use other field names, which the mapping does not cover. |
+| `GET /v2/company_multi_source/enrich`, `GET /v2/company_clean/enrich`, with `social_url` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `social_url` → `linkedinUrl` or `twitterUrl` or `facebookUrl` or `instagramUrl` or `youtubeUrl`; `bundle` → `expand`. Drop `fields`: the base record always comes back. Send the URL in the property for its network, usually `linkedinUrl`. One company per request. When several companies match, the highest-ranked one is returned. No match returns `404` and is not charged. |
+| `GET /v2/company_multi_source/collect/{shorthand_name}`, `GET /v2/company_clean/collect/{shorthand_name}`, `GET /v2/company_base/collect/{shorthand_name}` | [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich) | `shorthand_name` → `linkedinUrl`; `bundle` → `expand`. Drop `fields`: the base record always comes back. Build the URL from the shorthand name, as in `https://www.linkedin.com/company/{shorthand_name}`. When the path holds a full profile URL, send it as is. No match returns `404` and is not charged. |
+| `GET /v2/company_multi_source/collect/{company_id}`, `GET /v2/company_clean/collect/{company_id}`, `GET /v2/company_base/collect/{company_id}` | None | Coresignal IDs do not carry over. When the IDs come from a search in the same flow, the search and the collect calls become one CompanyEnrich search, because search results are full company records. For stored IDs, enrich by the stored domain, or store the CompanyEnrich `id` and use `GET /v2/companies/{companyId}`. |
+| `POST /v2/company_multi_source/search/es_dsl`, `POST /v2/company_clean/search/es_dsl`, `POST /v2/company_base/search/es_dsl` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `query` → `filter`; `items_per_page` → `pageSize`; `after` → `cursor`. Rework `sort`: results come in relevance order, so a sort on `_score` alone can be dropped. Sorting by `id` or by a field such as `employees_count` has no equivalent: sort in your code. Rewrite each clause. See [Translate search queries](/docs/migrate-from-coresignal-search). Coresignal returns up to 1,000 IDs per page and charges nothing for them. CompanyEnrich returns up to 100 full company records per page and charges per result. If your code collects each ID afterwards, drop the collect step. Base and Clean index fields are not in the search patterns. |
+| `POST /v2/company_multi_source/search/filter`, `POST /v2/company_base/search/filter` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `filter parameters` → `filter`; `items_per_page` → `pageSize`; `after` → `cursor`. Rework `sort`: `sort=id` returns IDs in ascending order. Results come in relevance order, so page with the cursor and sort in your code if the order matters. Rewrite each parameter, and turn each `exclude_` parameter into `notIn` on the same filter. See [Translate search queries](/docs/migrate-from-coresignal-search). If your code collects each ID afterwards, drop the collect step. |
+| `POST /v2/company_multi_source/semantic_search/es_dsl` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `query` → `filter`; `items_per_page` → `pageSize`; `after` → `cursor`. Drop `threshold`: there is no synonym expansion. Drop `boost`: there is no synonym expansion. Clauses translate as for `POST /v2/company_multi_source/search/es_dsl`. The field this endpoint expands, `active_job_postings.job_posting_title`, has no equivalent, because CompanyEnrich has no job postings. The response's `metadata` block has no counterpart. |
+| `POST /v2/company_multi_source/search/es_dsl/preview`, `POST /v2/company_multi_source/search/filter/preview` | [`POST /v2/companies/search/preview`](/api-reference/v2/post-companies-search-preview) | `query` → `filter`; `filter parameters` → `filter`. Drop `snapshot`: previews have one page. Drop `snapshot_token`: previews have one page. Rework `page`: previews return one page of up to 25 companies. For more, run a search. Returns up to 25 company summaries, each with `id`, `name`, `logoUrl`, `industry`, and `updatedAt`, and the `total` number of matches, with no score per record. Does not consume credits, and needs a plan that includes previews. |
+| `POST /v2/company_multi_source/search/es_dsl`, `POST /v2/company_multi_source/search/filter`, reading the `x-total-results` header | [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count) | `query` → `filter`; `filter parameters` → `filter`. Drop `items_per_page`: counts have no pages. Drop `after`: counts have no pages. Free. Search responses carry no total, so send the same filter to the count endpoint. `x-total-pages` has no counterpart: divide `total` by your page size. |
+| `GET /v2/historical_headcount/collect/{company_id}`, `GET /v2/historical_headcount/collect/{shorthand_name}` | [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) | Rework `company_id`: Coresignal IDs do not carry over. Send the company's `domain`, or its CompanyEnrich `id`. Rework `shorthand_name`: send the company's `domain` instead. Returns the observed employee count and department headcounts, with the latest 12 months of history under `history`. Pass `nextCursor` for each earlier 12 months. See the Historical Headcount API rows in the field mapping. Follower counts have no equivalent. |
+| `POST /v2/data_requests/company_multi_source/ids` | None | Coresignal IDs do not carry over. For stored records, send their domains to `POST /v2/companies/enrich/bulk`, up to 10,000 per job, or to `POST /v2/companies/enrich/batch`, up to 50 per request. |
+| `POST /v2/data_requests/company_multi_source/es_dsl`, `POST /v2/data_requests/company_clean/es_dsl`, `POST /v2/data_requests/company_base/es_dsl` | [`POST /v2/companies/search/export`](/api-reference/v2/post-companies-search-export) | `es_dsl_query.query` → `filter`; `limit` → `limit`. Rework `webhook_url`: there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes. Exports the results of a search as a background job, up to `limit`, which cannot exceed your plan's search limit. The response holds an `id` in place of `request_id`. Download the records as JSON, NDJSON, or CSV from `GET /v2/companies/search/export/{id}/results`. Each page of the export is charged as a search. |
+
+{/* end generated */}
+
+### People
+
+{/* generated: coresignal endpoints:people */}
+
+| Coresignal | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `GET /v2/employee_multi_source/enrich`, `GET /v2/employee_clean/enrich` with `social_url`, `linkedin_url` | None | No person lookup by profile URL. With a work email, use `POST /v2/people/enrich`. Without one, search by name at the employer's domain with `POST /v2/people/search`, which returns candidates without a confidence score. |
+| `GET /v2/employee_multi_source/collect/{shorthand_name}`, `GET /v2/employee_clean/collect/{shorthand_name}`, `GET /v2/employee_base/collect/{shorthand_name}` | None | No person lookup by profile URL or shorthand name. See the row above. |
+| `GET /v2/employee_multi_source/collect/{employee_id}`, `GET /v2/employee_clean/collect/{employee_id}`, `GET /v2/employee_base/collect/{employee_id}` | None | Coresignal IDs do not carry over. When the IDs come from a search in the same flow, the search and the collect calls become one CompanyEnrich people search, because search results are full person records. For stored IDs there is no equivalent. Store the CompanyEnrich person `id` and use `GET /v2/people/{personId}`. |
+| `POST /v2/employee_multi_source/search/es_dsl`, `POST /v2/employee_clean/search/es_dsl`, `POST /v2/employee_base/search/es_dsl` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `query` → `filter` or `company`; `items_per_page` → `pageSize`; `after` → `cursor`. Rework `sort`: results come in relevance order, so a sort on `_score` alone can be dropped. Sorting by `id` or by another field has no equivalent: sort in your code. Rewrite person clauses as `filter` and employer clauses as a `company` query. See [Translate search queries](/docs/migrate-from-coresignal-search#people-search-patterns). Results are full person records, so drop any collect step on the IDs. Base and Clean index fields are not in the search patterns. |
+| `POST /v2/employee_multi_source/search/filter`, `POST /v2/employee_base/search/filter` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `filter parameters` → `filter` or `company`; `items_per_page` → `pageSize`; `after` → `cursor`. Rework `sort`: `sort=id` returns IDs in ascending order. Results come in relevance order, so page with the cursor and sort in your code if the order matters. Rewrite person parameters as `filter` and employer parameters as a `company` query, and turn each `exclude_` parameter into `notIn` on the same filter. Results are full person records, so drop any collect step on the IDs. |
+| `POST /v2/employee_multi_source/semantic_search/es_dsl` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `query` → `filter` or `company`; `items_per_page` → `pageSize`; `after` → `cursor`. Drop `threshold`: there is no synonym expansion. Drop `boost`: there is no synonym expansion. Rework `match_phrase`: on `active_experience_title`, `experience.position_title`, or `headline`, Coresignal adds titles with the same meaning. CompanyEnrich `position` matches the phrase inside titles, without synonyms. List the title variants in `position`, or send a `semantic.query`. Other clauses translate as for `POST /v2/employee_multi_source/search/es_dsl`. The response's `metadata` block has no counterpart. |
+| `POST /v2/employee_multi_source/search/es_dsl/preview`, `POST /v2/employee_multi_source/search/filter/preview` | [`POST /v2/people/search/preview`](/api-reference/v2/post-people-search-preview) | `query` → `filter` or `company`; `filter parameters` → `filter` or `company`. Drop `snapshot`: previews have one page. Drop `snapshot_token`: previews have one page. Rework `page`: previews return one page of up to 10 people. For more, run a search. Returns up to 10 person summaries, each with `id`, `name`, `position`, `department`, and `experiences`, and the `total` number of matches, with no score per record. Does not consume credits, and needs a plan that includes previews. |
+| `POST /v2/employee_multi_source/search/es_dsl`, `POST /v2/employee_multi_source/search/filter`, reading the `x-total-results` header | [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count) | `query` → `filter` or `company`; `filter parameters` → `filter` or `company`. Drop `items_per_page`: counts have no pages. Drop `after`: counts have no pages. Free. Search responses carry no total. |
+| `GET /enrichment/contacts`, with `member_id` | [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) | Takes a CompanyEnrich person ID, not a Coresignal employee ID. After a people search or `POST /v2/people/enrich`, pass each person's `id`, and the employer's `domain` to get the email at that company. Without `domain`, the person's current companies are tried in seniority order. A call that has only a stored Coresignal ID has no equivalent. The response has `status` and `email` at the top level, in place of `code`, `message`, and `data`: `FOUND` becomes `found` and `NOT_FOUND` becomes `not-found`. Treat `unavailable` as no email, and call again later on `pending`. Costs 10 credits only when it finds an email your account has not accessed before. |
+| `POST /v2/data_requests/employee_multi_source/ids` | None | Coresignal IDs do not carry over, and there is no bulk person enrichment. Call `POST /v2/people/enrich` per work email within your rate limit, or export a people search. |
+| `POST /v2/data_requests/employee_multi_source/es_dsl` | [`POST /v2/people/search/export`](/api-reference/v2/post-people-search-export) | `es_dsl_query.query` → `filter` or `company`; `limit` → `limit`. Rework `webhook_url`: there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes. Exports the results of a people search as a background job. Download the records from `GET /v2/people/search/export/{id}/results`. |
+| `POST /rtapi/v2/employee/scrape` | None | No live profile retrieval. |
+
+{/* end generated */}
+
+### Supporting APIs
+
+{/* generated: coresignal endpoints:supporting */}
+
+| Coresignal | CompanyEnrich V2 | Notes |
+| --- | --- | --- |
+| `GET /v2/data_requests/{data_request_id}/files`, `GET /v2/data_requests/{data_request_id}/files/{file_name}` | [`GET /v2/batches/{id}`](/api-reference/v2/get-batches-id) | `data_request_id` → `id`. Drop `file_name`: each job has one results endpoint, with no files to name. Poll `GET /v2/batches/{id}` until the job completes, then download the results from the job's own endpoint, such as `GET /v2/companies/search/export/{id}/results`, as JSON, NDJSON, or CSV. There are no file names to list. List jobs with `GET /v2/batches` and cancel one with `POST /v2/batches/{id}/cancel`. |
+| `x-credits-remaining` response header | [`GET /v2/me`](/api-reference/v2/get-me) | Free. Returns `credits.total` and `credits.used`. Each paid CompanyEnrich response also carries `x-credit-cost`, `x-credit-balance` before the request, and `x-credit-remaining` after it, so code that reads `x-credits-remaining` can read `x-credit-remaining` instead. A search sent only to read the header becomes this call. |
+| `POST /v2/agentic_search/fast`, `POST /v2/agentic_search/advanced`, `POST /v2/agentic_search/reasoning`, with `entity` of `company` | [`POST /v2/companies/search`](/api-reference/v2/post-companies-search) | `prompt` → `semantic.query`. Drop `entity`: the endpoint sets it. Drop `threshold`: there is no synonym expansion. Rework `return_data`: when it is `false`, Coresignal returns a generated Elasticsearch query to run yourself. CompanyEnrich runs the search and reports the filters it inferred in `interpretation`, so there is no query to return. Returns ranked company records, with `nextCursor` for more pages, where `return_data` of `true` returns up to 20 previews. With `entity` of `auto`, pick the company or people search in your code. |
+| `POST /v2/agentic_search/fast`, `POST /v2/agentic_search/advanced`, `POST /v2/agentic_search/reasoning`, with `entity` of `employee` | [`POST /v2/people/search`](/api-reference/v2/post-people-search) | `prompt` → `semantic.query`. Drop `entity`: the endpoint sets it. Drop `threshold`: there is no synonym expansion. Rework `return_data`: when it is `false`, Coresignal returns a generated Elasticsearch query to run yourself. CompanyEnrich runs the search and reports what it inferred in `interpretation`. The plain-language query infers person filters and employers, such as `marketing leaders at Series B fintech startups in London`. |
+| `/v2/job_multi_source/*`, `/v2/job_base/*`, `POST /v2/data_requests/job_multi_source/es_dsl` | None | No job postings. Agentic search with `entity` of `job` has no equivalent either. Workforce history is headcount by department, not postings. |
+| `/v2/company_post/*`, `/v2/employee_post/*` | None | No social posts. |
+| `/v2/subscriptions/*` | None | No webhooks or change notifications. To track changes, re-enrich the companies you follow on a schedule and compare `updatedAt`, headcount, or funding. To find new matches, re-run a search and compare IDs. |
+
+{/* end generated */}
+
+## Request and response differences
+
+### Authentication
+
+| | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| Headers | `apikey: YOUR_CORESIGNAL_API_KEY` | `Authorization: Bearer YOUR_API_TOKEN` |
+| Base URL | `https://api.coresignal.com/cdapi/v2/...`, and `https://api.coresignal.com/enrichment/contacts` for contact enrichment | `https://api.companyenrich.com/v2/...` |
+| SDK | None. Calls use HTTP directly. | `CompanyEnrich()` reads `COMPANYENRICH_API_KEY`, or takes the key as its first argument |
+
+### Response shape
+
+| Call | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| Enrich and collect | The record is the body | The record is the body |
+| Search | A JSON array of IDs, with the total in the `x-total-results` header and the next page in `x-next-page-after` | `items`, full records, and `nextCursor`. Get totals from the free count endpoint. |
+| Search preview | An array of summaries, each with a `_score` | `items`, summaries without a score, and `total` |
+| Bulk Collect | `request_id`, then a list of files to download | `id`, then [`GET /v2/batches/{id}`](/api-reference/v2/get-batches-id) and results as JSON, NDJSON, or CSV |
+| Contact enrichment | `code`, `message`, and `data` with `email`, `email_status`, and `email_confidence` | `status`, `email`, and `certainty` at the top level |
+| Errors | A `detail` message | A problem document with `type`, `title`, `status`, and `detail`. `422` adds `errors` per field. The `x-trace-id` header identifies the request. |
+
+### Field names
+
+Coresignal's documentation and its OpenAPI specification spell some fields differently. The documentation uses `professional_network_url`, `professional_network_shorthand_name`, `financial_website_url`, and `company_id`. The specification uses `linkedin_url`, `linkedin_shorthand_name`, `crunchbase_url`, and `id`. The [field mapping](/docs/migrate-from-coresignal-field-mapping) lists both spellings, so search your code for whichever it reads.
+
+### Field selection
+
+Coresignal returns the full record by default. `bundle` limits it to the core bundle plus the bundles you name, and `fields` narrows it further. CompanyEnrich always returns the base record. The company base record includes name, domain, description, industry, size and revenue ranges, location, and social profiles. Add `financial`, `keywords`, `naicsCodes`, `technologies`, or `workforce` with `expand`, and `company` or `education` on a person.
+
+| Coresignal bundle | CompanyEnrich |
+| --- | --- |
+| `core_company_data` | The base record. Keywords and NAICS codes are the `keywords` and `naicsCodes` expansions. |
+| `financial_information` | The `financial` expansion: funding rounds, stage, and stock symbol |
+| `workforce_intelligence`, `growth_signals` | The `workforce` expansion, for department headcounts and the latest 12 months of history. [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) pages through earlier months. |
+| `company_intelligence` | The `technologies` expansion. Competitors, reviews, web traffic, news, and job postings have no equivalent. |
+| `core_employee_data` | The base person record, with the `education` expansion for schools |
+| `employer_information` | The `company` expansion, a company summary on each experience |
+| `career_intelligence`, `social_influence` | No equivalent |
+
+When you rewrite a call, turn its `bundle` and `fields` lists into an `expand` list that holds only the expansions your code reads. Each expansion adds credits.
+
+### Matching
+
+Neither API returns a confidence score for enrichment:
+
+* Enrichment by domain looks up that domain. Coresignal also accepts full URLs, so normalize them to a bare domain first.
+* Enrichment by a social profile URL requires the URL to match. If several companies match, CompanyEnrich returns the highest-ranked one.
+* A person lookup by work email returns the person, or `404`. There is no lookup by profile URL.
+
+### Status codes
+
+| Status | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| `200` | A record, or a search that ran. Charged for collect and enrich. | A record, or a search that ran |
+| `400` | Invalid request, including a `fields` value outside the selected bundles | Malformed request |
+| `401` | Missing or invalid key | Missing or invalid key |
+| `402` | Out of credits | Out of credits, or the plan does not include the request. Do not retry. |
+| `403` | The service is not enabled for the key | The key may not perform this request |
+| `404` | No record for the ID, URL, or website. Not charged. | No match. Not charged. |
+| `409` | A duplicate Bulk Collect request | Not used |
+| `422` | Invalid parameters, including an unknown Search Filters parameter | Validation failed. `errors` lists the messages per field. |
+| `429` | Rate limit hit | Rate limit hit. Wait for the time the response gives. |
+| `503` | A search that did not finish within 10 seconds, or a busy search service. Retry after `Retry-After`. | Server error |
+
+The SDK raises a typed exception for each non-2xx status, such as `NotFoundError`, `PaymentRequiredError`, and `RateLimitError`.
+
+### Billing behavior that affects your code
+
+These differences change how you write retries, guards, and tests. Prices for each endpoint are in [Credits](/docs/credits).
+
+* **No match is free on both APIs.** CompanyEnrich enrichment that finds nothing returns `404` and is not charged.
+* **Search returns records, and is charged per result.** Coresignal search returns IDs at no cost. CompanyEnrich search returns full records, so there is no separate collect call, and an empty search costs one result's base price. Size a new query with the free [count endpoint](/api-reference/v2/post-companies-search-count) first.
+* **Extra company fields are expansions.** Each one you request adds 1 credit per company returned, so request only the ones your code reads.
+* **Work emails are a separate call.** [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) costs 10 credits only when it finds an email your account has not accessed before.
+* **Responses report their cost.** Read `x-credit-cost` and `x-credit-remaining` from the response headers, in place of `x-credits-remaining`.
+
+### Pagination
+
+| | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| Page size | `items_per_page`, up to 1,000 IDs | `pageSize`, 1 to 100 records |
+| Next page | Send the `x-next-page-after` header value as `after` | Send the `nextCursor` from the last response as `cursor`, until it is omitted |
+| Order | Last updated first by default, or by `id`, `_score`, or a numeric field | Relevance order |
+| Cursor lifetime | None. `after` is a position in the sorted results. | 24 hours after the first page |
+
+Coresignal `after` values do not work on CompanyEnrich, so restart any paging job from the first page. If your code needs a sorted list, fetch every page, then sort. The Python SDK pages for you with `search_all()`.
+
+### Rate limits
+
+Coresignal limits data requests per second by plan, and returns `503` when a search does not finish within 10 seconds. CompanyEnrich applies a global limit of 500 requests per minute per IP address and a per-route limit from your plan, reported in `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-window`. A batch of 50 domains is one request. The SDKs wait and retry on `429`. See [Rate limits](/docs/rate-limit).
+
+### Values and URLs
+
+| | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| Countries | Full names in `hq_country`, and ISO alpha-2 codes in `hq_country_iso2` | `code` (ISO 3166-1 alpha-2, such as `US`) and `name` |
+| Company types | Labels such as `Privately Held` | Values such as `private` |
+| Size ranges | `51-200 employees`, with some ranges written several ways | `1-10` through `over-10K` |
+| Seniority and department | Labels such as `C-Level` and `Engineering and Technical` | Values such as `c-suite` and `engineering-technical` |
+| Headcount | A count, `employees_count` | A range, `employees`, or a count with `expand=workforce` |
+| Flags | `1` and `0` for flags such as `is_working` and `is_decision_maker` | Booleans |
+
+The [value translations](/docs/migrate-from-coresignal-field-mapping#value-translations) list every value.
+
+### IDs
+
+Coresignal IDs and CompanyEnrich IDs are separate. Coresignal company and employee IDs are integers. CompanyEnrich company IDs are UUIDs, and person IDs are 64-bit integers, so keep them in separate columns. Store the CompanyEnrich ID next to the Coresignal ID, and re-key company data on its domain.
+
+## Verify parity on your own data
+
+Before you move production traffic, measure CompanyEnrich on records you already have. This makes no Coresignal requests.
+
+<Steps>
+  <Step title="Check your key and plan">
+    Call [`GET /v2/me`](/api-reference/v2/get-me). It is free and returns your balance and plan capabilities.
+  </Step>
+  <Step title="Size your searches for free">
+    Send each translated query to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint and compare `total` with the `x-total-results` you recorded from Coresignal.
+  </Step>
+  <Step title="Pick a sample">
+    Take 100 to 200 company records you already collected from Coresignal. Using stored records means you spend no Coresignal credits. CompanyEnrich charges 1 credit per company found.
+  </Step>
+  <Step title="Compare the fields you read">
+    Run the script below on the sample. It enriches the domains in batches of 50 and sorts each field into `equal`, `differ`, `only Coresignal`, `only CompanyEnrich`, or `both empty`. Fields marked `lossy` in the [field mapping](/docs/migrate-from-coresignal-field-mapping) differ by definition, so leave them out or compare them by hand.
+  </Step>
+  <Step title="Check searches and people">
+    For each translated search, run the count, then a [preview](/api-reference/v2/post-companies-search-preview) if your plan includes it, then one page. For person lookups, test work emails you already know.
+  </Step>
+</Steps>
+
+<Accordion title="compare.py" icon="code">
+
+```python compare.py
+"""compare.py: compare stored Coresignal company records with CompanyEnrich on the same domains.
+
+Usage: python compare.py coresignal_companies.jsonl   (one stored Multi-source company record per line)
+Costs 1 CompanyEnrich credit per company found. Makes no Coresignal requests.
+"""
+
+import json
+import sys
+from collections import Counter
+
+from companyenrich import CompanyEnrich
+
+TYPES = {"Privately Held": "private", "Public Company": "public", "Nonprofit": "nonprofit",
+         "Educational": "educational", "Government Agency": "government",
+         "Self-Employed": "self-employed", "Self-Owned": "self-owned", "Partnership": "partnership"}
+
+# Coresignal's documentation and specification spell the LinkedIn URL differently; read whichever is stored.
+LINKEDIN = ("canonical_professional_network_url", "professional_network_url", "canonical_linkedin_url", "linkedin_url")
+
+
+def first(record, keys):
+    return next((record[key] for key in keys if record.get(key)), None)
+
+
+def year(value):
+    return int(value) if str(value).isdigit() else None
+
+
+def place(company, part):
+    return ((company.get("location") or {}).get(part) or {})
+
+
+# Field -> (read the Coresignal value, read the comparable CompanyEnrich value)
+FIELDS = {
+    "company_name": (lambda r: r.get("company_name"), lambda c: c.get("name")),
+    "website_domain": (lambda r: r.get("website_domain"), lambda c: c.get("domain")),
+    "founded_year": (lambda r: year(r.get("founded_year")), lambda c: c.get("foundedYear")),
+    "type": (lambda r: TYPES.get(r.get("type"), r.get("type")), lambda c: c.get("type")),
+    "hq_country_iso2": (lambda r: r.get("hq_country_iso2"), lambda c: place(c, "country").get("code")),
+    "hq_state": (lambda r: r.get("hq_state"), lambda c: place(c, "state").get("name")),
+    "linkedin url": (lambda r: first(r, LINKEDIN), lambda c: (c.get("socials") or {}).get("linkedinUrl")),
+}
+
+
+def normalize(value):
+    if isinstance(value, str):
+        value = value.lower().removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+    return value or None
+
+
+def outcome(coresignal, ce):
+    if coresignal is None and ce is None:
+        return "both empty"
+    if ce is None:
+        return "only Coresignal"
+    if coresignal is None:
+        return "only CompanyEnrich"
+    return "equal" if coresignal == ce else "differ"
+
+
+def main(path, client=None):
+    records = [json.loads(line) for line in open(path) if line.strip()]
+    records = [record for record in records if record.get("website_domain")]
+    client = client or CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+    results = Counter()
+    for start in range(0, len(records), 50):
+        chunk = records[start:start + 50]
+        batch = client.companies.enrich_batch([record["website_domain"] for record in chunk])
+        for record, item in zip(chunk, batch["items"], strict=True):
+            if item["status"] != "found":
+                results[f"lookup: {item['status']}"] += 1
+                continue
+            for field, (read_coresignal, read_ce) in FIELDS.items():
+                value = normalize(read_coresignal(record))
+                results[f"{field}: {outcome(value, normalize(read_ce(item['company'])))}"] += 1
+    for key, count in sorted(results.items()):
+        print(f"{key:45} {count}")
+    return results
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
+```
+
+</Accordion>
+
+## Cut over
+
+* Put the CompanyEnrich path behind a feature flag and keep Coresignal as the fallback until the parity results meet the thresholds you set.
+* Store CompanyEnrich IDs next to Coresignal IDs.
+* Log `x-credit-cost` per call while both paths run.
+* Move reads first, then writes to stored records, then remove the Coresignal calls, keys, and MCP configuration you no longer use.
+
+## When to keep Coresignal
+
+Keep Coresignal, or another source, for these workloads:
+
+* Collect calls on stored Coresignal IDs, and employee enrichment by profile URL or shorthand name.
+* Real-time employee profile scrapes.
+* Job postings, company and employee posts, and webhooks for profile or experience changes.
+* Company sections such as web traffic, employee and product reviews, salaries, news, key executives, competitors, acquisitions, and parent companies.
+* Employee fields such as skills, certifications, salary estimates, GitHub data, and social activity.
+* Searches that need OR across fields, sorting, fuzzy or wildcard matching, location text, SIC codes, skills, or job postings.
+* Flat-file datasets delivered to cloud storage, and agentic search that returns a generated Elasticsearch query.
+
+People searches support state and city IDs, but inclusion filters match only people whose reported location has been resolved to those places. Check coverage before replacing a location-based search. See [People search patterns](/docs/migrate-from-coresignal-search#people-search-patterns).
+
+A [coding agent](/docs/migrate-from-coresignal-agent) reports searches that need OR across fields, sorting, or an unsupported clause as needs redesign: they stay on Coresignal until you decide how to change them. You can run both APIs side by side and route each call by the [endpoint mapping](#endpoint-mapping).
+
+## What you can add after migrating
+
+<CardGroup cols={2}>
+  <Card title="Semantic company search" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    Search companies with a plain-language description instead of filters.
+  </Card>
+  <Card title="Similar companies" icon="clone" href="/docs/similar-companies-api">
+    Find lookalikes of up to 10 seed domains.
+  </Card>
+  <Card title="Company headcount" icon="chart-line" href="/docs/company-headcount-api">
+    Headcount by department, with monthly history.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Give AI agents access to the same data.
+  </Card>
+</CardGroup>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="Can I keep using my Coresignal IDs?">
+    No. Store the CompanyEnrich ID alongside the Coresignal ID, and re-key company data on its domain.
+  </Accordion>
+  <Accordion title="Do I still need a collect step after a search?">
+    No. CompanyEnrich search results are full records. Request the expansions your code reads in the search itself.
+  </Accordion>
+  <Accordion title="Can I enrich a person by profile URL?">
+    No. CompanyEnrich enriches a person by work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich), and people search returns full records. Keep Coresignal for profile URL lookups.
+  </Accordion>
+  <Accordion title="Can I send Elasticsearch DSL queries?">
+    No. Translate each clause to a filter with the [search patterns](/docs/migrate-from-coresignal-search). Queries that need OR across fields or sorting need a redesign.
+  </Accordion>
+  <Accordion title="How do I get the total number of results?">
+    Send the same filter to the free count endpoint. Search responses do not include a total.
+  </Accordion>
+  <Accordion title="Are there webhooks?">
+    No. Re-enrich the companies you follow on a schedule and compare `updatedAt`, headcount, or funding, or re-run a search and compare IDs.
+  </Accordion>
+  <Accordion title="Do batch and bulk enrichment need a specific plan?">
+    No. Batch and bulk enrichment work on every plan.
+  </Accordion>
+</AccordionGroup>

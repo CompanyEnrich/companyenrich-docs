@@ -81,7 +81,13 @@ const roots = {
   company: responseSchema('get', '/v2/companies/enrich'),
   person: responseSchema('get', '/v2/people/{personId}'),
   workEmail: responseSchema('get', '/v2/people/{personId}/email'),
+  workforce: responseSchema('get', '/v2/companies/workforce'),
   account: responseSchema('get', '/v2/me'),
+};
+// Rows with `in` set to one of these come from a separate call, named in the table.
+const separateCalls = {
+  workEmail: 'GET /v2/people/{personId}/email',
+  workforce: 'GET /v2/companies/workforce',
 };
 const searchRequests = {
   company: requestSchema('post', '/v2/companies/search'),
@@ -269,8 +275,8 @@ const renderers = {
       [mapping.vendor.name, 'CompanyEnrich', 'Expand', 'Fidelity', 'Notes'],
       mapping.fields[object].filter((row) => row.group === group).map((row) => [
         codes(row[source(mapping)]),
-        row.ce === null ? '—' : row.in === 'workEmail'
-          ? `${codes(row.ce)} from ${reference('GET /v2/people/{personId}/email')}`
+        row.ce === null ? '—' : separateCalls[row.in]
+          ? `${codes(row.ce)} from ${reference(separateCalls[row.in])}`
           : codes(row.ce, ' or '),
         row.expand ? code(row.expand) : ' ',
         row.fidelity,

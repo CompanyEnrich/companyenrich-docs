@@ -147,6 +147,15 @@
                   "docs/migrate-from-crustdata-search",
                   "docs/migrate-from-crustdata-agent"
                 ]
+              },
+              {
+                "group": "From Coresignal",
+                "pages": [
+                  "docs/migrate-from-coresignal",
+                  "docs/migrate-from-coresignal-field-mapping",
+                  "docs/migrate-from-coresignal-search",
+                  "docs/migrate-from-coresignal-agent"
+                ]
               }
             ]
           },

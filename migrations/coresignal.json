@@ -1,0 +1,3461 @@
+{
+  "$comment": "Coresignal to CompanyEnrich V2 migration mapping. Rendered into docs/migrate-from-coresignal*.mdx by scripts/sync-migrations.mjs, which also validates every CompanyEnrich path, filter, and value against openapi/v2.json.",
+  "version": 1,
+  "checkedAt": "2026-11-25",
+  "vendor": {
+    "key": "coresignal",
+    "name": "Coresignal",
+    "searchLabel": "query",
+    "slug": "coresignal",
+    "api": "Multi-source APIs, v2",
+    "baseUrl": "https://api.coresignal.com/cdapi",
+    "docs": "https://docs.coresignal.com",
+    "spec": "https://api.coresignal.com/cdapi/openapi.json",
+    "auth": "apikey: YOUR_CORESIGNAL_API_KEY",
+    "mcp": "https://mcp.coresignal.com/mcp/v2",
+    "cli": null,
+    "fieldNames": "Coresignal's documentation names LinkedIn fields professional_network_*, such as professional_network_url, and the company ID company_id. Its OpenAPI specification names them linkedin_*, such as linkedin_url, and id. Field rows list both spellings. Match whichever your code reads.",
+    "scope": "Covers the Multi-source Company and Employee APIs, the Contact Enrichment API, Bulk Collect, and the credit headers. Base and Clean endpoints map to the same CompanyEnrich endpoints, but their record fields are not in this mapping. Jobs, Posts, Historical Headcount, Real-time Employee, Agentic Search, and Webhooks are listed as endpoints.",
+    "paths": "Endpoint paths that start with /v2/ are relative to https://api.coresignal.com/cdapi. /enrichment/contacts and /rtapi/v2/employee/scrape are relative to https://api.coresignal.com."
+  },
+  "companyEnrich": {
+    "api": "v2",
+    "baseUrl": "https://api.companyenrich.com",
+    "spec": "https://docs.companyenrich.com/openapi/v2.json",
+    "auth": "Authorization: Bearer YOUR_API_TOKEN",
+    "apiKeyEnv": "COMPANYENRICH_API_KEY",
+    "mcp": "https://mcp.companyenrich.com/mcp",
+    "cli": "companyenrich",
+    "guides": {
+      "overview": "https://docs.companyenrich.com/docs/migrate-from-coresignal",
+      "fieldMapping": "https://docs.companyenrich.com/docs/migrate-from-coresignal-field-mapping",
+      "search": "https://docs.companyenrich.com/docs/migrate-from-coresignal-search",
+      "agent": "https://docs.companyenrich.com/docs/migrate-from-coresignal-agent"
+    },
+    "sdks": {
+      "python": "https://docs.companyenrich.com/docs/python-sdk",
+      "javascript": "https://docs.companyenrich.com/docs/javascript-typescript-sdk",
+      "ruby": "https://docs.companyenrich.com/docs/ruby-sdk",
+      "php": "https://docs.companyenrich.com/docs/php-sdk",
+      "cli": "https://docs.companyenrich.com/docs/cli"
+    }
+  },
+  "fidelity": {
+    "same": "Same meaning and format.",
+    "renamed": "Same meaning and values under a different name or label.",
+    "transformed": "Same information in a different format, casing, or structure. Convert it in code.",
+    "lossy": "Related but not equivalent. Values can differ, so check the fields your code depends on.",
+    "none": "No CompanyEnrich equivalent."
+  },
+  "endpoints": [
+    {
+      "group": "company",
+      "coresignal": [
+        "GET /v2/company_multi_source/enrich",
+        "GET /v2/company_clean/enrich"
+      ],
+      "coresignalInput": "with `website`",
+      "companyEnrich": "GET /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "website": [
+          "domain"
+        ],
+        "bundle": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "fields": "the base record always comes back. Request only the expansions for the fields your code reads."
+      },
+      "note": "Send a bare domain, such as `stripe.com`: strip the scheme, `www.`, and any path, which Coresignal accepts. The company record is the response body on both APIs. No match returns `404` on both and is not charged. Bundles do not line up with expansions: `financial_information` fields become `financial`, and headcount fields need `workforce`. See the field mapping. Clean records use other field names, which the mapping does not cover."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "GET /v2/company_multi_source/enrich",
+        "GET /v2/company_clean/enrich"
+      ],
+      "coresignalInput": "with `social_url`",
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "social_url": [
+          "linkedinUrl",
+          "twitterUrl",
+          "facebookUrl",
+          "instagramUrl",
+          "youtubeUrl"
+        ],
+        "bundle": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "fields": "the base record always comes back."
+      },
+      "note": "Send the URL in the property for its network, usually `linkedinUrl`. One company per request. When several companies match, the highest-ranked one is returned. No match returns `404` and is not charged."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "GET /v2/company_multi_source/collect/{shorthand_name}",
+        "GET /v2/company_clean/collect/{shorthand_name}",
+        "GET /v2/company_base/collect/{shorthand_name}"
+      ],
+      "companyEnrich": "POST /v2/companies/enrich",
+      "status": "partial",
+      "inputs": {
+        "shorthand_name": [
+          "linkedinUrl"
+        ],
+        "bundle": [
+          "expand"
+        ]
+      },
+      "drop": {
+        "fields": "the base record always comes back."
+      },
+      "note": "Build the URL from the shorthand name, as in `https://www.linkedin.com/company/{shorthand_name}`. When the path holds a full profile URL, send it as is. No match returns `404` and is not charged."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "GET /v2/company_multi_source/collect/{company_id}",
+        "GET /v2/company_clean/collect/{company_id}",
+        "GET /v2/company_base/collect/{company_id}"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Coresignal IDs do not carry over. When the IDs come from a search in the same flow, the search and the collect calls become one CompanyEnrich search, because search results are full company records. For stored IDs, enrich by the stored domain, or store the CompanyEnrich `id` and use `GET /v2/companies/{companyId}`."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "POST /v2/company_multi_source/search/es_dsl",
+        "POST /v2/company_clean/search/es_dsl",
+        "POST /v2/company_base/search/es_dsl"
+      ],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "redesign": {
+        "sort": "results come in relevance order, so a sort on `_score` alone can be dropped. Sorting by `id` or by a field such as `employees_count` has no equivalent: sort in your code."
+      },
+      "note": "Rewrite each clause. See [Translate search queries](/docs/migrate-from-coresignal-search). Coresignal returns up to 1,000 IDs per page and charges nothing for them. CompanyEnrich returns up to 100 full company records per page and charges per result. If your code collects each ID afterwards, drop the collect step. Base and Clean index fields are not in the search patterns."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "POST /v2/company_multi_source/search/filter",
+        "POST /v2/company_base/search/filter"
+      ],
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "filter parameters": [
+          "filter"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "redesign": {
+        "sort": "`sort=id` returns IDs in ascending order. Results come in relevance order, so page with the cursor and sort in your code if the order matters."
+      },
+      "note": "Rewrite each parameter, and turn each `exclude_` parameter into `notIn` on the same filter. See [Translate search queries](/docs/migrate-from-coresignal-search). If your code collects each ID afterwards, drop the collect step."
+    },
+    {
+      "group": "company",
+      "coresignal": "POST /v2/company_multi_source/semantic_search/es_dsl",
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "threshold": "there is no synonym expansion.",
+        "boost": "there is no synonym expansion."
+      },
+      "note": "Clauses translate as for `POST /v2/company_multi_source/search/es_dsl`. The field this endpoint expands, `active_job_postings.job_posting_title`, has no equivalent, because CompanyEnrich has no job postings. The response's `metadata` block has no counterpart."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "POST /v2/company_multi_source/search/es_dsl/preview",
+        "POST /v2/company_multi_source/search/filter/preview"
+      ],
+      "companyEnrich": "POST /v2/companies/search/preview",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter"
+        ],
+        "filter parameters": [
+          "filter"
+        ]
+      },
+      "drop": {
+        "snapshot": "previews have one page.",
+        "snapshot_token": "previews have one page."
+      },
+      "redesign": {
+        "page": "previews return one page of up to 25 companies. For more, run a search."
+      },
+      "note": "Returns up to 25 company summaries, each with `id`, `name`, `logoUrl`, `industry`, and `updatedAt`, and the `total` number of matches, with no score per record. Does not consume credits, and needs a plan that includes previews."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "POST /v2/company_multi_source/search/es_dsl",
+        "POST /v2/company_multi_source/search/filter"
+      ],
+      "coresignalInput": "reading the `x-total-results` header",
+      "companyEnrich": "POST /v2/companies/search/count",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter"
+        ],
+        "filter parameters": [
+          "filter"
+        ]
+      },
+      "note": "Free. Search responses carry no total, so send the same filter to the count endpoint. `x-total-pages` has no counterpart: divide `total` by your page size.",
+      "drop": {
+        "items_per_page": "counts have no pages.",
+        "after": "counts have no pages."
+      }
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "GET /v2/historical_headcount/collect/{company_id}",
+        "GET /v2/historical_headcount/collect/{shorthand_name}"
+      ],
+      "companyEnrich": "GET /v2/companies/workforce",
+      "status": "partial",
+      "redesign": {
+        "company_id": "Coresignal IDs do not carry over. Send the company's `domain`, or its CompanyEnrich `id`.",
+        "shorthand_name": "send the company's `domain` instead."
+      },
+      "note": "Returns the observed employee count and department headcounts, with the latest 12 months of history under `history`. Pass `nextCursor` for each earlier 12 months. See the Historical Headcount API rows in the field mapping. Follower counts have no equivalent."
+    },
+    {
+      "group": "company",
+      "coresignal": "POST /v2/data_requests/company_multi_source/ids",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Coresignal IDs do not carry over. For stored records, send their domains to `POST /v2/companies/enrich/bulk`, up to 10,000 per job, or to `POST /v2/companies/enrich/batch`, up to 50 per request."
+    },
+    {
+      "group": "company",
+      "coresignal": [
+        "POST /v2/data_requests/company_multi_source/es_dsl",
+        "POST /v2/data_requests/company_clean/es_dsl",
+        "POST /v2/data_requests/company_base/es_dsl"
+      ],
+      "companyEnrich": "POST /v2/companies/search/export",
+      "status": "partial",
+      "inputs": {
+        "es_dsl_query.query": [
+          "filter"
+        ],
+        "limit": [
+          "limit"
+        ]
+      },
+      "redesign": {
+        "webhook_url": "there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes."
+      },
+      "note": "Exports the results of a search as a background job, up to `limit`, which cannot exceed your plan's search limit. The response holds an `id` in place of `request_id`. Download the records as JSON, NDJSON, or CSV from `GET /v2/companies/search/export/{id}/results`. Each page of the export is charged as a search."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "GET /v2/employee_multi_source/enrich",
+        "GET /v2/employee_clean/enrich"
+      ],
+      "coresignalInput": [
+        "social_url",
+        "linkedin_url"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No person lookup by profile URL. With a work email, use `POST /v2/people/enrich`. Without one, search by name at the employer's domain with `POST /v2/people/search`, which returns candidates without a confidence score."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "GET /v2/employee_multi_source/collect/{shorthand_name}",
+        "GET /v2/employee_clean/collect/{shorthand_name}",
+        "GET /v2/employee_base/collect/{shorthand_name}"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No person lookup by profile URL or shorthand name. See the row above."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "GET /v2/employee_multi_source/collect/{employee_id}",
+        "GET /v2/employee_clean/collect/{employee_id}",
+        "GET /v2/employee_base/collect/{employee_id}"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Coresignal IDs do not carry over. When the IDs come from a search in the same flow, the search and the collect calls become one CompanyEnrich people search, because search results are full person records. For stored IDs there is no equivalent. Store the CompanyEnrich person `id` and use `GET /v2/people/{personId}`."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "POST /v2/employee_multi_source/search/es_dsl",
+        "POST /v2/employee_clean/search/es_dsl",
+        "POST /v2/employee_base/search/es_dsl"
+      ],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter",
+          "company"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "redesign": {
+        "sort": "results come in relevance order, so a sort on `_score` alone can be dropped. Sorting by `id` or by another field has no equivalent: sort in your code."
+      },
+      "note": "Rewrite person clauses as `filter` and employer clauses as a `company` query. See [Translate search queries](/docs/migrate-from-coresignal-search#people-search-patterns). Results are full person records, so drop any collect step on the IDs. Base and Clean index fields are not in the search patterns."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "POST /v2/employee_multi_source/search/filter",
+        "POST /v2/employee_base/search/filter"
+      ],
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "filter parameters": [
+          "filter",
+          "company"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "redesign": {
+        "sort": "`sort=id` returns IDs in ascending order. Results come in relevance order, so page with the cursor and sort in your code if the order matters."
+      },
+      "note": "Rewrite person parameters as `filter` and employer parameters as a `company` query, and turn each `exclude_` parameter into `notIn` on the same filter. Results are full person records, so drop any collect step on the IDs."
+    },
+    {
+      "group": "people",
+      "coresignal": "POST /v2/employee_multi_source/semantic_search/es_dsl",
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter",
+          "company"
+        ],
+        "items_per_page": [
+          "pageSize"
+        ],
+        "after": [
+          "cursor"
+        ]
+      },
+      "drop": {
+        "threshold": "there is no synonym expansion.",
+        "boost": "there is no synonym expansion."
+      },
+      "redesign": {
+        "match_phrase": "on `active_experience_title`, `experience.position_title`, or `headline`, Coresignal adds titles with the same meaning. CompanyEnrich `position` matches the phrase inside titles, without synonyms. List the title variants in `position`, or send a `semantic.query`."
+      },
+      "note": "Other clauses translate as for `POST /v2/employee_multi_source/search/es_dsl`. The response's `metadata` block has no counterpart."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "POST /v2/employee_multi_source/search/es_dsl/preview",
+        "POST /v2/employee_multi_source/search/filter/preview"
+      ],
+      "companyEnrich": "POST /v2/people/search/preview",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter",
+          "company"
+        ],
+        "filter parameters": [
+          "filter",
+          "company"
+        ]
+      },
+      "drop": {
+        "snapshot": "previews have one page.",
+        "snapshot_token": "previews have one page."
+      },
+      "redesign": {
+        "page": "previews return one page of up to 10 people. For more, run a search."
+      },
+      "note": "Returns up to 10 person summaries, each with `id`, `name`, `position`, `department`, and `experiences`, and the `total` number of matches, with no score per record. Does not consume credits, and needs a plan that includes previews."
+    },
+    {
+      "group": "people",
+      "coresignal": [
+        "POST /v2/employee_multi_source/search/es_dsl",
+        "POST /v2/employee_multi_source/search/filter"
+      ],
+      "coresignalInput": "reading the `x-total-results` header",
+      "companyEnrich": "POST /v2/people/search/count",
+      "status": "partial",
+      "inputs": {
+        "query": [
+          "filter",
+          "company"
+        ],
+        "filter parameters": [
+          "filter",
+          "company"
+        ]
+      },
+      "note": "Free. Search responses carry no total.",
+      "drop": {
+        "items_per_page": "counts have no pages.",
+        "after": "counts have no pages."
+      }
+    },
+    {
+      "group": "people",
+      "coresignal": "GET /enrichment/contacts",
+      "coresignalInput": "with `member_id`",
+      "companyEnrich": "GET /v2/people/{personId}/email",
+      "status": "partial",
+      "note": "Takes a CompanyEnrich person ID, not a Coresignal employee ID. After a people search or `POST /v2/people/enrich`, pass each person's `id`, and the employer's `domain` to get the email at that company. Without `domain`, the person's current companies are tried in seniority order. A call that has only a stored Coresignal ID has no equivalent. The response has `status` and `email` at the top level, in place of `code`, `message`, and `data`: `FOUND` becomes `found` and `NOT_FOUND` becomes `not-found`. Treat `unavailable` as no email, and call again later on `pending`. Costs 10 credits only when it finds an email your account has not accessed before."
+    },
+    {
+      "group": "people",
+      "coresignal": "POST /v2/data_requests/employee_multi_source/ids",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "Coresignal IDs do not carry over, and there is no bulk person enrichment. Call `POST /v2/people/enrich` per work email within your rate limit, or export a people search."
+    },
+    {
+      "group": "people",
+      "coresignal": "POST /v2/data_requests/employee_multi_source/es_dsl",
+      "companyEnrich": "POST /v2/people/search/export",
+      "status": "partial",
+      "inputs": {
+        "es_dsl_query.query": [
+          "filter",
+          "company"
+        ],
+        "limit": [
+          "limit"
+        ]
+      },
+      "redesign": {
+        "webhook_url": "there are no webhooks. Poll `GET /v2/batches/{id}` until the export completes."
+      },
+      "note": "Exports the results of a people search as a background job. Download the records from `GET /v2/people/search/export/{id}/results`."
+    },
+    {
+      "group": "people",
+      "coresignal": "POST /rtapi/v2/employee/scrape",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No live profile retrieval."
+    },
+    {
+      "group": "supporting",
+      "coresignal": [
+        "GET /v2/data_requests/{data_request_id}/files",
+        "GET /v2/data_requests/{data_request_id}/files/{file_name}"
+      ],
+      "companyEnrich": "GET /v2/batches/{id}",
+      "status": "partial",
+      "inputs": {
+        "data_request_id": [
+          "id"
+        ]
+      },
+      "note": "Poll `GET /v2/batches/{id}` until the job completes, then download the results from the job's own endpoint, such as `GET /v2/companies/search/export/{id}/results`, as JSON, NDJSON, or CSV. There are no file names to list. List jobs with `GET /v2/batches` and cancel one with `POST /v2/batches/{id}/cancel`.",
+      "drop": {
+        "file_name": "each job has one results endpoint, with no files to name."
+      }
+    },
+    {
+      "group": "supporting",
+      "coresignal": "`x-credits-remaining` response header",
+      "companyEnrich": "GET /v2/me",
+      "status": "mapped",
+      "note": "Free. Returns `credits.total` and `credits.used`. Each paid CompanyEnrich response also carries `x-credit-cost`, `x-credit-balance` before the request, and `x-credit-remaining` after it, so code that reads `x-credits-remaining` can read `x-credit-remaining` instead. A search sent only to read the header becomes this call."
+    },
+    {
+      "group": "supporting",
+      "coresignal": [
+        "POST /v2/agentic_search/fast",
+        "POST /v2/agentic_search/advanced",
+        "POST /v2/agentic_search/reasoning"
+      ],
+      "coresignalInput": "with `entity` of `company`",
+      "companyEnrich": "POST /v2/companies/search",
+      "status": "partial",
+      "inputs": {
+        "prompt": [
+          "semantic.query"
+        ]
+      },
+      "drop": {
+        "entity": "the endpoint sets it.",
+        "threshold": "there is no synonym expansion."
+      },
+      "redesign": {
+        "return_data": "when it is `false`, Coresignal returns a generated Elasticsearch query to run yourself. CompanyEnrich runs the search and reports the filters it inferred in `interpretation`, so there is no query to return."
+      },
+      "note": "Returns ranked company records, with `nextCursor` for more pages, where `return_data` of `true` returns up to 20 previews. With `entity` of `auto`, pick the company or people search in your code."
+    },
+    {
+      "group": "supporting",
+      "coresignal": [
+        "POST /v2/agentic_search/fast",
+        "POST /v2/agentic_search/advanced",
+        "POST /v2/agentic_search/reasoning"
+      ],
+      "coresignalInput": "with `entity` of `employee`",
+      "companyEnrich": "POST /v2/people/search",
+      "status": "partial",
+      "inputs": {
+        "prompt": [
+          "semantic.query"
+        ]
+      },
+      "drop": {
+        "entity": "the endpoint sets it.",
+        "threshold": "there is no synonym expansion."
+      },
+      "redesign": {
+        "return_data": "when it is `false`, Coresignal returns a generated Elasticsearch query to run yourself. CompanyEnrich runs the search and reports what it inferred in `interpretation`."
+      },
+      "note": "The plain-language query infers person filters and employers, such as `marketing leaders at Series B fintech startups in London`."
+    },
+    {
+      "group": "supporting",
+      "coresignal": [
+        "/v2/job_multi_source/*",
+        "/v2/job_base/*",
+        "POST /v2/data_requests/job_multi_source/es_dsl"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No job postings. Agentic search with `entity` of `job` has no equivalent either. Workforce history is headcount by department, not postings."
+    },
+    {
+      "group": "supporting",
+      "coresignal": [
+        "/v2/company_post/*",
+        "/v2/employee_post/*"
+      ],
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No social posts."
+    },
+    {
+      "group": "supporting",
+      "coresignal": "/v2/subscriptions/*",
+      "companyEnrich": null,
+      "status": "none",
+      "note": "No webhooks or change notifications. To track changes, re-enrich the companies you follow on a schedule and compare `updatedAt`, headcount, or funding. To find new matches, re-run a search and compare IDs."
+    }
+  ],
+  "mcp": [
+    {
+      "coresignal": "entity_search",
+      "ce": [
+        "search_companies",
+        "find_similar_companies",
+        "search_people"
+      ],
+      "note": "Filters, a plain-language description, or 1 to 10 seed domains for lookalikes. Records come back in the response, with no separate preview or file step. Job searches have no equivalent."
+    },
+    {
+      "coresignal": "entity_fetch",
+      "ce": [
+        "enrich_company",
+        "enrich_company_by_properties",
+        "get_company_by_id",
+        "lookup_person_by_email",
+        "get_person_by_id"
+      ],
+      "note": "A company by domain, name, social profile, or CompanyEnrich ID, and a person by work email or CompanyEnrich ID. No person lookup by profile URL, and no job records."
+    },
+    {
+      "coresignal": "email_enrich",
+      "ce": [
+        "enrich_person_email"
+      ],
+      "note": "Work email for a CompanyEnrich person ID."
+    },
+    {
+      "coresignal": null,
+      "ce": [
+        "get_company_workforce"
+      ],
+      "note": "Headcount by department, with monthly history, for one company."
+    },
+    {
+      "coresignal": null,
+      "ce": [
+        "get_current_user"
+      ],
+      "note": "Credit balance. Free."
+    },
+    {
+      "coresignal": [
+        "entity_fields",
+        "artifact_read"
+      ],
+      "ce": null,
+      "note": "No field discovery or file reading. Records have the fixed fields in the company and person schemas, and results come back in each response."
+    }
+  ],
+  "fields": {
+    "company": [
+      {
+        "group": "Identity",
+        "coresignal": [
+          "id",
+          "company_id"
+        ],
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A separate ID space. Coresignal IDs are integers and CompanyEnrich IDs are UUIDs. Store the CompanyEnrich ID next to the Coresignal ID."
+      },
+      {
+        "group": "Identity",
+        "coresignal": "company_name",
+        "ce": "name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "company_legal_name",
+        "ce": "legalName",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "website_domain",
+        "ce": "domain",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "website",
+        "ce": "website",
+        "fidelity": "transformed",
+        "note": "Both are full URLs. Normalize the scheme, `www.`, and trailing slash before comparing."
+      },
+      {
+        "group": "Identity",
+        "coresignal": [
+          "company_logo_url",
+          "company_logo"
+        ],
+        "ce": "logoUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": [
+          "description",
+          "description_enriched"
+        ],
+        "ce": "description",
+        "fidelity": "transformed",
+        "note": "Written from different sources, so the text differs."
+      },
+      {
+        "group": "Identity",
+        "coresignal": "type",
+        "ce": "type",
+        "fidelity": "renamed",
+        "values": "companyType"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "is_public",
+        "ce": "type",
+        "fidelity": "transformed",
+        "note": "Public companies have a `type` of `public`."
+      },
+      {
+        "group": "Identity",
+        "coresignal": "founded_year",
+        "ce": "foundedYear",
+        "fidelity": "transformed",
+        "note": "An integer instead of a string."
+      },
+      {
+        "group": "Identity",
+        "coresignal": "last_updated_at",
+        "ce": "updatedAt",
+        "fidelity": "transformed",
+        "note": "A date-time instead of a date."
+      },
+      {
+        "group": "Identity",
+        "coresignal": [
+          "company_name_alias",
+          "website_alias",
+          "tagline",
+          "description_metadata_raw",
+          "status",
+          "created_at",
+          "processed_at",
+          "is_deleted",
+          "quality",
+          "source_id",
+          "unique_website",
+          "unique_domain",
+          "expired_domain"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "One domain and one name per company. No record-quality or deletion flags."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "size_range",
+        "ce": "employees",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "Coresignal returns the self-reported range from the company profile. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range. CompanyEnrich records do not return the self-reported range; it is only a search filter, `reportedEmployees`."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": [
+          "employees_count",
+          "employees_count_inferred"
+        ],
+        "ce": "workforce.observedEmployeeCount",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "Coresignal counts the profiles that list the company. CompanyEnrich counts employees observed in its own data. Without the expansion, read the `employees` range."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_by_month[].employees_count",
+        "ce": "workforce.history[].observedEmployeeCount",
+        "fidelity": "lossy",
+        "note": "The `workforce` expansion holds the latest 12 months, newest first. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`.",
+        "expand": "workforce"
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_by_month[].date",
+        "ce": "workforce.history[].date",
+        "fidelity": "transformed",
+        "note": "The first day of the month. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`.",
+        "expand": "workforce"
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_change",
+        "ce": "workforce.history[].observedEmployeeCount",
+        "fidelity": "transformed",
+        "note": "Not returned. Compare two `workforce.history` entries. To filter on growth, use the `workforceGrowth` search filter."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_breakdown_by_department",
+        "ce": "workforce.departmentHeadcount",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "Counts for 14 departments instead of Coresignal's 20."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_breakdown_by_department_by_month",
+        "ce": "workforce.history[].departmentHeadcount",
+        "fidelity": "lossy",
+        "note": "By department. The `workforce` expansion holds the latest 12 months, newest first. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`.",
+        "expand": "workforce"
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": "employees_count_breakdown_by_seniority.employees_count_clevel",
+        "ce": "workforce.departmentHeadcount.cSuite",
+        "expand": "workforce",
+        "fidelity": "lossy",
+        "note": "The only seniority count. CompanyEnrich counts C-suite as a department."
+      },
+      {
+        "group": "Size and headcount",
+        "coresignal": [
+          "employees_count_breakdown_by_seniority",
+          "employees_count_breakdown_by_region",
+          "employees_count_by_country",
+          "avg_tenure_by_seniority_months",
+          "avg_tenure_by_department_months",
+          "departures_count",
+          "employee_attrition_rate",
+          "top_previous_companies",
+          "top_next_companies",
+          "followers_count_professional_network",
+          "followers_count_linkedin",
+          "followers_count_twitter",
+          "followers_count_owler"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Historical Headcount API",
+        "in": "workforce",
+        "coresignal": "headcount",
+        "ce": "history[].observedEmployeeCount",
+        "fidelity": "lossy",
+        "note": "Employees observed in CompanyEnrich data, newest first, 12 months per page. The API describes the entries as change points, so do not assume one entry per month: carry the last value forward when you chart months. Pass `nextCursor` for each earlier 12 months. The response is an object, not a list of rows."
+      },
+      {
+        "group": "Historical Headcount API",
+        "in": "workforce",
+        "coresignal": "created",
+        "ce": "history[].date",
+        "fidelity": "transformed",
+        "note": "The first day of the month the entry describes, instead of when the row was recorded."
+      },
+      {
+        "group": "Historical Headcount API",
+        "in": "workforce",
+        "coresignal": "size",
+        "ce": "history[].employeeCountRange",
+        "fidelity": "lossy",
+        "note": "A calculated range, such as `51-200`, instead of the self-reported label."
+      },
+      {
+        "group": "Historical Headcount API",
+        "in": "workforce",
+        "coresignal": [
+          "company_id",
+          "website"
+        ],
+        "ce": [
+          "companyId",
+          "domain"
+        ],
+        "fidelity": "lossy",
+        "note": "The CompanyEnrich company UUID and the bare domain."
+      },
+      {
+        "group": "Historical Headcount API",
+        "coresignal": [
+          "follower_count",
+          "source_id",
+          "professional_network_url",
+          "shorthand_name",
+          "canonical_shorthand_name",
+          "name",
+          "industry",
+          "type",
+          "location",
+          "country"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "The workforce response holds counts only. Read company details from the company record."
+      },
+      {
+        "group": "Revenue",
+        "coresignal": [
+          "revenue_annual_range",
+          "revenue_annual"
+        ],
+        "ce": "revenue",
+        "fidelity": "lossy",
+        "note": "A range label, such as `10m-50m`, instead of an amount or bounds for each source."
+      },
+      {
+        "group": "Revenue",
+        "coresignal": "stock_ticker",
+        "ce": [
+          "financial.stockSymbol",
+          "financial.stockExchange"
+        ],
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "One symbol and exchange instead of a list."
+      },
+      {
+        "group": "Revenue",
+        "coresignal": [
+          "revenue_quarterly",
+          "income_statements",
+          "stock_information",
+          "ipo_date",
+          "ipo_share_price",
+          "ipo_share_price_currency"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Funding",
+        "coresignal": "last_funding_round.type",
+        "ce": "financial.fundingStage",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A label such as `Series A`. The labels are not a fixed list, so compare them without case and map them to your own values."
+      },
+      {
+        "group": "Funding",
+        "coresignal": "last_funding_round.announced_date",
+        "ce": "financial.fundingDate",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "A date-time instead of a date."
+      },
+      {
+        "group": "Funding",
+        "coresignal": "last_funding_round.amount_raised",
+        "ce": "financial.fundingRounds[].amount",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Take the latest round by `date`. Text with the currency, such as `$36M`, so parse it before you compare it or store it as a number."
+      },
+      {
+        "group": "Funding",
+        "coresignal": "funding_rounds",
+        "ce": "financial.fundingRounds",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Each round has `type`, `date`, `amount`, `investors`, and `url`."
+      },
+      {
+        "group": "Funding",
+        "coresignal": "funding_rounds[].type",
+        "ce": "financial.fundingRounds[].type",
+        "expand": "financial",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Funding",
+        "coresignal": "funding_rounds[].announced_date",
+        "ce": "financial.fundingRounds[].date",
+        "expand": "financial",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Funding",
+        "coresignal": "funding_rounds[].amount_raised",
+        "ce": "financial.fundingRounds[].amount",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Text with the currency, such as `$36M`, so parse it before you compare it or store it as a number."
+      },
+      {
+        "group": "Funding",
+        "coresignal": [
+          "funding_rounds[].investors[].name",
+          "last_funding_round.investors[].name"
+        ],
+        "ce": "financial.fundingRounds[].investors",
+        "expand": "financial",
+        "fidelity": "transformed",
+        "note": "Investor names, as text."
+      },
+      {
+        "group": "Funding",
+        "coresignal": [
+          "last_funding_round.amount_raised_currency",
+          "funding_rounds[].investors[].is_lead",
+          "funding_rounds[].num_investors",
+          "acquired_by_summary",
+          "acquisition_list_source_1",
+          "parent_company_information",
+          "ownership_status"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No lead investors, acquisitions, or parent company."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_country_iso2",
+        "ce": "location.country.code",
+        "fidelity": "same",
+        "note": "ISO 3166-1 alpha-2 on both."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_country",
+        "ce": "location.country.name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_country_iso3",
+        "ce": "location.country.code",
+        "fidelity": "transformed",
+        "note": "Alpha-2 instead of alpha-3."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_state",
+        "ce": "location.state.name",
+        "fidelity": "renamed",
+        "note": "Coresignal fills it for US companies only. CompanyEnrich also returns `location.state.id` and, when known, the ISO 3166-2 code in `location.state.code`."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_city",
+        "ce": "location.city.name",
+        "fidelity": "renamed",
+        "note": "Coresignal fills it for US companies only."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_zipcode",
+        "ce": "location.postalCode",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Location",
+        "coresignal": [
+          "hq_street",
+          "hq_full_address"
+        ],
+        "ce": "location.address",
+        "fidelity": "lossy",
+        "note": "The street address."
+      },
+      {
+        "group": "Location",
+        "coresignal": "hq_location",
+        "ce": [
+          "location.city.name",
+          "location.state.name",
+          "location.country.name"
+        ],
+        "fidelity": "transformed",
+        "note": "Build the location string from its parts."
+      },
+      {
+        "group": "Location",
+        "coresignal": "company_phone_numbers",
+        "ce": "location.phone",
+        "fidelity": "lossy",
+        "note": "One headquarters phone number instead of a list."
+      },
+      {
+        "group": "Location",
+        "coresignal": [
+          "company_locations_full",
+          "hq_region",
+          "hq_latitude",
+          "hq_longitude",
+          "hq_apartment",
+          "hq_suite",
+          "company_emails"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "Headquarters only, with no coordinates or emails. Regions are a search filter, not a record field."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": "industry",
+        "ce": "industries",
+        "fidelity": "lossy",
+        "note": "A list of industries. Values can differ. CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": "naics_codes",
+        "ce": "naicsCodes",
+        "expand": "naicsCodes",
+        "fidelity": "renamed",
+        "note": "Both are lists of codes. Check codes against `GET /v2/industries`."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": [
+          "categories_and_keywords",
+          "business_areas",
+          "offerings"
+        ],
+        "ce": "keywords",
+        "expand": "keywords",
+        "fidelity": "lossy",
+        "note": "Keywords that describe what the company does, from different sources."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": [
+          "business_model",
+          "is_b2b"
+        ],
+        "ce": "categories",
+        "fidelity": "lossy",
+        "note": "Lowercase values, such as `b2b`, `b2c`, and `b2g`, in one list with other categories such as `saas`. Coresignal is replacing `is_b2b` with `business_model`."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": "is_saas",
+        "ce": "categories",
+        "fidelity": "transformed",
+        "note": "SaaS companies have `saas` in `categories`."
+      },
+      {
+        "group": "Industry and classification",
+        "coresignal": "sic_codes",
+        "ce": null,
+        "fidelity": "none",
+        "note": "No SIC codes. Use NAICS codes."
+      },
+      {
+        "group": "Technologies",
+        "coresignal": "technologies_used[].technology",
+        "ce": "technologies",
+        "expand": "technologies",
+        "fidelity": "lossy",
+        "note": "One flat list of technology names from different detection."
+      },
+      {
+        "group": "Technologies",
+        "coresignal": "num_technologies_used",
+        "ce": "technologies",
+        "expand": "technologies",
+        "fidelity": "transformed",
+        "note": "Count the list."
+      },
+      {
+        "group": "Technologies",
+        "coresignal": [
+          "technologies_used[].first_verified_at",
+          "technologies_used[].last_verified_at"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No detection dates."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "canonical_professional_network_url",
+          "professional_network_url",
+          "canonical_linkedin_url",
+          "linkedin_url"
+        ],
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "The documentation uses the `professional_network_` names and the API specification the `linkedin_` names. Normalize the scheme, `www.`, and trailing slash before comparing."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "canonical_professional_network_shorthand_name",
+          "professional_network_shorthand_name",
+          "canonical_linkedin_shorthand_name",
+          "linkedin_shorthand_name"
+        ],
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "The shorthand name is the last part of the URL."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": "twitter_url",
+        "ce": "socials.twitterUrl",
+        "fidelity": "transformed",
+        "note": "One URL instead of a list."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": "facebook_url",
+        "ce": "socials.facebookUrl",
+        "fidelity": "transformed",
+        "note": "One URL instead of a list."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": "instagram_url",
+        "ce": "socials.instagramUrl",
+        "fidelity": "transformed",
+        "note": "One URL instead of a list."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": "youtube_url",
+        "ce": "socials.youtubeUrl",
+        "fidelity": "transformed",
+        "note": "One URL instead of a list."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": "github_url",
+        "ce": "socials.githubUrl",
+        "fidelity": "transformed",
+        "note": "One URL instead of a list."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "financial_website_url",
+          "crunchbase_url"
+        ],
+        "ce": "socials.crunchbaseUrl",
+        "fidelity": "renamed",
+        "note": "The documentation uses `financial_website_url` and the API specification `crunchbase_url`."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "professional_network_shorthand_names",
+          "linkedin_shorthand_names",
+          "reddit_url",
+          "discord_url",
+          "pinterest_url",
+          "tiktok_url"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Other sections",
+        "coresignal": [
+          "key_executives",
+          "featured_employees",
+          "key_executive_arrivals",
+          "key_executive_departures",
+          "key_employee_change_events"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "Not part of the company record. Search people at the company's domain with a `seniority` of `c-suite`, `founder`, or `vp`. For recent arrivals, add `currentCompanyStartDate`."
+      },
+      {
+        "group": "Other sections",
+        "coresignal": [
+          "competitors",
+          "competitors_websites",
+          "similar_pages",
+          "affiliated_pages"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "A lookalike search on the company's domain returns similar companies, ranked by similarity, which is a different list."
+      },
+      {
+        "group": "Other sections",
+        "coresignal": [
+          "active_job_postings",
+          "active_job_postings_count",
+          "active_job_postings_count_change",
+          "base_salary",
+          "additional_pay",
+          "total_salary",
+          "total_website_visits_monthly",
+          "rank_global",
+          "visits_breakdown_by_country",
+          "company_employee_reviews_aggregate_score",
+          "product_reviews_aggregate_score",
+          "news_articles",
+          "company_updates",
+          "pricing_available",
+          "free_trial_available",
+          "demo_available"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No job postings, salaries, web traffic, reviews, news, posts, or product signals. Monthly variants of these fields have no equivalent either."
+      }
+    ],
+    "person": [
+      {
+        "group": "Identity",
+        "coresignal": "id",
+        "ce": "id",
+        "fidelity": "lossy",
+        "note": "A separate ID space. Both are integers, so keep them in separate columns."
+      },
+      {
+        "group": "Identity",
+        "coresignal": "full_name",
+        "ce": "name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "first_name",
+        "ce": "firstName",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "last_name",
+        "ce": "lastName",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "picture_url",
+        "ce": "imageUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": "updated_at",
+        "ce": "updatedAt",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Identity",
+        "coresignal": [
+          "parent_id",
+          "public_profile_id",
+          "historical_ids",
+          "is_parent",
+          "profile_score",
+          "is_deleted",
+          "middle_name",
+          "headline",
+          "summary",
+          "services",
+          "interests",
+          "created_at",
+          "checked_at",
+          "changed_at",
+          "processed_at"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_title",
+        "ce": "position",
+        "fidelity": "renamed",
+        "note": "One current title. When a person has several current jobs and the employer matters, read `experiences[].position` from the experience with `isMatched` set."
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_management_level",
+        "ce": [
+          "seniority",
+          "experiences[].seniority"
+        ],
+        "fidelity": "transformed",
+        "values": "seniority"
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_department",
+        "ce": [
+          "department",
+          "experiences[].department"
+        ],
+        "fidelity": "transformed",
+        "values": "department",
+        "note": "CompanyEnrich departments can include a sub-department, such as `sales/customer-success`."
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_company_id",
+        "ce": "experiences[].company.id",
+        "fidelity": "lossy",
+        "note": "A CompanyEnrich company UUID, from the experience with `isCurrent` set."
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_company_website",
+        "ce": [
+          "experiences[].company.domain",
+          "experiences[].company.website"
+        ],
+        "fidelity": "transformed",
+        "note": "Coresignal returns a full URL. `domain` is the bare domain."
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_company_shorthand_name",
+        "ce": "experiences[].company.socials.linkedinUrl",
+        "expand": "company",
+        "fidelity": "transformed",
+        "note": "The shorthand name is the last part of the URL."
+      },
+      {
+        "group": "Current job",
+        "coresignal": "active_experience_company_logo_url",
+        "ce": "experiences[].company.logoUrl",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Current job",
+        "coresignal": "is_working",
+        "ce": "experiences[].isCurrent",
+        "fidelity": "transformed",
+        "note": "A person is working when any experience has `isCurrent` set to `true`."
+      },
+      {
+        "group": "Current job",
+        "coresignal": [
+          "is_decision_maker",
+          "active_experience_description"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No decision-maker flag. Check `seniority` against the levels you treat as decision makers."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience",
+        "ce": "experiences",
+        "fidelity": "transformed",
+        "note": "One list for current and past jobs in both APIs."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].active_experience",
+        "ce": "experiences[].isCurrent",
+        "fidelity": "transformed",
+        "note": "A boolean instead of `1` or `0`."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].position_title",
+        "ce": "experiences[].position",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].management_level",
+        "ce": "experiences[].seniority",
+        "fidelity": "transformed",
+        "values": "seniority"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].department",
+        "ce": "experiences[].department",
+        "fidelity": "transformed",
+        "values": "department"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].date_from",
+        "ce": "experiences[].startDate",
+        "fidelity": "transformed",
+        "note": "Coresignal dates can be ISO dates or text such as `Oct 2024`. Parse both."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].date_to",
+        "ce": "experiences[].endDate",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_id",
+        "ce": "experiences[].company.id",
+        "fidelity": "lossy",
+        "note": "A CompanyEnrich company UUID."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_name",
+        "ce": [
+          "experiences[].company.name",
+          "experiences[].companyName"
+        ],
+        "fidelity": "transformed",
+        "note": "`companyName` is set when no company record matched."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_website",
+        "ce": [
+          "experiences[].company.domain",
+          "experiences[].company.website"
+        ],
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": [
+          "experience[].company_professional_network_url",
+          "experience[].company_linkedin_url"
+        ],
+        "ce": "experiences[].company.socials.linkedinUrl",
+        "expand": "company",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_industry",
+        "ce": "experiences[].company.industries",
+        "expand": "company",
+        "fidelity": "lossy"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_size_range",
+        "ce": "experiences[].company.employees",
+        "expand": "company",
+        "fidelity": "lossy",
+        "values": "companySize",
+        "note": "Calculated range, not the self-reported one."
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_type",
+        "ce": "experiences[].company.type",
+        "expand": "company",
+        "fidelity": "renamed",
+        "values": "companyType"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_founded_year",
+        "ce": "experiences[].company.foundedYear",
+        "expand": "company",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_hq_country",
+        "ce": "experiences[].company.location.country.name",
+        "expand": "company",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Work history",
+        "coresignal": "experience[].company_hq_country_iso2",
+        "ce": "experiences[].company.location.country.code",
+        "expand": "company",
+        "fidelity": "same"
+      },
+      {
+        "group": "Work history",
+        "coresignal": [
+          "experience[].location",
+          "experience[].description",
+          "experience[].duration_months",
+          "experience[].company_employees_count",
+          "experience[].company_annual_revenue_source_1",
+          "experience[].company_last_funding_round_date",
+          "experience[].company_categories_and_keywords",
+          "total_experience_duration_months",
+          "months_in_management",
+          "tenure_stats",
+          "internal_promotion_rate",
+          "experience_recently_started",
+          "experience_recently_closed"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "Work out durations from `experiences[].startDate` and `endDate`. To find recent job changes, search with `currentCompanyStartDate` or `currentPositionStartDate`."
+      },
+      {
+        "group": "Education",
+        "coresignal": "education",
+        "ce": "education",
+        "expand": "education",
+        "fidelity": "transformed"
+      },
+      {
+        "group": "Education",
+        "coresignal": "education[].institution_name",
+        "ce": "education[].institutionName",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "coresignal": "education[].degree",
+        "ce": "education[].degree",
+        "expand": "education",
+        "fidelity": "lossy",
+        "note": "An array that holds the degree and field of study."
+      },
+      {
+        "group": "Education",
+        "coresignal": "education[].date_from_year",
+        "ce": "education[].startYear",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "coresignal": "education[].date_to_year",
+        "ce": "education[].endYear",
+        "expand": "education",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Education",
+        "coresignal": [
+          "education[].description",
+          "education[].activities_and_societies",
+          "education[].institution_full_address",
+          "last_graduation_date",
+          "institution_ranking_score",
+          "education_degrees"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_country",
+        "ce": "location.country.name",
+        "fidelity": "renamed"
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_country_iso2",
+        "ce": "location.country.code",
+        "fidelity": "same"
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_country_iso3",
+        "ce": "location.country.code",
+        "fidelity": "transformed",
+        "note": "Alpha-2 instead of alpha-3."
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_state",
+        "ce": "location.state.name",
+        "fidelity": "lossy",
+        "note": "Present only when the person's reported location has been resolved to a state. `location.state.id` is the integer ID accepted by people search."
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_city",
+        "ce": "location.city.name",
+        "fidelity": "lossy",
+        "note": "Present only when the person's reported location has been resolved to a city. `location.city.id` is the integer ID accepted by people search."
+      },
+      {
+        "group": "Location",
+        "coresignal": "location_full",
+        "ce": "location.address",
+        "fidelity": "lossy",
+        "note": "The person's reported location text. It can be present even when the state or city has not been resolved."
+      },
+      {
+        "group": "Location",
+        "coresignal": [
+          "location_regions",
+          "location_latitude",
+          "location_longitude"
+        ],
+        "ce": null,
+        "fidelity": "none"
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "professional_network_url",
+          "linkedin_url"
+        ],
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "The documentation uses `professional_network_url` and the API specification `linkedin_url`. Normalize both URLs before comparing."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "professional_network_canonical_shorthand_name",
+          "linkedin_canonical_shorthand_name"
+        ],
+        "ce": "socials.linkedinUrl",
+        "fidelity": "transformed",
+        "note": "The shorthand name is the last part of the URL."
+      },
+      {
+        "group": "Social profiles",
+        "coresignal": [
+          "twitter_url",
+          "facebook_url",
+          "github_url",
+          "website",
+          "financial_website_url",
+          "crunchbase_url"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "Person records hold a LinkedIn URL only."
+      },
+      {
+        "group": "Contact",
+        "in": "workEmail",
+        "coresignal": "data.email",
+        "ce": "email",
+        "fidelity": "renamed",
+        "note": "At the top level of the response."
+      },
+      {
+        "group": "Contact",
+        "in": "workEmail",
+        "coresignal": [
+          "message",
+          "code"
+        ],
+        "ce": "status",
+        "fidelity": "transformed",
+        "note": "`found`, `not-found`, `unavailable`, or `pending`, in place of `FOUND` or `NOT_FOUND` and a numeric code."
+      },
+      {
+        "group": "Contact",
+        "in": "workEmail",
+        "coresignal": [
+          "data.email_status",
+          "data.email_confidence"
+        ],
+        "ce": "certainty",
+        "fidelity": "lossy",
+        "note": "`certainty` is `very-high`, `high`, `medium`, or `unknown`. A status such as `catch_all` and a numeric confidence have no direct counterpart."
+      },
+      {
+        "group": "Other",
+        "coresignal": [
+          "inferred_skills",
+          "historical_skills",
+          "languages",
+          "certifications",
+          "courses",
+          "awards",
+          "patents",
+          "publications",
+          "projects",
+          "organizations",
+          "recommendations",
+          "activity",
+          "personal_investments",
+          "partner_investments",
+          "exits",
+          "events",
+          "github_username",
+          "github_repos_summary",
+          "connections_count",
+          "followers_count",
+          "influence_score",
+          "post_frequency_yearly",
+          "projected_base_salary_median",
+          "projected_total_salary_median",
+          "profile_root_field_changes_summary"
+        ],
+        "ce": null,
+        "fidelity": "none",
+        "note": "No skills, certifications, publications, investments, GitHub data, social activity, salary estimates, or change history. Related fields with other suffixes have no equivalent either."
+      }
+    ],
+    "account": [
+      {
+        "group": "Credits",
+        "coresignal": "x-credits-remaining",
+        "ce": "credits.total",
+        "fidelity": "transformed",
+        "note": "Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional. Paid responses also carry an `x-credit-remaining` header."
+      }
+    ]
+  },
+  "ceOnly": {
+    "company": [
+      {
+        "ce": "financial.totalFunding",
+        "expand": "financial",
+        "note": "Total funding raised, as one amount."
+      },
+      {
+        "ce": "socials.linkedinId",
+        "note": "The company's LinkedIn ID."
+      },
+      {
+        "ce": [
+          "socials.angellistUrl",
+          "socials.g2Url"
+        ],
+        "note": "Other profiles."
+      },
+      {
+        "ce": "location.state.code",
+        "note": "The ISO 3166-2 code of the state, when known."
+      },
+      {
+        "ce": "workforce.unclassifiedHeadcount",
+        "expand": "workforce",
+        "note": "Employees without a department."
+      }
+    ],
+    "person": [
+      {
+        "ce": "experiences[].isMatched",
+        "note": "Which experience matched your search filters or your email lookup."
+      },
+      {
+        "ce": "education[].institution",
+        "expand": "education",
+        "note": "The school as a company summary."
+      },
+      {
+        "ce": [
+          "location.state.id",
+          "location.city.id"
+        ],
+        "note": "IDs that people search accepts as `state` and `city` filters."
+      }
+    ]
+  },
+  "values": {
+    "companySize": {
+      "title": "Company size",
+      "coresignal": "size_range, experience[].company_size_range",
+      "ce": "employees, reportedEmployees",
+      "enum": "CompanySearchFilter.employees",
+      "note": "Coresignal ranges are self-reported, so search them with `reportedEmployees`. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range. Coresignal writes some ranges more than one way, so match every spelling.",
+      "rows": [
+        {
+          "coresignal": [
+            "Myself Only",
+            "1 employee",
+            "2-10",
+            "2-10 employees",
+            "1-10 employees"
+          ],
+          "ce": "1-10",
+          "fidelity": "lossy",
+          "note": "One range covers these."
+        },
+        {
+          "coresignal": "11-50 employees",
+          "ce": "11-50",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "51-200 employees",
+          "ce": "51-200",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "201-500 employees",
+          "ce": "201-500",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": [
+            "501-1000 employees",
+            "501-1,000 employees"
+          ],
+          "ce": "501-1K",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": [
+            "1001-5000 employees",
+            "1,001-5,000 employees"
+          ],
+          "ce": "1K-5K",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": [
+            "5001-10,000 employees",
+            "5,001-10,000 employees"
+          ],
+          "ce": "5K-10K",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "10,001+ employees",
+          "ce": "over-10K",
+          "fidelity": "renamed"
+        }
+      ]
+    },
+    "companyType": {
+      "title": "Company type",
+      "coresignal": "type, experience[].company_type",
+      "ce": "type",
+      "enum": "CompanySearchFilter.type",
+      "note": "Coresignal records can carry other labels, such as `Private Company`. Map any label you store.",
+      "rows": [
+        {
+          "coresignal": "Privately Held",
+          "ce": "private",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Public Company",
+          "ce": "public",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Nonprofit",
+          "ce": "nonprofit",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Educational",
+          "ce": "educational",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Government Agency",
+          "ce": "government",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Self-Employed",
+          "ce": "self-employed",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Self-Owned",
+          "ce": "self-owned",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Partnership",
+          "ce": "partnership",
+          "fidelity": "renamed"
+        }
+      ]
+    },
+    "seniority": {
+      "title": "Seniority",
+      "coresignal": "active_experience_management_level, experience[].management_level",
+      "ce": "seniority, experiences[].seniority",
+      "enum": "PersonSearchFilter.seniority",
+      "note": "Use these for stored values and search filters.",
+      "rows": [
+        {
+          "coresignal": "C-Level",
+          "ce": "c-suite",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "President/Vice President",
+          "ce": "vp",
+          "fidelity": "lossy",
+          "note": "Some presidents are C-suite in CompanyEnrich."
+        },
+        {
+          "coresignal": "Director",
+          "ce": "director",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Head",
+          "ce": "head",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Manager",
+          "ce": "manager",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Senior",
+          "ce": "senior",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Founder",
+          "ce": "founder",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Owner",
+          "ce": "owner",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Partner",
+          "ce": "partner",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Intern",
+          "ce": "intern",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Specialist",
+          "ce": null,
+          "fidelity": "none",
+          "note": "Individual contributors with no level in the title. `entry` and `senior` each cover part of it."
+        }
+      ]
+    },
+    "department": {
+      "title": "Department",
+      "coresignal": "active_experience_department, experience[].department",
+      "ce": "department, experiences[].department",
+      "enum": "PersonSearchFilter.department",
+      "note": "CompanyEnrich departments have sub-departments, such as `sales/customer-success`. A top-level value matches its sub-departments.",
+      "rows": [
+        {
+          "coresignal": "Sales",
+          "ce": "sales",
+          "fidelity": "lossy",
+          "note": "Sales leaders can fall under `c-suite/sales-executive`, so add it when you search for them."
+        },
+        {
+          "coresignal": "Marketing",
+          "ce": "marketing",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Engineering and Technical",
+          "ce": [
+            "engineering-technical",
+            "information-technology"
+          ],
+          "fidelity": "lossy",
+          "note": "CompanyEnrich splits engineering and IT."
+        },
+        {
+          "coresignal": "Product",
+          "ce": "product-management",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Design",
+          "ce": "design",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Finance & Accounting",
+          "ce": "finance",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Human Resources",
+          "ce": "human-resources",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Legal",
+          "ce": "legal",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Operations",
+          "ce": "operations",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Consulting",
+          "ce": "consulting",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Education",
+          "ce": "education",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Medical",
+          "ce": "medical-health",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Customer Service",
+          "ce": [
+            "operations/customer-service-support",
+            "sales/customer-success"
+          ],
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "General Management",
+          "ce": "c-suite",
+          "fidelity": "lossy",
+          "note": "Executives. Other general managers have no department."
+        },
+        {
+          "coresignal": "Administrative",
+          "ce": "operations/office-operations",
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "Project Management",
+          "ce": [
+            "engineering-technical/project-management",
+            "information-technology/project-program-management"
+          ],
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "Research",
+          "ce": [
+            "engineering-technical/research-development",
+            "medical-health/medical-research"
+          ],
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "Real Estate",
+          "ce": [
+            "operations/real-estate",
+            "finance/real-estate-finance"
+          ],
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "Trades",
+          "ce": [
+            "engineering-technical/technician",
+            "engineering-technical/mechanic",
+            "operations/construction"
+          ],
+          "fidelity": "lossy"
+        },
+        {
+          "coresignal": "Other",
+          "ce": null,
+          "fidelity": "none"
+        }
+      ]
+    },
+    "fundingRound": {
+      "title": "Funding round",
+      "coresignal": "last_funding_round.type, funding_rounds[].type",
+      "ce": "fundingRounds",
+      "enum": "CompanySearchFilter.fundingRounds",
+      "note": "These are search filter values. Company records return labels such as `Series A` in `financial.fundingStage`.",
+      "rows": [
+        {
+          "coresignal": "Seed",
+          "ce": "seed",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": "Angel",
+          "ce": "angel",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": [
+            "Series A",
+            "Series B",
+            "Series C",
+            "Series D",
+            "Series E",
+            "Series F",
+            "Series G",
+            "Series H"
+          ],
+          "ce": [
+            "series_a",
+            "series_b",
+            "series_c",
+            "series_d",
+            "series_e",
+            "series_f",
+            "series_g",
+            "series_h"
+          ],
+          "fidelity": "renamed",
+          "note": "Same round for each value. Coresignal also writes `Serie B`."
+        },
+        {
+          "coresignal": "Debt financing",
+          "ce": "debt_financing",
+          "fidelity": "renamed"
+        },
+        {
+          "coresignal": [
+            "Pre seed",
+            "Series I",
+            "Series J",
+            "Series unknown",
+            "Convertible note",
+            "Corporate round",
+            "Equity crowdfunding",
+            "Grant",
+            "Initial coin offering",
+            "Non equity assistance",
+            "Post IPO debt",
+            "Post IPO equity",
+            "Post IPO secondary",
+            "Private equity",
+            "Product crowdfunding",
+            "Secondary market",
+            "Undisclosed"
+          ],
+          "ce": null,
+          "fidelity": "none",
+          "note": "No exact value. CompanyEnrich also has `venture` and `other`."
+        }
+      ]
+    }
+  },
+  "search": {
+    "company": [
+      {
+        "coresignal": {
+          "terms": {
+            "website.domain_only": [
+              "acme.example",
+              "globex.example"
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "domain": [
+              "acme.example",
+              "globex.example"
+            ]
+          }
+        },
+        "fidelity": "same",
+        "note": "Also for `website_domain` and `website`. Search Filters: `website`, `exact_website`. Send bare domains."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "company_name": "acme"
+          }
+        },
+        "ce": {
+          "filter": {
+            "query": "acme"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches company names, keywords, or domain prefixes. Search Filters: `name`, `exact_name`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "professional_network_url": "https://www.linkedin.com/company/acme-example"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No search by profile URL. To look up one company, use `POST /v2/companies/enrich` with `linkedinUrl`."
+      },
+      {
+        "coresignal": {
+          "terms": {
+            "hq_country_iso2": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "country": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "fidelity": "same",
+        "note": "Search Filters: `hq_country_iso2`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "hq_country": "Germany"
+          }
+        },
+        "ce": {
+          "filter": {
+            "country": "DE"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "ISO 3166-1 alpha-2 codes instead of names. Look up codes with `POST /v2/geo/countries`. Search Filters: `hq_country`, `exact_hq_country`."
+      },
+      {
+        "coresignal": {
+          "bool": {
+            "must_not": [
+              {
+                "terms": {
+                  "hq_country_iso2": [
+                    "CN"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "country": {
+              "notIn": [
+                "CN"
+              ]
+            }
+          }
+        },
+        "fidelity": "same",
+        "note": "A `must_not` clause, or an `exclude_` Search Filters parameter, becomes `notIn` on the same filter."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "hq_state": "California"
+          }
+        },
+        "ce": {
+          "filter": {
+            "state": "STATE_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Search Filters: `hq_state`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "hq_city": "Austin"
+          }
+        },
+        "ce": {
+          "filter": {
+            "city": "CITY_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Search Filters: `hq_city`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "hq_region": "EMEA"
+          }
+        },
+        "ce": {
+          "filter": {
+            "region": "REGION_ID"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Replace `REGION_ID` with a region ID from `GET /v2/geo/regions`. The regions cover different country lists."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "hq_location": "Austin, TX"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No location text filter. Use the country, state, or city filter. Search Filters: `hq_location`."
+      },
+      {
+        "coresignal": {
+          "terms": {
+            "size_range": [
+              "51-200 employees",
+              "201-500 employees"
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "reportedEmployees": [
+              "51-200",
+              "201-500"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the company size table. `employees` filters on the calculated range instead. Search Filters: `size_range`."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "employees_count": {
+              "gte": 50,
+              "lte": 500
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "workforceSize": [
+              {
+                "department": "overall",
+                "min": 50,
+                "max": 500
+              }
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Counts from CompanyEnrich employee data. `min` and `max` are inclusive, as `gte` and `lte` are, so `gt` 50 becomes `min` 51. Search Filters: `employees_count_gte`, `employees_count_lte`."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "employees_count_change.change_yearly_percentage": {
+              "gte": 20
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "workforceGrowth": {
+              "period": "y1",
+              "department": "overall",
+              "min": 0.2
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "A ratio instead of a percentage: divide by 100. Growth comes from CompanyEnrich employee data. Periods are `m6`, `y1`, and `y2`, so `change_monthly_percentage` and `change_quarterly_percentage` have no equivalent."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "employees_count_breakdown_by_department.employees_count_technical": {
+              "gt": 50
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "workforceSize": [
+              {
+                "department": "engineering_technical",
+                "min": 51
+              }
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "14 departments instead of Coresignal's 20."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "founded_year": {
+              "gte": 2018
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "foundedYear": {
+              "min": 2018
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Search Filters: `founded_year_gte`, `founded_year_lte`."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "type": "Privately Held"
+          }
+        },
+        "ce": {
+          "filter": {
+            "type": "private"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the company type table. Search Filters: `type`."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "is_public": true
+          }
+        },
+        "ce": {
+          "filter": {
+            "type": "public"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Search Filters: `is_public`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "industry": "Software Development"
+          }
+        },
+        "ce": {
+          "filter": {
+            "naicsCodes": [
+              "5112"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "No industry-label filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search. Search Filters: `industry`, `exact_industry`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "naics_codes": "541511"
+          }
+        },
+        "ce": {
+          "filter": {
+            "naicsCodes": [
+              "541511"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Codes have 2 to 6 digits, so a shorter code matches every code that starts with it. Check codes against `GET /v2/industries`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "sic_codes": "7372"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No SIC filter. Use NAICS codes."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "categories_and_keywords": "fintech"
+          }
+        },
+        "ce": {
+          "filter": {
+            "keywords": "fintech"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Check the keyword with `GET /v2/keywords/autocomplete`. Also for `business_areas` and `offerings`. In Search Filters text, `|` becomes `in`, `+` becomes an array, which requires every keyword, and `-` becomes `notIn`."
+      },
+      {
+        "coresignal": {
+          "query_string": {
+            "default_field": "description",
+            "query": "observability"
+          }
+        },
+        "ce": {
+          "filter": {
+            "keywords": "observability"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "No description text filter. Match keywords, or describe the companies in a semantic search. Search Filters: `description`."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "technologies_used",
+            "query": {
+              "match": {
+                "technologies_used.technology": "Salesforce"
+              }
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "technologies": "salesforce"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Look up names with `GET /v2/technologies/autocomplete`. Several technologies that must all match become an array. Search Filters: `technologies_used`."
+      },
+      {
+        "coresignal": {
+          "bool": {
+            "should": [
+              {
+                "nested": {
+                  "path": "technologies_used",
+                  "query": {
+                    "match": {
+                      "technologies_used.technology": "Salesforce"
+                    }
+                  }
+                }
+              },
+              {
+                "nested": {
+                  "path": "technologies_used",
+                  "query": {
+                    "match": {
+                      "technologies_used.technology": "HubSpot"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "technologies": {
+              "in": [
+                "salesforce",
+                "hubspot"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Use `in` to match any of them, as `Salesforce | HubSpot` does in Search Filters."
+      },
+      {
+        "coresignal": {
+          "technologies_used": "Salesforce | HubSpot"
+        },
+        "ce": {
+          "filter": {
+            "technologies": {
+              "in": [
+                "salesforce",
+                "hubspot"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "A Search Filters parameter. `|` becomes `in`, `+` becomes an array, which requires every technology, and `-` becomes `notIn`."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "is_saas": true
+          }
+        },
+        "ce": {
+          "filter": {
+            "categories": "saas"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Search Filters: `is_saas`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "business_model": "B2B"
+          }
+        },
+        "ce": {
+          "filter": {
+            "categories": "b2b"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Also for `is_b2b`. Search Filters: `business_model`, `is_b2b`."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "revenue_annual.source_5_annual_revenue.annual_revenue": {
+              "gte": 10000000
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "revenue": [
+              "10m-50m",
+              "50m-100m",
+              "100m-200m",
+              "200m-1b",
+              "over-1b"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Revenue is a set of ranges. List every range above the bound. Search Filters: `revenue_gte`, `revenue_lte`."
+      },
+      {
+        "coresignal": {
+          "terms": {
+            "last_funding_round.type": [
+              "Series A",
+              "Series B"
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "fundingRounds": [
+              "series_a",
+              "series_b"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "See the funding round table. Coresignal matches the latest round only. To keep only companies whose latest round is one of these, check `financial.fundingStage` on each result. Search Filters: `last_funding_round_type`."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "last_funding_round.announced_date": {
+              "gte": "2025-01-01"
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "fundingYear": {
+              "min": 2025
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Year of the latest funding, not a date. Search Filters: `last_funding_round_date_gte`, `last_funding_round_date_lte`."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "last_funding_round.amount_raised": {
+              "gte": 10000000
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "fundingAmount": {
+              "min": 10000000
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "CompanyEnrich `fundingAmount` is total funding, not the latest round's amount."
+      },
+      {
+        "coresignal": {
+          "exists": {
+            "field": "last_funding_round.type"
+          }
+        },
+        "ce": {
+          "filter": {
+            "require": "anyFunding"
+          }
+        },
+        "fidelity": "renamed",
+        "note": "`require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`. Other `exists` checks have no equivalent."
+      },
+      {
+        "coresignal": {
+          "range": {
+            "active_job_postings_count": {
+              "gte": 10
+            }
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No job posting, follower, review, traffic, or product filters. Search Filters: `active_job_postings_count_gte`, `active_job_postings_title`."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "is_deleted": 0
+          }
+        },
+        "ce": {},
+        "fidelity": "lossy",
+        "note": "Drop it. CompanyEnrich has no deleted-record flag."
+      },
+      {
+        "coresignal": {
+          "bool": {
+            "should": [
+              {
+                "match": {
+                  "industry": "Software Development"
+                }
+              },
+              {
+                "range": {
+                  "last_funding_round.amount_raised": {
+                    "gt": 5000000
+                  }
+                }
+              }
+            ],
+            "minimum_should_match": 1
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No OR across different filters. Run one search per branch and merge the results on `id`. OR within one filter works: send an array."
+      },
+      {
+        "coresignal": {
+          "sort": [
+            "_score"
+          ]
+        },
+        "ce": {},
+        "fidelity": "same",
+        "note": "Drop it. Results come in relevance order."
+      },
+      {
+        "coresignal": {
+          "sort": [
+            "employees_count"
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No sorting. To reproduce a top list by a field, count the matches for free, fetch every page, then sort in your code. Sorting by `id` has no equivalent either."
+      },
+      {
+        "coresignal": "?items_per_page=1000&after=NEXT_PAGE_AFTER",
+        "ce": {
+          "pageSize": 100,
+          "cursor": "NEXT_CURSOR"
+        },
+        "fidelity": "transformed",
+        "note": "Up to 100 records per page. Send `nextCursor` from the last response as `cursor`, until it is omitted."
+      }
+    ],
+    "person": [
+      {
+        "coresignal": {
+          "match": {
+            "active_experience_company_website.domain_only": "stripe.com"
+          }
+        },
+        "ce": {
+          "filter": {
+            "domain": "stripe.com"
+          }
+        },
+        "fidelity": "same",
+        "note": "Search Filters have no current-employer website parameter, because `experience_company_website` also matches past employers."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "active_experience_company_id": 123456
+          }
+        },
+        "ce": {
+          "filter": {
+            "companyId": "COMPANY_ID"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "Coresignal IDs do not carry over. Filter by `domain`, or by CompanyEnrich company IDs. Search Filters: `active_experience_company_id`."
+      },
+      {
+        "coresignal": {
+          "active_experience_company_name": "Stripe"
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "query": "Stripe"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "A Search Filters parameter. `query` matches company names, keywords, or domain prefixes, so it can match more than one employer. Filter by `domain` when you know it."
+      },
+      {
+        "coresignal": {
+          "match_phrase": {
+            "active_experience_title": "head of growth"
+          }
+        },
+        "ce": {
+          "filter": {
+            "position": "head of growth"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches the phrase in current positions. Check titles with `GET /v2/positions/autocomplete`. Search Filters: `active_experience_title`."
+      },
+      {
+        "coresignal": {
+          "bool": {
+            "should": [
+              {
+                "match_phrase": {
+                  "active_experience_title": "CTO"
+                }
+              },
+              {
+                "match_phrase": {
+                  "active_experience_title": "VP Engineering"
+                }
+              }
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "position": [
+              "CTO",
+              "VP Engineering"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "OR within one field becomes an array, which matches any phrase."
+      },
+      {
+        "coresignal": {
+          "active_experience_management_level": [
+            "C-Level",
+            "President/Vice President"
+          ]
+        },
+        "ce": {
+          "filter": {
+            "seniority": [
+              "c-suite",
+              "vp"
+            ]
+          }
+        },
+        "fidelity": "renamed",
+        "note": "See the seniority table. Also for a `match` or `terms` clause on the same field."
+      },
+      {
+        "coresignal": {
+          "active_experience_department": "Engineering and Technical"
+        },
+        "ce": {
+          "filter": {
+            "department": [
+              "engineering-technical",
+              "information-technology"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "See the department table. Also for a `match` or `terms` clause on the same field."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "is_decision_maker": 1
+          }
+        },
+        "ce": {
+          "filter": {
+            "seniority": [
+              "owner",
+              "founder",
+              "c-suite",
+              "partner",
+              "vp",
+              "head",
+              "director"
+            ]
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Coresignal derives the flag from the title. List the seniority levels you treat as decision makers. Search Filters: `is_decision_maker`."
+      },
+      {
+        "coresignal": {
+          "terms": {
+            "location_country_iso2": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "ce": {
+          "filter": {
+            "country": [
+              "US",
+              "CA"
+            ]
+          }
+        },
+        "fidelity": "same",
+        "note": "Search Filters: `location_country_iso2`."
+      },
+      {
+        "coresignal": {
+          "term": {
+            "location_country": "Germany"
+          }
+        },
+        "ce": {
+          "filter": {
+            "country": "DE"
+          }
+        },
+        "fidelity": "transformed",
+        "note": "ISO 3166-1 alpha-2 codes instead of names. Search Filters: `location_country`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "location_state": "California"
+          }
+        },
+        "ce": {
+          "filter": {
+            "state": "STATE_ID"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose reported location has been resolved to that state. A `notIn` exclusion keeps people without a resolved state."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "location_city": "San Francisco"
+          }
+        },
+        "ce": {
+          "filter": {
+            "city": "CITY_ID"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose reported location has been resolved to that city. A `notIn` exclusion keeps people without a resolved city. Search Filters: `location_city`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "location_full": "Bay Area"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No location text filter. Use the country, state, or city filter. Search Filters: `location_full`."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "experience",
+            "query": {
+              "bool": {
+                "must": [
+                  {
+                    "term": {
+                      "experience.active_experience": 1
+                    }
+                  },
+                  {
+                    "range": {
+                      "experience.date_from": {
+                        "gte": "2026-08-01"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "currentPositionStartDate": {
+              "after": "2026-08-01T00:00:00Z"
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Dates are date-times. For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. Search Filters `experience_date_from_gte` matches past roles too."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "experience",
+            "query": {
+              "bool": {
+                "must": [
+                  {
+                    "term": {
+                      "experience.active_experience": 0
+                    }
+                  },
+                  {
+                    "match": {
+                      "experience.company_website.domain_only": "google.com"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "pastExperience": {
+              "domain": "google.com"
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Past jobs only. A clause without `experience.active_experience`, like Search Filters `experience_company_website`, matches past or current employers: run one search with `pastExperience` and one with `domain`, and merge on `id`."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "experience",
+            "query": {
+              "match_phrase": {
+                "experience.position_title": "product manager"
+              }
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "pastExperience": {
+              "position": "product manager"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Coresignal matches past and current titles here. CompanyEnrich `pastExperience` matches past jobs, and `position` current ones. Search Filters: `experience_position_title`."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "education",
+            "query": {
+              "match_phrase": {
+                "education.institution_name": "Stanford University"
+              }
+            }
+          }
+        },
+        "ce": {
+          "filter": {
+            "education": {
+              "institutionName": "Stanford University"
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Or match the school's LinkedIn page with `institutionLinkedinHandle`. Degree and year filters have no equivalent. Search Filters: `education_institution_name`."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "experience",
+            "query": {
+              "bool": {
+                "must": [
+                  {
+                    "term": {
+                      "experience.active_experience": 1
+                    }
+                  },
+                  {
+                    "term": {
+                      "experience.company_size_range": "51-200 employees"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "reportedEmployees": "51-200"
+            }
+          }
+        },
+        "fidelity": "renamed",
+        "note": "Employer conditions go in a `company` query, which takes any company search filter."
+      },
+      {
+        "coresignal": {
+          "nested": {
+            "path": "experience",
+            "query": {
+              "bool": {
+                "must": [
+                  {
+                    "term": {
+                      "experience.active_experience": 1
+                    }
+                  },
+                  {
+                    "term": {
+                      "experience.company_hq_country_iso2": "US"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "country": "US"
+            }
+          }
+        },
+        "fidelity": "same",
+        "note": "The employer's country, not the person's."
+      },
+      {
+        "coresignal": {
+          "active_experience_company_industry": "Financial Services"
+        },
+        "ce": {
+          "company": {
+            "filter": {
+              "naicsCodes": [
+                "5221"
+              ]
+            }
+          }
+        },
+        "fidelity": "lossy",
+        "note": "A Search Filters parameter, or `experience.company_industry` in a nested query. Pick NAICS codes from `GET /v2/industries`, or put a `semantic` query in the `company` query."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "full_name": "Jane Doe"
+          }
+        },
+        "ce": {
+          "filter": {
+            "query": "Jane Doe"
+          }
+        },
+        "fidelity": "lossy",
+        "note": "Matches person names. Combine it with `domain` to find one person at a company. Search Filters: `full_name`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "headline": "founder"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No headline, summary, or keyword filter. Match current titles with `position`. Search Filters: `headline`, `summary`, `keyword`."
+      },
+      {
+        "coresignal": {
+          "match": {
+            "inferred_skills": "Python"
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No skill, certification, salary, career-length, or employment-status filters."
+      },
+      {
+        "coresignal": {
+          "bool": {
+            "should": [
+              {
+                "match_phrase": {
+                  "active_experience_title": "developer"
+                }
+              },
+              {
+                "match": {
+                  "active_experience_department": "Engineering and Technical"
+                }
+              }
+            ],
+            "minimum_should_match": 1
+          }
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No OR across different filters. Run one search per branch and merge on `id`."
+      },
+      {
+        "coresignal": {
+          "sort": [
+            "_score"
+          ]
+        },
+        "ce": {},
+        "fidelity": "same",
+        "note": "Drop it. Results come in relevance order."
+      },
+      {
+        "coresignal": {
+          "sort": [
+            "id"
+          ]
+        },
+        "ce": null,
+        "fidelity": "none",
+        "note": "No sorting. Page with the cursor."
+      }
+    ]
+  },
+  "fixtures": {
+    "$comment": "Fictional records for offline tests. Shapes follow each provider's documented schema. Coresignal returns 404 with a `detail` message for a missed collect or enrich; the exact text can differ.",
+    "company": {
+      "coresignal": {
+        "id": 7340218,
+        "company_name": "Acme Analytics",
+        "website": "https://acme-analytics.example",
+        "website_domain": "acme-analytics.example",
+        "professional_network_url": "https://www.linkedin.com/company/acme-analytics-example",
+        "description": "Acme Analytics builds a product analytics platform.",
+        "type": "Privately Held",
+        "founded_year": "2016",
+        "size_range": "201-500 employees",
+        "employees_count": 312,
+        "industry": "Software Development",
+        "hq_country": "United States",
+        "hq_country_iso2": "US",
+        "hq_state": "California",
+        "hq_city": "San Francisco",
+        "last_funding_round": {
+          "type": "Series B",
+          "announced_date": "2024-05-14",
+          "amount_raised": 30000000,
+          "amount_raised_currency": "USD"
+        },
+        "last_updated_at": "2026-10-01"
+      },
+      "companyEnrich": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "website": "https://acme-analytics.example",
+        "logoUrl": "https://logo.example/acme-analytics.example.png",
+        "description": "Acme Analytics builds a product analytics platform.",
+        "type": "private",
+        "foundedYear": 2016,
+        "employees": "201-500",
+        "revenue": "10m-50m",
+        "industry": "Software Publishers",
+        "location": {
+          "country": {
+            "code": "US",
+            "name": "United States"
+          },
+          "state": {
+            "id": 1416,
+            "name": "California",
+            "code": "US-CA"
+          },
+          "city": {
+            "id": 125634,
+            "name": "San Francisco"
+          },
+          "postalCode": "94105"
+        },
+        "socials": {
+          "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+        },
+        "financial": {
+          "totalFunding": 48000000,
+          "fundingStage": "Series B",
+          "fundingDate": "2024-05-14T00:00:00Z",
+          "fundingRounds": [
+            {
+              "type": "Series B",
+              "date": "2024-05-14T00:00:00Z",
+              "amount": "$30M"
+            }
+          ]
+        },
+        "updatedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    "search": {
+      "coresignal": [
+        7340218,
+        7340219
+      ],
+      "coresignalHeaders": {
+        "x-total-results": "2",
+        "x-total-pages": "1",
+        "x-credits-remaining": "9973"
+      },
+      "companyEnrich": {
+        "items": [
+          {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example",
+            "employees": "201-500"
+          }
+        ]
+      }
+    },
+    "workEmail": {
+      "coresignal": {
+        "code": 0,
+        "message": "FOUND",
+        "data": {
+          "email_status": "verified",
+          "email": "jane.doe@acme-analytics.example",
+          "email_confidence": 100
+        }
+      },
+      "companyEnrich": {
+        "personId": 4815162342,
+        "domain": "acme-analytics.example",
+        "status": "found",
+        "email": "jane.doe@acme-analytics.example",
+        "certainty": "high"
+      }
+    },
+    "notFound": {
+      "coresignal": {
+        "detail": "Not Found"
+      },
+      "companyEnrich": {
+        "status": 404,
+        "title": "Not Found"
+      }
+    }
+  }
+}
