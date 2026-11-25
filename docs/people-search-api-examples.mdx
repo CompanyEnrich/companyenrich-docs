@@ -1,7 +1,7 @@
 ---
 title: "People Search API examples"
 sidebarTitle: "Examples"
-description: "Ready-to-run People Search API queries: decision makers at a company, job titles, recent hires, former employees, semantic search, people at lookalike companies, audience sizing, CSV exports, and work emails."
+description: "Ready-to-run People Search API queries: decision makers at a company, job titles, recent hires, former employees, people in a city or state, semantic search, people at lookalike companies, audience sizing, CSV exports, and work emails."
 ---
 
 Each example on this page is one [People Search API](/docs/people-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
@@ -383,6 +383,159 @@ companyenrich people search --past-domain google.com --seniority founder --count
 
 </CodeGroup>
 
+## Find people in a city or state
+
+The `city` and `state` filters narrow a person's location below the country. Both take CompanyEnrich IDs, not names, so look up the ID first. Geo lookups are free.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/geo/cities \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "san francisco", "countryCodes": ["US"]}'
+```
+
+```javascript JavaScript
+const { items } = await client.geo.searchCities({
+  query: 'san francisco',
+  countryCodes: ['US'],
+});
+
+for (const city of items) {
+  console.log(city.id, city.name, city.stateId);
+}
+```
+
+```python Python
+result = client.geo.search_cities(query="san francisco", country_codes=["US"])
+
+for city in result["items"]:
+    print(city["id"], city["name"], city.get("stateId"))
+```
+
+```ruby Ruby
+result = client.geo.search_cities(query: "san francisco", country_codes: ["US"])
+
+result["items"].each do |city|
+  puts "#{city['id']} #{city['name']} #{city['stateId']}"
+end
+```
+
+```php PHP
+$result = $client->geo->searchCities(query: 'san francisco', countryCodes: ['US']);
+
+foreach ($result['items'] as $city) {
+    echo $city['id'], ' ', $city['name'], ' ', $city['stateId'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich geo cities "san francisco" --country US
+```
+
+</CodeGroup>
+
+The lookup returns every city whose name contains the query, so check the name and `stateId` of each result before you pick one. This response is shortened, and its IDs are illustrative:
+
+```json
+{
+  "items": [
+    { "id": 125634, "name": "San Francisco", "countryCode": "US", "stateId": 1416 }
+  ]
+}
+```
+
+Then send the ID in `filter.city`. This search finds engineering VPs and directors located in that city. Replace `125634` with the ID from your own lookup.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "city": 125634,
+      "seniority": ["vp", "director"],
+      "department": "engineering-technical"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: {
+    city: 125634,
+    seniority: ['vp', 'director'],
+    department: 'engineering-technical',
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={
+        "city": 125634,
+        "seniority": ["vp", "director"],
+        "department": "engineering-technical",
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: {
+    city: 125634,
+    seniority: ["vp", "director"],
+    department: "engineering-technical"
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} (#{person['position']})"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: [
+        'city' => 125634,
+        'seniority' => ['vp', 'director'],
+        'department' => 'engineering-technical',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --body '{"filter": {"city": 125634}}' \
+  --seniority vp,director --department engineering-technical --limit 25
+```
+
+</CodeGroup>
+
+For a whole state, look up its ID with [`POST /v2/geo/states`](/api-reference/v2/post-geo-states) and send it in `filter.state`. An array of IDs matches people in any of those places. Both filters match only people whose reported location has been resolved to that city or state; people whose location is not resolved yet match neither. See [Location filters](/docs/people-search-api-filters#location) for exclusions.
+
+The CLI has no flag for a person's city or state, so they go in `--body`, and the other flags are applied on top. `--company-city` and `--company-state` are different filters: they match where the person's company is headquartered.
+
+The SDKs send `filter` to the API as written, so `city` and `state` work in every SDK version. Version 1.0.1 of the JavaScript and Python SDKs was published before these filters existed, so a type checker may report them as unknown keys there.
+
 ## Describe who you want
 
 Semantic search takes a plain-language description. The API turns it into person filters and a description of the companies those people work at.
@@ -462,6 +615,8 @@ companyenrich people search --semantic "VP of sales at Series A SaaS startups in
 </CodeGroup>
 
 The `interpretation` field shows what the API inferred. A query it cannot infer any filters from is rejected, so include something concrete, such as a role or a country. See [Semantic search options](/docs/people-search-api-filters#semantic-search-options).
+
+A place named in the description is matched at country level. To keep the results in one city or state, add `filter.city` or `filter.state` to the same request, as in [Find people in a city or state](#find-people-in-a-city-or-state).
 
 ## Find people at companies like your customers
 
