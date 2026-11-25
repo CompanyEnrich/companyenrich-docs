@@ -872,7 +872,7 @@
         "ce": "financial.fundingRounds[].amount",
         "expand": "financial",
         "fidelity": "transformed",
-        "note": "Take the latest round by `date`. The amount is a string."
+        "note": "Take the latest round by `date`. The amount is text with its currency, such as `$36M`."
       },
       {
         "group": "Funding",
@@ -2528,7 +2528,7 @@
         "ce": {
           "filter": {
             "currentPositionStartDate": {
-              "after": "2026-08-01"
+              "after": "2026-08-01T00:00:00Z"
             }
           }
         },

@@ -15,7 +15,7 @@ There is no automatic translator. A query language allows combinations that a fi
 | | PDL | CompanyEnrich |
 | --- | --- | --- |
 | Query | Elasticsearch (`term`, `terms`, `exists`, `bool`, `match`, `range`, `match_phrase`, `wildcard`, `prefix`, `match_all`) or SQL that translates to it | A `filter` object. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
-| Combining conditions | Any `bool` logic: `must`, `should`, `must_not` | Every filter must match. Within one filter, an array or `in` matches any value and `notIn` excludes values. |
+| Combining conditions | Any `bool` logic: `must`, `should`, `must_not` | Every filter must match. Within one filter, `in` matches any value and `notIn` excludes values. A plain array matches any value, except on `keywords`, `technologies`, and `categories`, where it requires every value. |
 | Field names | PDL schema fields, such as `location.country` | Filter names, such as `country`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
 | Values | Lowercase canonical values | Exact values from [field values](/docs/field-values), ISO country codes, and IDs from the free lookup endpoints |
 | Array limit | 100 values | Depends on the filter. People search `domain` takes up to 2,500 per rule. |

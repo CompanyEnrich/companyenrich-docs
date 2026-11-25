@@ -15,7 +15,7 @@ A translation that silently drops a condition returns, and charges for, the wron
 | | Crustdata | CompanyEnrich |
 | --- | --- | --- |
 | Request | `filters`, a condition or an `and`/`or` group of conditions, plus `search` for a ranked query | `filter`, an object with one key per filter. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
-| Combining conditions | Any mix of `and` and `or` groups, nested | Every filter must match. Within a filter, an array or `in` matches any value, and `notIn` excludes values. There is no OR across different filters. |
+| Combining conditions | Any mix of `and` and `or` groups, nested | Every filter must match. Within a filter, `in` matches any value and `notIn` excludes values. A plain array matches any value, except on `keywords`, `technologies`, and `categories`, where it requires every value. There is no OR across different filters. |
 | Operators | `=`, `!=`, `in`, `not_in`, `<`, `=<`, `>`, `=>`, fuzzy and phrase text matching, null checks, `has_all`, and geo operators | A value or an array, `in` and `notIn` rules, `min` and `max` ranges, `after` and `before` dates, and `require` for features a company must have |
 | Field names | Dot paths into the record, such as `locations.country` and `experience.employment_details.current.title` | Filter names, such as `country` and `position`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
 | Values | Index values, such as `Privately Held`, `Vice President`, and ISO alpha-3 codes, found with Crustdata autocomplete | Exact values from [field values](/docs/field-values), ISO alpha-2 country codes, and IDs from the free lookup endpoints |
@@ -161,7 +161,7 @@ Use `filter.state` and `filter.city` for the person's location. They take intege
 | `{"field": "basic_profile.location.country", "type": "in", "value": ["United States", "Canada"]}` | `{"filter": {"country": ["US", "CA"]}}` | transformed | ISO 3166-1 alpha-2 codes instead of full names. |
 | `{"field": "basic_profile.location.state", "type": "=", "value": "California"}` | `{"filter": {"state": "STATE_ID"}}` | lossy | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose reported location has been resolved to that state. A `notIn` exclusion keeps people without a resolved state. |
 | `{"field": "basic_profile.location.city", "type": "=", "value": "San Francisco"}` | `{"filter": {"city": "CITY_ID"}}` | lossy | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose reported location has been resolved to that city. A `notIn` exclusion keeps people without a resolved city. |
-| `{"field": "experience.employment_details.current.start_date", "type": "=>", "value": "2026-08-01"}` | `{"filter": {"currentPositionStartDate": {"after": "2026-08-01"}}}` | renamed | For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. |
+| `{"field": "experience.employment_details.current.start_date", "type": "=>", "value": "2026-08-01"}` | `{"filter": {"currentPositionStartDate": {"after": "2026-08-01T00:00:00Z"}}}` | renamed | For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. |
 | `{"field": "experience.employment_details.past.company_website_domain", "type": "=", "value": "google.com"}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | renamed |   |
 | `{"field": "experience.employment_details.past.title", "type": "(.)", "value": "product manager"}` | `{"filter": {"pastExperience": {"position": "product manager"}}}` | lossy |   |
 | `{"field": "education.schools.school", "type": "(.)", "value": "Stanford University"}` | `{"filter": {"education": {"institutionName": "Stanford University"}}}` | lossy | Or match the school's LinkedIn page with `institutionLinkedinHandle`. Degree and year filters have no equivalent. |
@@ -178,7 +178,7 @@ Use `filter.state` and `filter.city` for the person's location. They take intege
 
 ## Conditions that do not translate
 
-* **OR across different fields.** Run one search per branch and merge the results on `id`. OR across values of one field works: send an array, or `in`.
+* **OR across different fields.** Run one search per branch and merge the results on `id`. OR across values of one field works: send `in`.
 * **Sorting.** Sort the records in your code. To reproduce a top list, such as the largest companies, count the matches for free, fetch every page, then sort.
 * **Radius and polygon searches.** Filter by the countries, states, or cities in the area.
 * **Followers, hiring, web traffic, reviews, SIC codes, and technology categories.**
