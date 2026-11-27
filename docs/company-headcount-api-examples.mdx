@@ -1,10 +1,12 @@
 ---
 title: "Company Headcount API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Headcount basics"
 description: "Ready-to-run Company Headcount API requests: current headcount by department, 12-month history, older history, headcount with the company profile, and searches for growing, shrinking, and department-heavy companies."
 ---
 
 Each example on this page is one [Company Headcount API](/docs/company-headcount-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers the lookup, its history, and the two search filters. For a specific job, such as getting an employee count or tracking changes at your accounts, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -98,6 +100,31 @@ companyenrich company workforce stripe.com
 </CodeGroup>
 
 To look up by CompanyEnrich ID in place of the domain, send `id` in cURL and JavaScript, `company_id` in Python and Ruby, and `companyId` in PHP. The CLI accepts either a domain or an ID as its argument.
+
+The response has the current headcount and the latest 12 months of history. This example is shortened and shows a fictional company.
+
+```json
+{
+  "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "domain": "acme-analytics.example",
+  "observedEmployeeCount": 312,
+  "employeeCountRange": "201-500",
+  "departmentHeadcount": {
+    "cSuite": 6,
+    "engineeringTechnical": 124,
+    "sales": 58,
+    "marketing": 27
+  },
+  "unclassifiedHeadcount": 41,
+  "historyFrom": "2025-11-01",
+  "historyTo": "2026-11-01",
+  "history": [
+    { "date": "2026-10-01", "observedEmployeeCount": 312 },
+    { "date": "2026-04-01", "observedEmployeeCount": 287 }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
 
 ## Read the last 12 months of history
 
@@ -270,7 +297,7 @@ The expansion also works on company search, batch enrichment, and bulk enrichmen
 
 ## Find companies that are growing
 
-The `workforceGrowth` filter on company search matches headcount change over a period. This search finds SaaS companies in the United States whose headcount grew at least 20% in the last year.
+The `workforceGrowth` filter on company search matches headcount change over a period. This search finds SaaS companies in the United States whose headcount grew at least 20% in the last year. The filter needs a `period` and a `department`, and `overall` measures the whole company.
 
 <CodeGroup>
 
@@ -282,7 +309,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
     "filter": {
       "categories": "saas",
       "country": "US",
-      "workforceGrowth": {"period": "y1", "min": 0.2}
+      "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2}
     },
     "pageSize": 25
   }'
@@ -293,7 +320,7 @@ const page = await client.companies.search({
   filter: {
     categories: 'saas',
     country: 'US',
-    workforceGrowth: { period: 'y1', min: 0.2 },
+    workforceGrowth: { period: 'y1', department: 'overall', min: 0.2 },
   },
   pageSize: 25,
 });
@@ -308,7 +335,7 @@ page = client.companies.search(
     filter={
         "categories": "saas",
         "country": "US",
-        "workforceGrowth": {"period": "y1", "min": 0.2},
+        "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
     },
     page_size=25,
 )
@@ -322,7 +349,7 @@ page = client.companies.search(
   filter: {
     categories: "saas",
     country: "US",
-    workforceGrowth: { period: "y1", min: 0.2 }
+    workforceGrowth: { period: "y1", department: "overall", min: 0.2 }
   },
   page_size: 25
 )
@@ -337,7 +364,7 @@ $page = $client->companies->search(
     filter: [
         'categories' => 'saas',
         'country' => 'US',
-        'workforceGrowth' => ['period' => 'y1', 'min' => 0.2],
+        'workforceGrowth' => ['period' => 'y1', 'department' => 'overall', 'min' => 0.2],
     ],
     pageSize: 25,
 );
@@ -348,7 +375,7 @@ foreach ($page['items'] as $company) {
 ```
 
 ```bash CLI
-companyenrich company search --category saas --country US --growth 20%.. --growth-period y1 --limit 25
+companyenrich company search --category saas --country US --growth 20%.. --growth-period y1 --growth-department overall --limit 25
 ```
 
 </CodeGroup>
@@ -368,7 +395,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
   -d '{
     "filter": {
       "employees": ["201-500", "501-1K"],
-      "workforceGrowth": {"period": "m6", "max": -0.1}
+      "workforceGrowth": {"period": "m6", "department": "overall", "max": -0.1}
     },
     "pageSize": 25
   }'
@@ -378,7 +405,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
 const page = await client.companies.search({
   filter: {
     employees: ['201-500', '501-1K'],
-    workforceGrowth: { period: 'm6', max: -0.1 },
+    workforceGrowth: { period: 'm6', department: 'overall', max: -0.1 },
   },
   pageSize: 25,
 });
@@ -392,7 +419,7 @@ for (const company of page.items) {
 page = client.companies.search(
     filter={
         "employees": ["201-500", "501-1K"],
-        "workforceGrowth": {"period": "m6", "max": -0.1},
+        "workforceGrowth": {"period": "m6", "department": "overall", "max": -0.1},
     },
     page_size=25,
 )
@@ -405,7 +432,7 @@ for company in page["items"]:
 page = client.companies.search(
   filter: {
     employees: ["201-500", "501-1K"],
-    workforceGrowth: { period: "m6", max: -0.1 }
+    workforceGrowth: { period: "m6", department: "overall", max: -0.1 }
   },
   page_size: 25
 )
@@ -419,7 +446,7 @@ end
 $page = $client->companies->search(
     filter: [
         'employees' => ['201-500', '501-1K'],
-        'workforceGrowth' => ['period' => 'm6', 'max' => -0.1],
+        'workforceGrowth' => ['period' => 'm6', 'department' => 'overall', 'max' => -0.1],
     ],
     pageSize: 25,
 );
@@ -430,7 +457,7 @@ foreach ($page['items'] as $company) {
 ```
 
 ```bash CLI
-companyenrich company search --employees 201-500,501-1K --growth ..-10% --growth-period m6 --limit 25
+companyenrich company search --employees 201-500,501-1K --growth ..-10% --growth-period m6 --growth-department overall --limit 25
 ```
 
 </CodeGroup>
@@ -516,6 +543,18 @@ companyenrich company search --country DE --headcount engineering_technical=50..
 </CodeGroup>
 
 Add more entries to `workforceSize` to set several ranges at once. Department names in the workforce filters use underscores, such as `engineering_technical`.
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                              | Page                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Get the number of employees at a company          | [Get a company's employee count](/docs/get-company-employee-count)                    |
+| Get headcount month by month, back through years  | [Get a company's headcount history](/docs/get-company-headcount-history)              |
+| Watch a list of accounts for growth or decline    | [Track headcount changes at your accounts](/docs/track-headcount-changes)             |
+| Measure one team, such as sales or engineering    | [Track headcount growth by department](/docs/track-headcount-by-department)           |
+| Find new companies by how fast they are growing   | [Find fast-growing companies](/docs/find-fast-growing-companies)                      |
 
 ## Related pages
 

@@ -1,10 +1,12 @@
 ---
 title: "Semantic Company Search API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Semantic basics"
 description: "Ready-to-run semantic company searches: describe a market, read what the API inferred, combine a description with filters, turn off inference, tune ranking, count for free, export, and find people at matching companies."
 ---
 
 Each example on this page is one [Semantic Company Search API](/docs/semantic-company-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers every semantic option, counting, and exports. For a specific job, such as giving an AI agent a search tool or finding companies in a niche, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -121,6 +123,28 @@ companyenrich company search --semantic "AI tools for hospitals" --limit 25
 
 </CodeGroup>
 
+The response holds the matching companies and a cursor for the next page. This example is shortened and shows a fictional company, as do the other responses on this page.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Health AI",
+      "domain": "acme-health-ai.example",
+      "description": "Acme Health AI builds clinical documentation software for hospitals.",
+      "employees": "51-200",
+      "industry": "Software Publishers",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
 ## See what the API inferred from your query
 
 By default, the API reads attributes such as location and size from your description. This query returns only companies in Turkey and ranks companies categorized as SaaS higher.
@@ -199,7 +223,18 @@ companyenrich company search --semantic "saas companies in Turkey" --limit 25
 
 </CodeGroup>
 
-`interpretation.filter` holds the filters that were applied, and `interpretation.boost` holds the attributes that only affect ranking. See [How your query is interpreted](/docs/semantic-company-search-api#how-your-query-is-interpreted).
+`interpretation.filter` holds the filters that were applied, and `interpretation.boost` holds the attributes that only affect ranking. For this query, the response carries an `interpretation` like this one. The values are illustrative.
+
+```json
+{
+  "interpretation": {
+    "filter": { "country": ["TR"] },
+    "boost": { "categories": ["saas"] }
+  }
+}
+```
+
+`interpretation.filter` uses the same format as the request `filter`. See [How your query is interpreted](/docs/semantic-company-search-api#how-your-query-is-interpreted).
 
 ## Combine a description with filters
 
@@ -464,6 +499,15 @@ companyenrich company count --semantic "logistics software" --country DE
 
 </CodeGroup>
 
+The response has two numbers, and an `interpretation` when the API inferred something from the description. These values are illustrative.
+
+```json
+{
+  "count": 10000,
+  "total": 31250
+}
+```
+
 `count` is the number of companies your plan can access. For a semantic query, `total` describes the pool of candidates the semantic search draws from.
 
 ## Export a semantic search to CSV
@@ -622,6 +666,16 @@ companyenrich people search --seniority c-suite,vp --company-semantic "AI tools 
 </CodeGroup>
 
 This search covers people at the 1,000 best-matching companies. See the [People Search API](/docs/people-search-api) for the person filters.
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                                 | Page                                                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Let an AI agent search for companies                 | [Give an AI agent a company search tool](/docs/company-search-tool-for-ai-agents)           |
+| Find companies in a niche that has no industry code  | [Find companies in a niche from a description](/docs/find-companies-in-a-niche)             |
+| Build a list from exact criteria instead             | [Build a list of companies that match your ICP](/docs/build-an-icp-company-list)            |
 
 ## Related pages
 

@@ -1,0 +1,349 @@
+---
+title: "Find the employees of a company"
+sidebarTitle: "Employees of a company"
+description: "List the people who work at a company with the People Search API: count them for free, narrow to a department, and find the people who joined recently."
+---
+
+To find the people who work at a company, search the [People Search API](/docs/people-search-api) with the company's domain in `filter.domain`. The search returns current employees as full person records, and filters narrow it to a department, a seniority level, or people who joined after a date. Counting the matches is free, and a search costs 2 credits per person returned.
+
+## Count a company's employees for free
+
+Start with the count endpoint. It takes the same filter as a search and costs nothing, so you know how many people a search would return before you pay for it.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"domain": "stripe.com"}
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const { count, total } = await client.people.count({
+  filter: { domain: 'stripe.com' },
+});
+console.log(count, total);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+result = client.people.count(filter={"domain": "stripe.com"})
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+result = client.people.count(filter: { domain: "stripe.com" })
+puts result["count"], result["total"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$result = $client->people->count(filter: ['domain' => 'stripe.com']);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich people count --domain stripe.com
+```
+
+</CodeGroup>
+
+The response has two numbers. These values are illustrative.
+
+```json
+{
+  "count": 11500,
+  "total": 11500
+}
+```
+
+`total` is the number of people who match, and `count` is the number your plan can access. Use the company's primary domain. A domain that is not the company's domain in the dataset matches no one, so a count of 0 is a reason to check the domain. The later examples on this page reuse the `client` created here.
+
+## List the people in one department
+
+Add `department` to get one function. This search returns people in engineering at the company.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": "stripe.com",
+      "department": "engineering-technical"
+    },
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { domain: 'stripe.com', department: 'engineering-technical' },
+  pageSize: 100,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position, person.seniority);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"domain": "stripe.com", "department": "engineering-technical"},
+    page_size=100,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"), person.get("seniority"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { domain: "stripe.com", department: "engineering-technical" },
+  page_size: 100
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} #{person['position']} #{person['seniority']}"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['domain' => 'stripe.com', 'department' => 'engineering-technical'],
+    pageSize: 100,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $person['seniority'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --department engineering-technical --limit 100
+```
+
+</CodeGroup>
+
+Each item is a full [person record](/docs/person-schema). This example is shortened and shows a fictional person.
+
+```json
+{
+  "items": [
+    {
+      "id": 9000000000002,
+      "name": "Sam Example",
+      "position": "Senior Software Engineer",
+      "seniority": "senior",
+      "department": "engineering-technical",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/samexample"
+      },
+      "experiences": [
+        {
+          "startDate": "2026-09-14",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "Senior Software Engineer",
+          "seniority": "senior",
+          "department": "engineering-technical",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        }
+      ],
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+A department includes its sub-departments. The people department names use hyphens, such as `engineering-technical`. See [Departments](/docs/field-values#departments) for the full list.
+
+## Find the people who joined in the last 90 days
+
+`currentCompanyStartDate` matches the date a person joined their current company. This example finds the engineers who joined in the last 90 days.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": "stripe.com",
+      "department": "engineering-technical",
+      "currentCompanyStartDate": {"after": "2026-09-01T00:00:00Z"}
+    },
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+const recent = await client.people.search({
+  filter: {
+    domain: 'stripe.com',
+    department: 'engineering-technical',
+    currentCompanyStartDate: { after: since },
+  },
+  pageSize: 100,
+});
+
+for (const person of recent.items) {
+  const job = person.experiences?.find((experience) => experience.isMatched);
+  console.log(person.name, person.position, job?.startDate);
+}
+```
+
+```python Python
+from datetime import datetime, timedelta, timezone
+
+since = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+recent = client.people.search(
+    filter={
+        "domain": "stripe.com",
+        "department": "engineering-technical",
+        "currentCompanyStartDate": {"after": since},
+    },
+    page_size=100,
+)
+
+for person in recent["items"]:
+    job = next((e for e in person.get("experiences") or [] if e.get("isMatched")), {})
+    print(person.get("name"), person.get("position"), job.get("startDate"))
+```
+
+```ruby Ruby
+require "time"
+
+since = (Time.now.utc - (90 * 24 * 60 * 60)).iso8601
+
+recent = client.people.search(
+  filter: {
+    domain: "stripe.com",
+    department: "engineering-technical",
+    currentCompanyStartDate: { after: since }
+  },
+  page_size: 100
+)
+
+recent["items"].each do |person|
+  job = (person["experiences"] || []).find { |experience| experience["isMatched"] } || {}
+  puts "#{person['name']} #{person['position']} #{job['startDate']}"
+end
+```
+
+```php PHP
+$since = (new DateTimeImmutable('-90 days', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+
+$recent = $client->people->search(
+    filter: [
+        'domain' => 'stripe.com',
+        'department' => 'engineering-technical',
+        'currentCompanyStartDate' => ['after' => $since],
+    ],
+    pageSize: 100,
+);
+
+foreach ($recent['items'] as $person) {
+    $startDate = '';
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isMatched']) {
+            $startDate = $experience['startDate'] ?? '';
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $startDate, PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --department engineering-technical \
+  --joined-after 90d --limit 100
+```
+
+</CodeGroup>
+
+A date range takes `after`, `before`, or both, and both ends are inclusive. To match the start of the current position instead of the company, use `currentPositionStartDate`. See [Find people who recently started a new role](/docs/find-people-who-recently-started-a-role).
+
+## Get every employee
+
+A page holds at most 100 people. For the whole company, follow `nextCursor`, or run an export, which pages through the search in the background and gives you one file.
+
+```bash
+companyenrich people export --domain stripe.com --limit 5000 --wait -o stripe-people.csv
+```
+
+An export costs the same 2 credits per person as the search, and `limit` sets the most people it returns. See [Export a people search to CSV](/docs/people-search-api-examples#export-a-people-search-to-csv) for the same export in cURL and the SDKs.
+
+## Common questions
+
+### Does the search return only current employees?
+
+Yes. Filters at the top level of `filter`, such as `domain` and `department`, match a person's current job. To find people who used to work at a company, put the domain inside `pastExperience`. See [Find former employees of a company](/docs/people-search-api-examples#find-former-employees-of-a-company).
+
+### How is this different from the Company Headcount API?
+
+The Company Headcount API returns a company's employee count, by department and over time, without the person records. Use it when you need the numbers, and this search when you need the people. See [Get a company's employee count](/docs/get-company-employee-count).
+
+### Can I search by company name?
+
+The filter takes a domain, a CompanyEnrich company ID in `companyId`, or a LinkedIn handle in `companyLinkedinHandle`. To go from a name to a domain, see [Find a company's domain from its name](/docs/find-company-domain-by-name).
+
+### Does the search return email addresses?
+
+No. Look up the work email with the person's `id`. See [Find a person's work email](/docs/find-a-work-email).
+
+### What does listing a company's employees cost?
+
+2 credits for each person returned. The count is free. Listing 500 people costs 1,000 credits, so use a department or seniority filter to get only the people you need.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find decision makers at your target accounts" icon="user" href="/docs/find-decision-makers">
+    Narrow a company to its leaders.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every person filter and the date ranges.
+  </Card>
+  <Card title="Get a company's employee count" icon="chart-line" href="/docs/get-company-employee-count">
+    Headcount numbers without the person records.
+  </Card>
+  <Card title="Person schema" icon="table-list" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+</CardGroup>

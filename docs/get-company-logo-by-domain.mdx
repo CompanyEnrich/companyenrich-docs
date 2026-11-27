@@ -1,0 +1,246 @@
+---
+title: "Get a company logo by domain"
+sidebarTitle: "Company logos"
+description: "Get any company's logo from its domain: a free image URL that needs no API key, or the logoUrl field on every Company Enrichment API record."
+---
+
+To get a company's logo from its domain, load `https://api.companyenrich.com/logo/` followed by the domain. The Logo API returns the image itself, needs no API key, and costs no credits. Every company record from the [Company Enrichment API](/docs/company-enrichment-api) also has the logo address in `logoUrl`, so any enrichment or search gives you the logo along with the company's details.
+
+| You have                         | Use                                                                               | Credits |
+| -------------------------------- | --------------------------------------------------------------------------------- | ------- |
+| A domain, and you want the image | `https://api.companyenrich.com/logo/stripe.com`                                   | None    |
+| A domain, and you want the company's details too | [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) | 1    |
+| The first letters of a domain    | [`GET /v2/companies/autocomplete`](/api-reference/v2/get-companies-autocomplete)  | None    |
+
+## Get a logo with one URL
+
+Put the domain at the end of the address and use it anywhere an image URL works.
+
+<CodeGroup>
+
+```html HTML
+<img src="https://api.companyenrich.com/logo/stripe.com" alt="Stripe logo" width="64" height="64" />
+```
+
+```bash cURL
+# Saves the image and prints its content type.
+curl -s -o stripe-logo -w "%{content_type}\n" https://api.companyenrich.com/logo/stripe.com
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const response = await fetch('https://api.companyenrich.com/logo/stripe.com');
+
+const extensions = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/svg+xml': 'svg' };
+const extension = extensions[response.headers.get('content-type')] ?? 'img';
+
+await writeFile(`stripe-logo.${extension}`, Buffer.from(await response.arrayBuffer()));
+```
+
+```python Python
+from urllib.request import urlopen
+
+with urlopen("https://api.companyenrich.com/logo/stripe.com") as response:
+    extensions = {"image/jpeg": "jpg", "image/png": "png", "image/svg+xml": "svg"}
+    extension = extensions.get(response.headers.get_content_type(), "img")
+    with open(f"stripe-logo.{extension}", "wb") as file:
+        file.write(response.read())
+```
+
+</CodeGroup>
+
+How the Logo API behaves:
+
+* **No key and no credits.** The request needs no `Authorization` header. The Logo API is free under a fair-use limit. The [Logo API page](https://companyenrich.com/free-tools/logo-api) states the current limit and the usage terms.
+* **The format varies.** The image can be a JPEG, a PNG, or an SVG, depending on the company. Read the `Content-Type` header when you save the file.
+* **The size varies.** Set the display size in your own markup, as the HTML example does.
+* **A missing logo is not an error.** A domain with no known logo returns `200` with a generated placeholder image.
+* **Logos can be cached.** Responses are sent with `Cache-Control: public, max-age=2592000`, which lets browsers and CDNs keep a logo for 30 days.
+
+Send the company's bare domain in lowercase, such as `stripe.com`, with no `www.` and no path.
+
+## Read the logo from a company record
+
+When you also need the company's name, industry, or size, enrich the domain and read `logoUrl` from the record. Enrichment costs 1 credit.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrich({ domain: 'stripe.com' });
+console.log(company.name, company.logoUrl);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com")
+print(company.get("name"), company["logoUrl"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com")
+puts company["name"], company["logoUrl"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrich('stripe.com');
+echo $company['name'] ?? '', ' ', $company['logoUrl'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --fields name,domain,logoUrl
+```
+
+</CodeGroup>
+
+`logoUrl` is present on every company record. It is an address built from the company's ID, and like the domain address above it returns the image without an API key. This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "website": "https://acme-analytics.example",
+  "logoUrl": "https://api.companyenrich.com/companies/logo/3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "industry": "Software Publishers",
+  "updatedAt": "2026-10-01T12:00:00Z"
+}
+```
+
+Search results, batch and bulk enrichment results, and the company summaries inside a person's work history include `logoUrl` as well. The later examples on this page reuse the `client` created here.
+
+## Suggest companies with their logos as someone types
+
+Company autocomplete returns up to 10 companies whose domain matches what was typed, each with its `name`, `domain`, and `logoUrl`. It needs an API key and costs no credits, which makes it a fit for a company picker in a form.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/autocomplete?query=strip" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const { items } = await client.companies.autocomplete('strip');
+
+for (const company of items) {
+  console.log(company.name, company.domain, company.logoUrl);
+}
+```
+
+```python Python
+suggestions = client.companies.autocomplete("strip")
+
+for company in suggestions["items"]:
+    print(company.get("name"), company["domain"], company["logoUrl"])
+```
+
+```ruby Ruby
+suggestions = client.companies.autocomplete("strip")
+
+suggestions["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['logoUrl']}"
+end
+```
+
+```php PHP
+$suggestions = $client->companies->autocomplete('strip');
+
+foreach ($suggestions['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['logoUrl'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company autocomplete strip
+```
+
+</CodeGroup>
+
+The response lists the matches in `items`. An exact domain match comes first, then domains that start with the query. This example shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "logoUrl": "https://api.companyenrich.com/companies/logo/3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23"
+    }
+  ]
+}
+```
+
+## Show logos for a list of domains
+
+A logo address is the domain added to a fixed prefix, so a list of domains needs no API call. This example builds an image tag for each domain.
+
+```javascript
+const domains = ['stripe.com', 'adyen.com', 'notion.com'];
+
+const html = domains
+  .map((domain) => `<img src="https://api.companyenrich.com/logo/${domain}" alt="${domain} logo" width="32" height="32" />`)
+  .join('\n');
+
+console.log(html);
+```
+
+## Common questions
+
+### Is the Logo API free?
+
+Yes. It needs no API key and costs no credits. It runs under a fair-use limit, which the [Logo API page](https://companyenrich.com/free-tools/logo-api) states along with the usage terms.
+
+### What image format and size do I get?
+
+The image can be a JPEG, a PNG, or an SVG, and its size depends on the company. Read the `Content-Type` header if the format matters, and set the size you want when you display the image.
+
+### What happens when a company has no logo?
+
+The Logo API still answers `200`, with a generated placeholder image. It does not return `404` for an unknown domain.
+
+### Can I get a logo from a company name?
+
+The Logo API takes a domain. To go from a name to a domain, see [Find a company's domain from its name](/docs/find-company-domain-by-name). The record that lookup returns includes `logoUrl`.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Find a company's domain from its name" icon="magnifying-glass" href="/docs/find-company-domain-by-name">
+    Turn a company name into a domain and a full record.
+  </Card>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    Which endpoints are free and what the others cost.
+  </Card>
+</CardGroup>

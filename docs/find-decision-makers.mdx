@@ -1,0 +1,390 @@
+---
+title: "Find decision makers at your target accounts"
+sidebarTitle: "Decision makers"
+description: "Find VPs, executives, and other decision makers at one company, a list of accounts, or every company that matches your ICP, with the People Search API."
+---
+
+To find decision makers at a company, search the [People Search API](/docs/people-search-api) by the company's domain and a seniority level. Seniority values such as `c-suite` and `vp` pick the level, and `department` picks the function, such as sales or engineering. Each result is a full person record with the current role and the work history. A search costs 2 credits per person returned.
+
+## Find VPs and above at one company
+
+This search returns people in sales at Stripe whose seniority is VP or higher.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": "stripe.com",
+      "seniority": ["owner", "founder", "c-suite", "partner", "vp"],
+      "department": "sales"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const vpAndAbove = ['owner', 'founder', 'c-suite', 'partner', 'vp'];
+
+const page = await client.people.search({
+  filter: { domain: 'stripe.com', seniority: vpAndAbove, department: 'sales' },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  console.log(person.name, person.position, person.socials?.linkedinUrl);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+vp_and_above = ["owner", "founder", "c-suite", "partner", "vp"]
+
+page = client.people.search(
+    filter={"domain": "stripe.com", "seniority": vp_and_above, "department": "sales"},
+    page_size=25,
+)
+
+for person in page["items"]:
+    print(person.get("name"), person.get("position"), (person.get("socials") or {}).get("linkedinUrl"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+vp_and_above = ["owner", "founder", "c-suite", "partner", "vp"]
+
+page = client.people.search(
+  filter: { domain: "stripe.com", seniority: vp_and_above, department: "sales" },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  puts "#{person['name']} #{person['position']} #{person.dig('socials', 'linkedinUrl')}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$vpAndAbove = ['owner', 'founder', 'c-suite', 'partner', 'vp'];
+
+$page = $client->people->search(
+    filter: ['domain' => 'stripe.com', 'seniority' => $vpAndAbove, 'department' => 'sales'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com --seniority owner,founder,c-suite,partner,vp \
+  --department sales --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [person record](/docs/person-schema). This example is shortened and shows a fictional person.
+
+```json
+{
+  "items": [
+    {
+      "id": 9000000000001,
+      "name": "Jane Doe",
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+      },
+      "experiences": [
+        {
+          "startDate": "2021-03-01",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "VP of Sales",
+          "seniority": "vp",
+          "department": "sales",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        }
+      ],
+      "updatedAt": "2026-09-15T08:30:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+The seniority levels, from the top down, are `owner`, `founder`, `c-suite`, `partner`, `vp`, `head`, `director`, `manager`, `senior`, `entry`, and `intern`. An array matches any of the levels you list. These filters match a person's current job. The later examples on this page reuse the `client` and the `vpAndAbove` list created here.
+
+## Search a list of accounts in one request
+
+`filter.domain` takes up to 2,500 domains, so one search covers a whole account list. The experience with `isMatched` set to `true` tells you which account each person belongs to.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": ["stripe.com", "adyen.com", "checkout.com"],
+      "seniority": ["owner", "founder", "c-suite", "partner", "vp"]
+    },
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+const accounts = ['stripe.com', 'adyen.com', 'checkout.com'];
+
+const page = await client.people.search({
+  filter: { domain: accounts, seniority: vpAndAbove },
+  pageSize: 100,
+});
+
+for (const person of page.items) {
+  const job = person.experiences?.find((experience) => experience.isMatched);
+  console.log(job?.company?.domain, person.name, person.position);
+}
+```
+
+```python Python
+accounts = ["stripe.com", "adyen.com", "checkout.com"]
+
+page = client.people.search(
+    filter={"domain": accounts, "seniority": vp_and_above},
+    page_size=100,
+)
+
+for person in page["items"]:
+    job = next((e for e in person.get("experiences") or [] if e.get("isMatched")), {})
+    print((job.get("company") or {}).get("domain"), person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+accounts = ["stripe.com", "adyen.com", "checkout.com"]
+
+page = client.people.search(
+  filter: { domain: accounts, seniority: vp_and_above },
+  page_size: 100
+)
+
+page["items"].each do |person|
+  job = (person["experiences"] || []).find { |experience| experience["isMatched"] } || {}
+  puts "#{job.dig('company', 'domain')} #{person['name']} #{person['position']}"
+end
+```
+
+```php PHP
+$accounts = ['stripe.com', 'adyen.com', 'checkout.com'];
+
+$page = $client->people->search(
+    filter: ['domain' => $accounts, 'seniority' => $vpAndAbove],
+    pageSize: 100,
+);
+
+foreach ($page['items'] as $person) {
+    $domain = '';
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isMatched']) {
+            $domain = $experience['company']['domain'] ?? '';
+            break;
+        }
+    }
+    echo $domain, ' ', $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --domain stripe.com,adyen.com,checkout.com \
+  --seniority owner,founder,c-suite,partner,vp --limit 100
+```
+
+</CodeGroup>
+
+A page holds at most 100 people. Follow `nextCursor` for the rest, or run an export for a long list. See [Export a people search to CSV](/docs/people-search-api-examples#export-a-people-search-to-csv).
+
+## Find decision makers at companies that match your ICP
+
+When you have criteria and not a list, describe the companies in the `company` field. It takes the same filters as a company search, and the people search returns only people whose current company matches. This search finds sales leaders at SaaS companies in the United States with 51 to 500 employees.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "seniority": ["c-suite", "vp"],
+      "department": "sales"
+    },
+    "company": {
+      "filter": {
+        "country": "US",
+        "categories": "saas",
+        "employees": ["51-200", "201-500"]
+      }
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { seniority: ['c-suite', 'vp'], department: 'sales' },
+  company: {
+    filter: { country: 'US', categories: 'saas', employees: ['51-200', '201-500'] },
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  const job = person.experiences?.find((experience) => experience.isMatched);
+  console.log(person.name, person.position, job?.company?.name);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"seniority": ["c-suite", "vp"], "department": "sales"},
+    company={
+        "filter": {"country": "US", "categories": "saas", "employees": ["51-200", "201-500"]},
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    job = next((e for e in person.get("experiences") or [] if e.get("isMatched")), {})
+    print(person.get("name"), person.get("position"), (job.get("company") or {}).get("name"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { seniority: ["c-suite", "vp"], department: "sales" },
+  company: {
+    filter: { country: "US", categories: "saas", employees: ["51-200", "201-500"] }
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  job = (person["experiences"] || []).find { |experience| experience["isMatched"] } || {}
+  puts "#{person['name']} #{person['position']} #{job.dig('company', 'name')}"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['seniority' => ['c-suite', 'vp'], 'department' => 'sales'],
+    company: [
+        'filter' => ['country' => 'US', 'categories' => 'saas', 'employees' => ['51-200', '201-500']],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    $company = '';
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isMatched']) {
+            $company = $experience['company']['name'] ?? '';
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $company, PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --seniority c-suite,vp --department sales \
+  --company-country US --company-category saas --company-employees 51-200,201-500 --limit 25
+```
+
+</CodeGroup>
+
+The `company` field also takes a description or lookalike seeds. A company query that uses a description, lookalike seeds, or the keyword, technology, funding, or workforce filters matches people at the 1,000 best-matching companies. See [Company query](/docs/people-search-api-filters#company-query).
+
+## Find decision makers who joined recently
+
+A recent start date is a common signal for outreach. Add `currentCompanyStartDate` to keep only people who joined their company after a date:
+
+```json
+{
+  "filter": {
+    "domain": ["stripe.com", "adyen.com", "checkout.com"],
+    "seniority": ["c-suite", "vp", "head", "director"],
+    "currentCompanyStartDate": { "after": "2026-09-01T00:00:00Z" }
+  }
+}
+```
+
+In the CLI, `--joined-after 90d` covers the last 90 days without a fixed date.
+
+## Common questions
+
+### Does the search return email addresses?
+
+No. A person record has the name, role, location, LinkedIn URL, and work history. Look up the work email separately with the person's `id`. See [Find a person's work email](/docs/find-a-work-email).
+
+### How do I check the size of a list before I pay?
+
+Send the same query to the count endpoint, [`POST /v2/people/search/count`](/api-reference/v2/post-people-search-count). It returns the number of matches and costs nothing. In the CLI, this is `companyenrich people count` with the same flags.
+
+### How many accounts can I search at once?
+
+Up to 2,500 domains in `filter.domain`. For more, split the list across several searches, or describe the companies with the `company` field.
+
+### Can I search by job title instead of seniority?
+
+Yes. `position` matches phrases in the current job title, such as `head of growth`. You can use it together with `seniority` and `department`.
+
+### What does a decision-maker search cost?
+
+2 credits for each person returned. The count is free, and a search that returns no people costs 2 credits. Work emails are charged separately, at 10 credits for each new email found.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every person filter and the company query.
+  </Card>
+  <Card title="Find a person's work email" icon="at" href="/docs/find-a-work-email">
+    Get the email address for the people you found.
+  </Card>
+  <Card title="Find the employees of a company" icon="users" href="/docs/find-employees-of-a-company">
+    List everyone at a company, or one department.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Start with the accounts, then find the people.
+  </Card>
+</CardGroup>

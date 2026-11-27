@@ -1,0 +1,376 @@
+---
+title: "Find companies that use a technology"
+sidebarTitle: "By technology"
+description: "Find companies that use a technology such as Shopify with the Company Search API: filter by one or several, look up names for free, and return tech stacks."
+---
+
+To find companies that use a technology, filter the [Company Search API](/docs/company-search-api) by `technologies`. Send one name, such as `Shopify`, or several. An array matches companies that use all of them, and `in` matches companies that use any of them. Look up names with the free technology autocomplete. A filter search costs 1 credit per company returned.
+
+## Find companies that use one technology
+
+This search returns companies in the United States with 11 to 200 employees that use Shopify.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "technologies": "Shopify",
+      "country": "US",
+      "employees": ["11-50", "51-200"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  filter: {
+    technologies: 'Shopify',
+    country: 'US',
+    employees: ['11-50', '51-200'],
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.employees);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    filter={
+        "technologies": "Shopify",
+        "country": "US",
+        "employees": ["11-50", "51-200"],
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("employees"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  filter: {
+    technologies: "Shopify",
+    country: "US",
+    employees: ["11-50", "51-200"]
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['employees']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    filter: [
+        'technologies' => 'Shopify',
+        'country' => 'US',
+        'employees' => ['11-50', '51-200'],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --tech Shopify --country US --employees 11-50,51-200 --limit 25
+```
+
+</CodeGroup>
+
+The response is a page of [company records](/docs/company-schema) and a cursor for the next page. The filter decides which companies match. To see each company's technologies in the response, add the `technologies` expansion, as shown in [Return each company's tech stack](#return-each-companys-tech-stack). The later examples on this page reuse the `client` created here.
+
+## Look up a technology name
+
+Technology autocomplete returns up to 10 names that start with your text, ordered by popularity. It costs no credits. Use it to find the name CompanyEnrich has for a technology before you search.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/technologies/autocomplete?query=shopi" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const { items } = await client.technologies.autocomplete('shopi');
+console.log(items);
+```
+
+```python Python
+suggestions = client.technologies.autocomplete("shopi")
+print(suggestions["items"])
+```
+
+```ruby Ruby
+suggestions = client.technologies.autocomplete("shopi")
+p suggestions["items"]
+```
+
+```php PHP
+$suggestions = $client->technologies->autocomplete('shopi');
+print_r($suggestions['items']);
+```
+
+```bash CLI
+companyenrich technologies shopi
+```
+
+</CodeGroup>
+
+The response lists the matching names in `items`:
+
+```json
+{
+  "items": ["Shopify"]
+}
+```
+
+## Match any of several technologies, or all of them
+
+A plain array requires every technology. Use `in` to match companies that use at least one, and `notIn` to exclude a technology. This search returns companies that use React or Vue.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "technologies": {"in": ["react", "vue"]},
+      "categories": "saas"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    technologies: { in: ['react', 'vue'] },
+    categories: 'saas',
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "technologies": {"in": ["react", "vue"]},
+        "categories": "saas",
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    technologies: { in: ["react", "vue"] },
+    categories: "saas"
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'technologies' => ['in' => ['react', 'vue']],
+        'categories' => 'saas',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --any-tech react,vue --category saas --limit 25
+```
+
+</CodeGroup>
+
+The three forms of the filter:
+
+| Form                                              | Matches companies that                |
+| ------------------------------------------------- | ------------------------------------- |
+| `"technologies": ["Shopify", "Klaviyo"]`          | Use every technology in the list.     |
+| `"technologies": {"in": ["react", "vue"]}`        | Use at least one of them.             |
+| `"technologies": {"notIn": ["WordPress"]}`        | Do not use any of them.               |
+
+Confirm each name with the autocomplete before you rely on it.
+
+## Return each company's tech stack
+
+Add `technologies` to `expand` to get the full list of technologies for every company on the page. The expansion adds 1 credit per company, so this search costs 2 credits per company.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "technologies": "Shopify",
+      "country": "US"
+    },
+    "expand": ["technologies"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: { technologies: 'Shopify', country: 'US' },
+  expand: ['technologies'],
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.domain, company.technologies);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={"technologies": "Shopify", "country": "US"},
+    expand=["technologies"],
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company["domain"], company.get("technologies"))
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: { technologies: "Shopify", country: "US" },
+  expand: ["technologies"],
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['domain']} #{(company['technologies'] || []).join(', ')}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: ['technologies' => 'Shopify', 'country' => 'US'],
+    expand: ['technologies'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['domain'], ' ', implode(', ', $company['technologies'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --tech Shopify --country US --expand technologies --limit 25
+```
+
+</CodeGroup>
+
+Each company then has a `technologies` array. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Outfitters",
+      "domain": "acme-outfitters.example",
+      "employees": "11-50",
+      "categories": ["e-commerce", "b2c"],
+      "updatedAt": "2026-10-01T12:00:00Z",
+      "technologies": ["Shopify", "Klaviyo", "Google Analytics"]
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+## Common questions
+
+### How many companies use a technology?
+
+Send the same filter to the count endpoint, [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count). It returns the number of matches and costs nothing. In the CLI, this is `companyenrich company count --tech Shopify`.
+
+### How do I find the right name for a technology?
+
+Use the free [technology autocomplete](/api-reference/v2/get-technologies-autocomplete). It suggests up to 10 names that start with the text you send, ordered by popularity.
+
+### How do I see which technologies one company uses?
+
+Enrich its domain with the `technologies` expansion. See [Check whether a company uses a technology](/docs/get-funding-headcount-and-tech-stack#check-whether-a-company-uses-a-technology).
+
+### Can I combine a technology with other filters?
+
+Yes. A company must match every filter you send, so you can add country, size, industry, funding, or founding year. See [Build a list of companies that match your ICP](/docs/build-an-icp-company-list).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Get funding, headcount, and tech stack in one call" icon="layer-group" href="/docs/get-funding-headcount-and-tech-stack">
+    Read the tech stack of a company you already know.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Combine technology with industry, size, and location.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

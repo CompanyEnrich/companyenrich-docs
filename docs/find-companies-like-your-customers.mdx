@@ -1,0 +1,417 @@
+---
+title: "Find companies like your best customers"
+sidebarTitle: "Lookalikes of your customers"
+description: "Turn a customer list into a list of lookalike companies with the Similar Companies API: choose seeds, exclude existing customers, and handle more than 10 seeds."
+---
+
+To find companies like your best customers, send up to 10 customer domains as seeds to the [Similar Companies API](/docs/similar-companies-api). It returns a ranked list of lookalike companies, each as a full company record with a similarity score. Add filters to stay in your market and to leave out the customers you already have. A lookalike search costs 5 credits per company returned.
+
+## Find lookalikes of your customers
+
+This search uses three customers as seeds, keeps the results to the United States and Canada with 51 to 500 employees, and excludes every existing customer.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com", "checkout.com"]},
+    "filter": {
+      "country": ["US", "CA"],
+      "employees": ["51-200", "201-500"],
+      "domain": {"notIn": ["stripe.com", "adyen.com", "checkout.com", "mollie.com"]}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const customers = ['stripe.com', 'adyen.com', 'checkout.com', 'mollie.com'];
+const seeds = customers.slice(0, 3);
+
+const similar = await client.companies.search({
+  lookalike: { domains: seeds },
+  filter: {
+    country: ['US', 'CA'],
+    employees: ['51-200', '201-500'],
+    domain: { notIn: customers },
+  },
+  pageSize: 25,
+});
+
+for (const company of similar.items) {
+  console.log(company.name, company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+customers = ["stripe.com", "adyen.com", "checkout.com", "mollie.com"]
+seeds = customers[:3]
+
+similar = client.companies.search(
+    lookalike={"domains": seeds},
+    filter={
+        "country": ["US", "CA"],
+        "employees": ["51-200", "201-500"],
+        "domain": {"notIn": customers},
+    },
+    page_size=25,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company.get("name"), company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+customers = ["stripe.com", "adyen.com", "checkout.com", "mollie.com"]
+seeds = customers.first(3)
+
+similar = client.companies.search(
+  lookalike: { domains: seeds },
+  filter: {
+    country: ["US", "CA"],
+    employees: ["51-200", "201-500"],
+    domain: { notIn: customers }
+  },
+  page_size: 25
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$customers = ['stripe.com', 'adyen.com', 'checkout.com', 'mollie.com'];
+$seeds = array_slice($customers, 0, 3);
+
+$similar = $client->companies->search(
+    lookalike: ['domains' => $seeds],
+    filter: [
+        'country' => ['US', 'CA'],
+        'employees' => ['51-200', '201-500'],
+        'domain' => ['notIn' => $customers],
+    ],
+    pageSize: 25,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com checkout.com --country US,CA \
+  --employees 51-200,201-500 \
+  --exclude-domain stripe.com,adyen.com,checkout.com,mollie.com --limit 25
+```
+
+</CodeGroup>
+
+The response lists the lookalikes in ranked order and has a `scores` object keyed by company ID. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Acme Payments",
+      "domain": "acme-payments.example",
+      "employees": "201-500",
+      "industry": "Financial Transactions Processing",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "scores": {
+    "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d": 0.87
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+Things to know about the result:
+
+* **Keep the order returned.** Scores are ranking scores, not probabilities, and they compare companies within one response only.
+* **Exclude your seeds too.** Put the seeds in the `notIn` list along with your other customers if you want to be sure none of them comes back.
+* **You pay for the page.** 25 lookalikes cost 25 × 5 = 125 credits, so start with a small `pageSize`.
+
+The later examples on this page reuse the `client` and the `customers` list created here.
+
+## Check the list for free before you pay
+
+If your plan includes previews, the preview endpoint takes the same `lookalike` and `filter` fields and returns up to 25 company summaries with their scores, at no cost.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/preview \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com", "checkout.com"]},
+    "filter": {"country": ["US", "CA"], "employees": ["51-200", "201-500"]}
+  }'
+```
+
+```javascript JavaScript
+const preview = await client.companies.preview({
+  lookalike: { domains: ['stripe.com', 'adyen.com', 'checkout.com'] },
+  filter: { country: ['US', 'CA'], employees: ['51-200', '201-500'] },
+});
+
+for (const company of preview.items) {
+  console.log(company.name, company.industry, preview.scores?.[company.id]);
+}
+```
+
+```python Python
+preview = client.companies.preview(
+    lookalike={"domains": ["stripe.com", "adyen.com", "checkout.com"]},
+    filter={"country": ["US", "CA"], "employees": ["51-200", "201-500"]},
+)
+
+scores = preview.get("scores") or {}
+for company in preview["items"]:
+    print(company.get("name"), company.get("industry"), scores.get(company["id"]))
+```
+
+```ruby Ruby
+preview = client.companies.preview(
+  lookalike: { domains: ["stripe.com", "adyen.com", "checkout.com"] },
+  filter: { country: ["US", "CA"], employees: ["51-200", "201-500"] }
+)
+
+scores = preview["scores"] || {}
+preview["items"].each do |company|
+  puts "#{company['name']} #{company['industry']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+$preview = $client->companies->preview(
+    lookalike: ['domains' => ['stripe.com', 'adyen.com', 'checkout.com']],
+    filter: ['country' => ['US', 'CA'], 'employees' => ['51-200', '201-500']],
+);
+
+foreach ($preview['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['industry'] ?? '', ' ', $preview['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company preview --similar-to stripe.com,adyen.com,checkout.com \
+  --country US,CA --employees 51-200,201-500
+```
+
+</CodeGroup>
+
+Each summary has the company's `id`, `name`, `logoUrl`, `industry`, and `updatedAt`. The count endpoint is free too, but for a lookalike query its numbers describe the pool of candidates the search draws from, so use the preview to judge the list.
+
+## Use more than 10 customers
+
+A request takes at most 10 seeds. With a longer customer list, run one search for each group of up to 10 customers and merge the results by company ID. A company that several groups return resembles more of your customers.
+
+<CodeGroup>
+
+```javascript JavaScript
+const allCustomers = ['stripe.com', 'adyen.com', 'checkout.com', 'mollie.com', 'notion.com', 'linear.app'];
+
+const found = new Map();
+
+for (let i = 0; i < allCustomers.length; i += 10) {
+  const group = allCustomers.slice(i, i + 10);
+
+  const page = await client.companies.search({
+    lookalike: { domains: group },
+    filter: { domain: { notIn: allCustomers } },
+    pageSize: 25,
+  });
+
+  for (const company of page.items) {
+    const entry = found.get(company.id) ?? { company, groups: 0 };
+    entry.groups += 1;
+    found.set(company.id, entry);
+  }
+}
+
+const ranked = [...found.values()].sort((a, b) => b.groups - a.groups);
+
+for (const { company, groups } of ranked) {
+  console.log(company.domain, groups);
+}
+```
+
+```python Python
+all_customers = ["stripe.com", "adyen.com", "checkout.com", "mollie.com", "notion.com", "linear.app"]
+
+found = {}
+
+for start in range(0, len(all_customers), 10):
+    group = all_customers[start:start + 10]
+
+    page = client.companies.search(
+        lookalike={"domains": group},
+        filter={"domain": {"notIn": all_customers}},
+        page_size=25,
+    )
+
+    for company in page["items"]:
+        entry = found.setdefault(company["id"], {"company": company, "groups": 0})
+        entry["groups"] += 1
+
+ranked = sorted(found.values(), key=lambda entry: entry["groups"], reverse=True)
+
+for entry in ranked:
+    print(entry["company"]["domain"], entry["groups"])
+```
+
+```ruby Ruby
+all_customers = ["stripe.com", "adyen.com", "checkout.com", "mollie.com", "notion.com", "linear.app"]
+
+found = {}
+
+all_customers.each_slice(10) do |group|
+  page = client.companies.search(
+    lookalike: { domains: group },
+    filter: { domain: { notIn: all_customers } },
+    page_size: 25
+  )
+
+  page["items"].each do |company|
+    entry = (found[company["id"]] ||= { company: company, groups: 0 })
+    entry[:groups] += 1
+  end
+end
+
+ranked = found.values.sort_by { |entry| -entry[:groups] }
+
+ranked.each do |entry|
+  puts "#{entry[:company]['domain']} #{entry[:groups]}"
+end
+```
+
+```php PHP
+$allCustomers = ['stripe.com', 'adyen.com', 'checkout.com', 'mollie.com', 'notion.com', 'linear.app'];
+
+$found = [];
+
+foreach (array_chunk($allCustomers, 10) as $group) {
+    $page = $client->companies->search(
+        lookalike: ['domains' => $group],
+        filter: ['domain' => ['notIn' => $allCustomers]],
+        pageSize: 25,
+    );
+
+    foreach ($page['items'] as $company) {
+        $found[$company['id']] ??= ['company' => $company, 'groups' => 0];
+        $found[$company['id']]['groups']++;
+    }
+}
+
+usort($found, fn (array $a, array $b): int => $b['groups'] <=> $a['groups']);
+
+foreach ($found as $entry) {
+    echo $entry['company']['domain'], ' ', $entry['groups'], PHP_EOL;
+}
+```
+
+</CodeGroup>
+
+Two rules keep the merged list sound:
+
+* **Do not compare scores across searches.** A score ranks a company within its own response. Count how many groups returned a company instead, as this example does.
+* **Put similar customers in the same group.** The seeds describe the kind of company you want, so a group drawn from one segment gives a clearer result than a mix of segments.
+
+Each search is charged separately. Six groups of 25 lookalikes cost 6 × 25 × 5 = 750 credits.
+
+## Tighten the match
+
+Two settings narrow the list further. Send them next to the seeds:
+
+```json
+{
+  "lookalike": { "domains": ["stripe.com", "adyen.com"], "minScore": 0.7 },
+  "filter": { "require": ["linkedin", "revenue"] }
+}
+```
+
+* `lookalike.minScore`, from 0 to 1, drops companies that are not similar enough to the seeds.
+* `filter.require` keeps only companies that have the fields you need, such as a LinkedIn profile or a revenue range.
+
+## Export the list with scores
+
+For a long list, run an export with the same `lookalike` and `filter` fields. The CSV has a `score` column next to the company columns.
+
+```bash
+companyenrich company export --similar-to stripe.com,adyen.com,checkout.com --country US,CA \
+  --limit 1000 --wait -o lookalikes.csv
+```
+
+An export costs the same 5 credits per company as the search. See [Export lookalikes to CSV](/docs/similar-companies-api-examples#export-lookalikes-to-csv) for the same export in cURL and the SDKs.
+
+## Common questions
+
+### How many customers can I use as seeds?
+
+Between 1 and 10 domains in one request. For a longer list, run one search per group of up to 10 and merge the results, as shown in [Use more than 10 customers](#use-more-than-10-customers).
+
+### Which customers should I choose as seeds?
+
+Choose customers from the segment you want more of. The seeds describe the kind of company you are looking for, so customers that resemble each other give a more focused list. To pick them from a CRM export, see [Find lookalikes of your closed-won deals](/docs/find-lookalikes-of-closed-won-deals).
+
+### What does the score mean?
+
+It is a ranking score, not a probability. A higher score ranks a company higher within the same response, and scores from different searches are not comparable.
+
+### What does a lookalike list cost?
+
+5 credits for each company returned, plus 1 credit per company for each expansion. A search that returns no companies costs 5 credits. Previews are free on plans that include them.
+
+### How do I find people at these companies?
+
+Send the same seeds in `company.lookalike` on a people search. See [Find people at companies like your customers](/docs/people-search-api-examples#find-people-at-companies-like-your-customers).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Seeds, ranking, scores, pricing, and limits.
+  </Card>
+  <Card title="Similar Companies API filters" icon="filter" href="/docs/similar-companies-api-filters">
+    Narrow lookalikes to your market and exclude customers.
+  </Card>
+  <Card title="Rank a prospect list by similarity to your customers" icon="chart-line" href="/docs/rank-prospects-by-similarity">
+    Score the prospects you already have against your customers.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Use exact filters when you can state your criteria.
+  </Card>
+</CardGroup>

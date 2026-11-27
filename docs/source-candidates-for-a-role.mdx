@@ -1,0 +1,477 @@
+---
+title: "Source candidates for a role"
+sidebarTitle: "Source candidates"
+description: "Source candidates with the People Search API: search by job title, location, past employer, and school, and get each full work history in one response."
+---
+
+To source candidates for a role, search the [People Search API](/docs/people-search-api) by job title, location, and past employers. `position` matches phrases in the current title, `pastExperience` matches earlier jobs, and `education` matches schools. Each result is a full person record with the complete work history, so there is no second request per candidate. A search costs 2 credits per person returned.
+
+| You want candidates who        | Filter                                              | Example                                                  |
+| ------------------------------ | --------------------------------------------------- | -------------------------------------------------------- |
+| Hold a certain title now       | `position`                                          | `"position": "software engineer"`                        |
+| Are at a certain level         | `seniority`, `department`                           | `"seniority": "senior"`                                  |
+| Live in a place                | `country`, `state`, `city`                          | `"country": "US"`                                        |
+| Used to work somewhere         | `pastExperience`                                    | `"pastExperience": {"domain": "google.com"}`             |
+| Went to a school               | `education`                                         | `"education": {"institutionName": "Stanford"}`           |
+| Do not work somewhere now      | `domain` with `notIn`                               | `"domain": {"notIn": ["google.com"]}`                    |
+
+## Find people by title and location
+
+This search returns software engineers in the United States.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "position": "software engineer",
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.people.search({
+  filter: { position: 'software engineer', country: 'US' },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  const current = person.experiences?.find((experience) => experience.isCurrent);
+  console.log(person.name, person.position, current?.company?.name, person.socials?.linkedinUrl);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.people.search(
+    filter={"position": "software engineer", "country": "US"},
+    page_size=25,
+)
+
+for person in page["items"]:
+    current = next((e for e in person.get("experiences") or [] if e.get("isCurrent")), {})
+    print(
+        person.get("name"),
+        person.get("position"),
+        (current.get("company") or {}).get("name"),
+        (person.get("socials") or {}).get("linkedinUrl"),
+    )
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.people.search(
+  filter: { position: "software engineer", country: "US" },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  current = (person["experiences"] || []).find { |experience| experience["isCurrent"] } || {}
+  puts "#{person['name']} #{person['position']} #{current.dig('company', 'name')} #{person.dig('socials', 'linkedinUrl')}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->people->search(
+    filter: ['position' => 'software engineer', 'country' => 'US'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    $employer = '';
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isCurrent']) {
+            $employer = $experience['company']['name'] ?? '';
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $employer, ' ',
+        $person['socials']['linkedinUrl'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --position "software engineer" --country US --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [person record](/docs/person-schema) with every job in `experiences`. This example is shortened and shows a fictional person.
+
+```json
+{
+  "items": [
+    {
+      "id": 9000000000002,
+      "name": "Sam Example",
+      "position": "Senior Software Engineer",
+      "seniority": "senior",
+      "department": "engineering-technical",
+      "location": {
+        "country": { "code": "US", "name": "United States" },
+        "city": { "id": 125634, "name": "San Francisco" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/samexample"
+      },
+      "experiences": [
+        {
+          "startDate": "2023-02-01",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "Senior Software Engineer",
+          "seniority": "senior",
+          "department": "engineering-technical",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        },
+        {
+          "startDate": "2019-06-01",
+          "endDate": "2023-01-01",
+          "isCurrent": false,
+          "isMatched": false,
+          "position": "Software Engineer",
+          "seniority": "entry",
+          "department": "engineering-technical",
+          "companyName": "Example Corp"
+        }
+      ],
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+`position` matches phrases in the current job title. To narrow below the country, use `state` or `city`, which take IDs. See [Find people in a city or state](/docs/people-search-api-examples#find-people-in-a-city-or-state). The later examples on this page reuse the `client` created here.
+
+## Require a past employer
+
+Filters inside `pastExperience` match a previous job, and people who still work at that company are left out. This search returns software engineers in the United States who used to work at Google.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "position": "software engineer",
+      "country": "US",
+      "pastExperience": {"domain": "google.com"}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const alumni = await client.people.search({
+  filter: {
+    position: 'software engineer',
+    country: 'US',
+    pastExperience: { domain: 'google.com' },
+  },
+  pageSize: 25,
+});
+
+for (const person of alumni.items) {
+  const past = person.experiences?.find((experience) => experience.isMatched && !experience.isCurrent);
+  console.log(person.name, person.position, past?.position, past?.endDate);
+}
+```
+
+```python Python
+alumni = client.people.search(
+    filter={
+        "position": "software engineer",
+        "country": "US",
+        "pastExperience": {"domain": "google.com"},
+    },
+    page_size=25,
+)
+
+for person in alumni["items"]:
+    past = next(
+        (e for e in person.get("experiences") or [] if e.get("isMatched") and not e.get("isCurrent")),
+        {},
+    )
+    print(person.get("name"), person.get("position"), past.get("position"), past.get("endDate"))
+```
+
+```ruby Ruby
+alumni = client.people.search(
+  filter: {
+    position: "software engineer",
+    country: "US",
+    pastExperience: { domain: "google.com" }
+  },
+  page_size: 25
+)
+
+alumni["items"].each do |person|
+  past = (person["experiences"] || []).find { |e| e["isMatched"] && !e["isCurrent"] } || {}
+  puts "#{person['name']} #{person['position']} #{past['position']} #{past['endDate']}"
+end
+```
+
+```php PHP
+$alumni = $client->people->search(
+    filter: [
+        'position' => 'software engineer',
+        'country' => 'US',
+        'pastExperience' => ['domain' => 'google.com'],
+    ],
+    pageSize: 25,
+);
+
+foreach ($alumni['items'] as $person) {
+    $past = [];
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isMatched'] && !$experience['isCurrent']) {
+            $past = $experience;
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ',
+        $past['position'] ?? '', ' ', $past['endDate'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --position "software engineer" --country US \
+  --past-domain google.com --limit 25
+```
+
+</CodeGroup>
+
+Every value you put inside `pastExperience` must match the same past job. You can also match a past title, seniority, or department there, and the dates the job started and ended.
+
+## Require a school and return education
+
+`education.institutionName` matches phrases in school names. The `education` expansion adds each person's schools and degrees to the record for 1 extra credit per person, so this search costs 3 credits per person.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "position": "data engineer",
+      "education": {"institutionName": "Stanford"}
+    },
+    "expand": ["education"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const graduates = await client.people.search({
+  filter: {
+    position: 'data engineer',
+    education: { institutionName: 'Stanford' },
+  },
+  expand: ['education'],
+  pageSize: 25,
+});
+
+for (const person of graduates.items) {
+  const schools = (person.education ?? []).map((entry) => entry.institutionName);
+  console.log(person.name, person.position, schools.join(', '));
+}
+```
+
+```python Python
+graduates = client.people.search(
+    filter={
+        "position": "data engineer",
+        "education": {"institutionName": "Stanford"},
+    },
+    expand=["education"],
+    page_size=25,
+)
+
+for person in graduates["items"]:
+    schools = [entry.get("institutionName") for entry in person.get("education") or []]
+    print(person.get("name"), person.get("position"), ", ".join(filter(None, schools)))
+```
+
+```ruby Ruby
+graduates = client.people.search(
+  filter: {
+    position: "data engineer",
+    education: { institutionName: "Stanford" }
+  },
+  expand: ["education"],
+  page_size: 25
+)
+
+graduates["items"].each do |person|
+  schools = (person["education"] || []).map { |entry| entry["institutionName"] }.compact
+  puts "#{person['name']} #{person['position']} #{schools.join(', ')}"
+end
+```
+
+```php PHP
+$graduates = $client->people->search(
+    filter: [
+        'position' => 'data engineer',
+        'education' => ['institutionName' => 'Stanford'],
+    ],
+    expand: ['education'],
+    pageSize: 25,
+);
+
+foreach ($graduates['items'] as $person) {
+    $schools = array_filter(array_column($person['education'] ?? [], 'institutionName'));
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', implode(', ', $schools), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --position "data engineer" --school Stanford \
+  --expand education --limit 25
+```
+
+</CodeGroup>
+
+The filter works without the expansion. Leave `expand` out to pay 2 credits and get the records without the education history.
+
+## Leave out people at certain employers
+
+Use `notIn` on `domain` to exclude people who work at companies you do not hire from, such as your own company or a client:
+
+```json
+{
+  "filter": {
+    "position": "software engineer",
+    "country": "US",
+    "domain": { "notIn": ["google.com", "meta.com"] }
+  }
+}
+```
+
+In the CLI, this is `--exclude-domain google.com,meta.com`.
+
+## Skip candidates you already have
+
+The search has no filter for person IDs, so remove the people you have already seen in your own code. Keep the `id` of every candidate you store, and drop those IDs from each new page.
+
+<CodeGroup>
+
+```javascript JavaScript
+const seen = new Set([9000000000001, 9000000000002]);
+
+const fresh = page.items.filter((person) => !seen.has(person.id));
+
+for (const person of fresh) {
+  seen.add(person.id);
+  console.log(person.id, person.name);
+}
+```
+
+```python Python
+seen = {9000000000001, 9000000000002}
+
+fresh = [person for person in page["items"] if person["id"] not in seen]
+
+for person in fresh:
+    seen.add(person["id"])
+    print(person["id"], person.get("name"))
+```
+
+```ruby Ruby
+require "set"
+
+seen = Set[9000000000001, 9000000000002]
+
+fresh = page["items"].reject { |person| seen.include?(person["id"]) }
+
+fresh.each do |person|
+  seen << person["id"]
+  puts "#{person['id']} #{person['name']}"
+end
+```
+
+```php PHP
+$seen = [9000000000001 => true, 9000000000002 => true];
+
+foreach ($page['items'] as $person) {
+    if (isset($seen[$person['id']])) {
+        continue;
+    }
+    $seen[$person['id']] = true;
+    echo $person['id'], ' ', $person['name'] ?? '', PHP_EOL;
+}
+```
+
+</CodeGroup>
+
+You are charged for every person on a page, including the ones you drop. Narrow the search with filters, such as a start date or an excluded employer, to keep duplicates low.
+
+## Common questions
+
+### Can I filter candidates by skills?
+
+No. The search has no skills filter. Use phrases in the job title with `position`, a past employer with `pastExperience`, a school with `education`, or a plain-language description. See [Describe who you want](/docs/people-search-api-examples#describe-who-you-want).
+
+### Does each result include the full work history?
+
+Yes. A search returns full person records, and `experiences` lists the current and past jobs with their titles, dates, and companies. You do not need a second request per person.
+
+### How do I contact a candidate?
+
+Each record has the person's LinkedIn URL in `socials.linkedinUrl`. To get a work email, look it up with the person's `id`. See [Find a person's work email](/docs/find-a-work-email). Person records do not include phone numbers.
+
+### How many candidates match my search?
+
+Send the same query to the count endpoint, which is free. In the CLI, this is `companyenrich people count` with the same flags.
+
+### What does sourcing cost?
+
+2 credits for each person returned, plus 1 per person for the `education` expansion. The count is free, and a search that returns no people costs 2 credits.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every person filter, past experience, and education.
+  </Card>
+  <Card title="Person schema" icon="table-list" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="Find the employees of a company" icon="users" href="/docs/find-employees-of-a-company">
+    List the people at one company by department.
+  </Card>
+  <Card title="Find a person's work email" icon="at" href="/docs/find-a-work-email">
+    Get an email address for a candidate.
+  </Card>
+</CardGroup>

@@ -1,0 +1,309 @@
+---
+title: "Look up a company's NAICS codes"
+sidebarTitle: "NAICS codes"
+description: "Get the NAICS codes for any company from its domain or name with the Company Enrichment API, for one company or a list, and count companies by code."
+---
+
+To look up a company's NAICS codes, enrich its domain with the [Company Enrichment API](/docs/company-enrichment-api) and add `expand=naicsCodes`. The response lists the codes as strings in `naicsCodes`, next to the company's primary `industry`. The request costs 2 credits: 1 for the company and 1 for the expansion.
+
+<Tip>
+  For a single lookup in the browser, with no API key, use the free [NAICS company lookup](https://companyenrich.com/free-tools/naics-lookup).
+</Tip>
+
+## Get NAICS codes from a domain
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=naicsCodes" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['naicsCodes'],
+});
+
+console.log(company.name, company.industry, company.naicsCodes);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com", expand=["naicsCodes"])
+
+print(company.get("name"), company.get("industry"), company.get("naicsCodes"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com", expand: ["naicsCodes"])
+
+puts company["name"], company["industry"]
+p company["naicsCodes"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrich('stripe.com', expand: ['naicsCodes']);
+
+echo $company['name'] ?? '', ' ', $company['industry'] ?? '', PHP_EOL;
+print_r($company['naicsCodes'] ?? []);
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand naicsCodes --fields name,domain,industry,naicsCodes
+```
+
+</CodeGroup>
+
+The codes are in `naicsCodes`. This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "industry": "Software Publishers",
+  "industries": ["Software Publishers"],
+  "updatedAt": "2026-10-01T12:00:00Z",
+  "naicsCodes": ["511210"]
+}
+```
+
+`naicsCodes` is an array, because a company can belong to more than one industry. Each code is a string of digits. The later examples on this page reuse the `client` created here.
+
+## Look up NAICS codes by company name
+
+When you do not have a domain, send the company name to the properties lookup with the same expansion. A name alone can match several companies, and the API returns the highest-ranked one, so add `linkedinUrl` when you have it.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Stripe",
+    "expand": ["naicsCodes"]
+  }'
+```
+
+```javascript JavaScript
+const company = await client.companies.enrichByProperties({
+  name: 'Stripe',
+  expand: ['naicsCodes'],
+});
+
+console.log(company.name, company.domain, company.naicsCodes);
+```
+
+```python Python
+company = client.companies.enrich_by_properties(
+    name="Stripe",
+    expand=["naicsCodes"],
+)
+
+print(company.get("name"), company.get("domain"), company.get("naicsCodes"))
+```
+
+```ruby Ruby
+company = client.companies.enrich_by_properties(
+  name: "Stripe",
+  expand: ["naicsCodes"]
+)
+
+puts company["name"], company["domain"]
+p company["naicsCodes"]
+```
+
+```php PHP
+$company = $client->companies->enrichByProperties(
+    name: 'Stripe',
+    expand: ['naicsCodes'],
+);
+
+echo $company['name'] ?? '', ' ', $company['domain'] ?? '', PHP_EOL;
+print_r($company['naicsCodes'] ?? []);
+```
+
+```bash CLI
+companyenrich company enrich --name "Stripe" --expand naicsCodes --fields name,domain,naicsCodes
+```
+
+</CodeGroup>
+
+Check the `domain` in the response to confirm that the API matched the company you meant. A name that matches no company returns `404`. See [When a company is not found](/docs/company-enrichment-api#when-a-company-is-not-found).
+
+## Get NAICS codes for a list of companies
+
+A batch request takes up to 50 domains. With the `naicsCodes` expansion, each company found costs 2 credits.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.com"],
+    "expand": ["naicsCodes"]
+  }'
+```
+
+```javascript JavaScript
+const { items } = await client.companies.enrichBatch({
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
+  expand: ['naicsCodes'],
+});
+
+for (const item of items) {
+  console.log(item.domain, item.status, item.company?.naicsCodes);
+}
+```
+
+```python Python
+batch = client.companies.enrich_batch(
+    ["stripe.com", "adyen.com", "notion.com"],
+    expand=["naicsCodes"],
+)
+
+for item in batch["items"]:
+    company = item.get("company") or {}
+    print(item["domain"], item["status"], company.get("naicsCodes"))
+```
+
+```ruby Ruby
+batch = client.companies.enrich_batch(
+  ["stripe.com", "adyen.com", "notion.com"],
+  expand: ["naicsCodes"]
+)
+
+batch["items"].each do |item|
+  puts "#{item['domain']} #{item['status']} #{item.dig('company', 'naicsCodes')}"
+end
+```
+
+```php PHP
+$batch = $client->companies->enrichBatch(
+    ['stripe.com', 'adyen.com', 'notion.com'],
+    expand: ['naicsCodes'],
+);
+
+foreach ($batch['items'] as $item) {
+    echo $item['domain'], ' ', $item['status'], ' ',
+        implode(',', $item['company']['naicsCodes'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com adyen.com notion.com --expand naicsCodes \
+  --fields domain,status,company.industry,company.naicsCodes
+```
+
+</CodeGroup>
+
+For more than 50 domains, see [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains).
+
+## Count the companies that share a NAICS code
+
+The company search `naicsCodes` filter takes a code or a prefix of 2 to 6 digits. The count endpoint costs no credits, so you can size an industry before you pay for any records.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"naicsCodes": ["5112"], "country": "US"}
+  }'
+```
+
+```javascript JavaScript
+const { total } = await client.companies.count({
+  filter: { naicsCodes: ['5112'], country: 'US' },
+});
+console.log(total);
+```
+
+```python Python
+result = client.companies.count(
+    filter={"naicsCodes": ["5112"], "country": "US"},
+)
+print(result["total"])
+```
+
+```ruby Ruby
+result = client.companies.count(
+  filter: { naicsCodes: ["5112"], country: "US" }
+)
+puts result["total"]
+```
+
+```php PHP
+$result = $client->companies->count(
+    filter: ['naicsCodes' => ['5112'], 'country' => 'US'],
+);
+echo $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --naics 5112 --country US
+```
+
+</CodeGroup>
+
+`total` is the number of companies that match. Send the same filter to the [Company Search API](/docs/company-search-api) to get the companies themselves.
+
+## Common questions
+
+### Can a company have more than one NAICS code?
+
+Yes. `naicsCodes` is an array, and a company that works in several industries has several codes.
+
+### How do I get the industry name for a NAICS code?
+
+Every company record has the name of its primary industry in `industry`, with no expansion needed. The free [`GET /v2/industries`](/api-reference/v2/get-industries) endpoint lists every industry with its NAICS code prefixes. In the CLI, `companyenrich industries software` searches that list by name.
+
+### Does the API return SIC codes?
+
+No. The company record has NAICS codes and industry names, not SIC codes.
+
+### What does a NAICS lookup cost?
+
+2 credits for each company returned: 1 for the company and 1 for the `naicsCodes` expansion. A domain with no match returns `404` and costs nothing. Counting companies by NAICS code is free.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company search filters" icon="filter" href="/docs/company-search-api-filters">
+    Filter companies by NAICS code, size, location, and more.
+  </Card>
+  <Card title="Enrich a list of company domains" icon="list" href="/docs/enrich-a-list-of-company-domains">
+    Classify a whole file of domains in one job.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+</CardGroup>

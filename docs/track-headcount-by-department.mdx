@@ -1,0 +1,306 @@
+---
+title: "Track headcount growth by department"
+sidebarTitle: "Headcount by department"
+description: "Get a company's headcount in 14 departments with its history, and find companies by how one department, such as sales or engineering, grew or how large it is."
+---
+
+To track headcount by department, use the [Company Headcount API](/docs/company-headcount-api). `GET /v2/companies/workforce` returns a company's headcount in each of 14 departments with a month-by-month history. On company search, the `workforceGrowth` and `workforceSize` filters find companies by how one department grew or how large it is. A lookup costs 1 credit.
+
+## Get headcount by department for one company
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+const departments = Object.entries(workforce.departmentHeadcount ?? {}).sort((a, b) => b[1] - a[1]);
+
+for (const [department, headcount] of departments) {
+  console.log(department, headcount);
+}
+console.log('unclassified', workforce.unclassifiedHeadcount);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain="stripe.com")
+
+departments = sorted(
+    (workforce.get("departmentHeadcount") or {}).items(),
+    key=lambda item: item[1],
+    reverse=True,
+)
+
+for department, headcount in departments:
+    print(department, headcount)
+print("unclassified", workforce.get("unclassifiedHeadcount"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain: "stripe.com")
+
+departments = (workforce["departmentHeadcount"] || {}).sort_by { |_department, headcount| -headcount }
+
+departments.each do |department, headcount|
+  puts "#{department} #{headcount}"
+end
+puts "unclassified #{workforce['unclassifiedHeadcount']}"
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+$departments = $workforce['departmentHeadcount'] ?? [];
+arsort($departments);
+
+foreach ($departments as $department => $headcount) {
+    echo $department, ' ', $headcount, PHP_EOL;
+}
+echo 'unclassified ', $workforce['unclassifiedHeadcount'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company workforce stripe.com
+```
+
+</CodeGroup>
+
+`departmentHeadcount` has one number for each department the company has people in. This example is shortened and shows a fictional company.
+
+```json
+{
+  "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "domain": "acme-analytics.example",
+  "observedEmployeeCount": 312,
+  "employeeCountRange": "201-500",
+  "departmentHeadcount": {
+    "cSuite": 6,
+    "engineeringTechnical": 124,
+    "sales": 58,
+    "marketing": 27,
+    "operations": 22,
+    "humanResources": 9
+  },
+  "unclassifiedHeadcount": 41
+}
+```
+
+The 14 departments have one name in a response and another in a search filter:
+
+| Department             | Key in `departmentHeadcount` | Value in the search filters |
+| ---------------------- | ---------------------------- | --------------------------- |
+| C-suite                | `cSuite`                     | `c_suite`                   |
+| Product management     | `productManagement`          | `product_management`        |
+| Engineering and technical | `engineeringTechnical`    | `engineering_technical`     |
+| Design                 | `design`                     | `design`                    |
+| Education              | `education`                  | `education`                 |
+| Finance                | `finance`                    | `finance`                   |
+| Human resources        | `humanResources`             | `human_resources`           |
+| Information technology | `informationTechnology`      | `information_technology`    |
+| Legal                  | `legal`                      | `legal`                     |
+| Marketing              | `marketing`                  | `marketing`                 |
+| Medical and health     | `medicalHealth`              | `medical_health`            |
+| Operations             | `operations`                 | `operations`                |
+| Sales                  | `sales`                      | `sales`                     |
+| Consulting             | `consulting`                 | `consulting`                |
+
+Every key is optional, so read a department with a default. People who could not be assigned to a department are counted in `unclassifiedHeadcount`. The later examples on this page reuse the `client` and the `workforce` response from this one.
+
+## See how one department changed
+
+Each point in `history` has its own `departmentHeadcount`, so the same response shows how a team grew over the last 12 months. This example prints the sales headcount at each point.
+
+<CodeGroup>
+
+```javascript JavaScript
+for (const point of workforce.history ?? []) {
+  console.log(point.date, point.departmentHeadcount?.sales ?? 0);
+}
+```
+
+```python Python
+for point in workforce.get("history") or []:
+    print(point["date"], (point.get("departmentHeadcount") or {}).get("sales", 0))
+```
+
+```ruby Ruby
+(workforce["history"] || []).each do |point|
+  puts "#{point['date']} #{point.dig('departmentHeadcount', 'sales') || 0}"
+end
+```
+
+```php PHP
+foreach ($workforce['history'] ?? [] as $point) {
+    echo $point['date'], ' ', $point['departmentHeadcount']['sales'] ?? 0, PHP_EOL;
+}
+```
+
+</CodeGroup>
+
+`history` lists the months in which the headcount changed, newest first. To go back further than 12 months, see [Get a company's headcount history](/docs/get-company-headcount-history).
+
+## Find companies where a department is growing
+
+On company search, set `department` in the `workforceGrowth` filter to measure one team. This search finds companies in the United States whose sales team grew at least 20% in the last year and now has 10 or more people.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "workforceGrowth": {"period": "y1", "department": "sales", "min": 0.2},
+      "workforceSize": [{"department": "sales", "min": 10}],
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    workforceGrowth: { period: 'y1', department: 'sales', min: 0.2 },
+    workforceSize: [{ department: 'sales', min: 10 }],
+    country: 'US',
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.employees);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "workforceGrowth": {"period": "y1", "department": "sales", "min": 0.2},
+        "workforceSize": [{"department": "sales", "min": 10}],
+        "country": "US",
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("employees"))
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    workforceGrowth: { period: "y1", department: "sales", min: 0.2 },
+    workforceSize: [{ department: "sales", min: 10 }],
+    country: "US"
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['employees']}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'workforceGrowth' => ['period' => 'y1', 'department' => 'sales', 'min' => 0.2],
+        'workforceSize' => [['department' => 'sales', 'min' => 10]],
+        'country' => 'US',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --growth 20%.. --growth-period y1 --growth-department sales \
+  --headcount sales=10.. --country US --limit 25
+```
+
+</CodeGroup>
+
+The two filters do different jobs. `workforceGrowth` matches the change over 6 months, 1 year, or 2 years, and needs a `period` and a `department`. `workforceSize` matches the current headcount of a department, or of the whole company when you leave `department` out. A filter search costs 1 credit per company returned, and these filters add nothing to that price.
+
+## Find companies that are building a team
+
+To find companies that are starting a function, look for a small department. Use `workforceSize` with a `min` and a `max`. This filter matches companies with 11 to 200 employees that have 1 to 5 people in sales:
+
+```json
+{
+  "filter": {
+    "employees": ["11-50", "51-200"],
+    "workforceSize": [{ "department": "sales", "min": 1, "max": 5 }]
+  }
+}
+```
+
+In the CLI, this is `companyenrich company search --employees 11-50,51-200 --headcount sales=1..5`.
+
+## Common questions
+
+### Can I track headcount by role or job title?
+
+The headcount data is grouped into 14 departments, not into job titles. To find the people in a role at a company, such as its sales directors, use the [People Search API](/docs/people-search-api).
+
+### Why do the department numbers not add up to the total?
+
+People who could not be assigned to a department are counted in `unclassifiedHeadcount`, so the department numbers on their own come to less than `observedEmployeeCount`.
+
+### Why are the department names different in the filters?
+
+Responses use camel case keys, such as `engineeringTechnical`, and the search filters use underscores, such as `engineering_technical`. The table above lists both.
+
+### Can I add department headcount to a list of companies?
+
+Yes. The `workforce` expansion on enrichment and search adds the same data to each company for 1 extra credit. See [Get a company's employee count](/docs/get-company-employee-count#get-employee-counts-for-a-list-of-companies).
+
+### What does department data cost?
+
+1 credit for a lookup, which includes every department and 12 months of history. The search filters cost nothing on top of the search.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Headcount API" icon="chart-line" href="/docs/company-headcount-api">
+    Response fields, history, search filters, pricing, and limits.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values#workforce-departments">
+    The workforce departments and their names.
+  </Card>
+  <Card title="Find fast-growing companies" icon="rocket" href="/docs/find-fast-growing-companies">
+    Search by overall growth with industry and size.
+  </Card>
+  <Card title="People Search API" icon="user" href="/docs/people-search-api">
+    Find the people in a department by title and seniority.
+  </Card>
+</CardGroup>

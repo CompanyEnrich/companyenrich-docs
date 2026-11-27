@@ -1,0 +1,378 @@
+---
+title: "Enrich a list of company domains"
+sidebarTitle: "Enrich a list of domains"
+description: "Enrich a list of company domains with the Company Enrichment API: up to 50 in one request, or up to 10,000 in a background job that returns CSV or JSON."
+---
+
+To enrich a list of company domains, send them to the [Company Enrichment API](/docs/company-enrichment-api) in one of two ways. A batch request takes up to 50 domains and answers in the same response. A bulk job takes up to 10,000 domains, runs in the background, and returns the results as CSV, JSON, or NDJSON. Each company found costs 1 credit.
+
+| List size        | Use                                                                                | How results arrive                              |
+| ---------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Up to 50 domains | [`POST /v2/companies/enrich/batch`](/api-reference/v2/post-companies-enrich-batch) | In the response, with one item per domain.      |
+| Up to 10,000     | [`POST /v2/companies/enrich/bulk`](/api-reference/v2/post-companies-enrich-bulk)   | From a background job, as CSV, JSON, or NDJSON. |
+| More than 10,000 | Several bulk jobs                                                                  | One download per job.                           |
+
+## Enrich a file of domains and save the results as CSV
+
+Start with a text file named `domains.txt` that has one domain per line. This example creates a bulk job from the file, waits for it to finish, and saves the results to `enriched.csv`.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Build the request body from domains.txt. This step needs jq.
+jq -Rn '{domains: [inputs | select(length > 0)]}' domains.txt > body.json
+
+# 2. Start the job. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @body.json
+
+# 3. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 4. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o enriched.csv
+```
+
+```javascript JavaScript
+import { readFileSync, writeFileSync } from 'node:fs';
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const domains = readFileSync('domains.txt', 'utf8')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+const job = await client.companies.bulkEnrichment.create({ domains });
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.companies.bulkEnrichment.csv(job.id);
+writeFileSync('enriched.csv', await response.text());
+```
+
+```python Python
+from pathlib import Path
+
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+lines = Path("domains.txt").read_text().splitlines()
+domains = [line.strip() for line in lines if line.strip()]
+
+job = client.companies.bulk_enrichment.create(domains)
+client.batches.wait_for_completion(job["id"])
+
+csv_text = client.companies.bulk_enrichment.csv(job["id"])
+Path("enriched.csv").write_text(csv_text)
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+domains = File.readlines("domains.txt", chomp: true).map(&:strip).reject(&:empty?)
+
+job = client.companies.bulk_enrichment.create(domains)
+client.batches.wait_for_completion(job["id"])
+
+File.write("enriched.csv", client.companies.bulk_enrichment.csv(job["id"]))
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$domains = file('domains.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+$job = $client->companies->bulkEnrichment->create($domains);
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('enriched.csv', $client->companies->bulkEnrichment->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company bulk-enrich -f domains.txt --wait -o enriched.csv
+```
+
+</CodeGroup>
+
+The CSV has one row for each input domain, in the same order as your file. Each row starts with the columns `index`, `input_domain`, `status_code`, `request_state`, `success`, and `error`, followed by the company fields.
+
+Things to know before you run a large list:
+
+* **The balance check comes first.** The API returns `402` unless your balance covers every domain in the job. Credits are not reserved, and you are charged as results complete.
+* **Duplicates are separate requests.** A bulk job sends one request for every line and charges for each one, so remove duplicate domains before you send the list.
+* **Your script does not have to keep running.** The job runs on CompanyEnrich's side. Save the batch `id` and download the results from any later session.
+
+The later examples on this page reuse the `client` created here.
+
+## Add funding, headcount, and tech stack to every row
+
+Name the data you want in `expand`. Each expansion adds 1 credit for every company found, so this job costs up to 4 credits per domain. A list of 500 domains costs at most 2,000 credits.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.com"],
+    "expand": ["financial", "workforce", "technologies"]
+  }'
+```
+
+```javascript JavaScript
+const job = await client.companies.bulkEnrichment.create({
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
+  expand: ['financial', 'workforce', 'technologies'],
+});
+
+await client.batches.waitForCompletion(job.id);
+
+for await (const record of client.companies.bulkEnrichment.stream(job.id)) {
+  if (!record.success) continue;
+  const company = record.company;
+  console.log(
+    record.domain,
+    company.financial?.totalFunding,
+    company.workforce?.observedEmployeeCount,
+    company.technologies?.length,
+  );
+}
+```
+
+```python Python
+job = client.companies.bulk_enrichment.create(
+    ["stripe.com", "adyen.com", "notion.com"],
+    expand=["financial", "workforce", "technologies"],
+)
+
+client.batches.wait_for_completion(job["id"])
+
+for record in client.companies.bulk_enrichment.stream(job["id"]):
+    if not record["success"]:
+        continue
+    company = record["company"]
+    print(
+        record["domain"],
+        (company.get("financial") or {}).get("totalFunding"),
+        (company.get("workforce") or {}).get("observedEmployeeCount"),
+        len(company.get("technologies") or []),
+    )
+```
+
+```ruby Ruby
+job = client.companies.bulk_enrichment.create(
+  ["stripe.com", "adyen.com", "notion.com"],
+  expand: ["financial", "workforce", "technologies"]
+)
+
+client.batches.wait_for_completion(job["id"])
+
+client.companies.bulk_enrichment.stream(job["id"]) do |record|
+  next unless record["success"]
+
+  company = record["company"]
+  puts [
+    record["domain"],
+    company.dig("financial", "totalFunding"),
+    company.dig("workforce", "observedEmployeeCount"),
+    (company["technologies"] || []).length
+  ].join(" ")
+end
+```
+
+```php PHP
+$job = $client->companies->bulkEnrichment->create(
+    ['stripe.com', 'adyen.com', 'notion.com'],
+    expand: ['financial', 'workforce', 'technologies'],
+);
+
+$client->batches->waitForCompletion($job['id']);
+
+foreach ($client->companies->bulkEnrichment->stream($job['id']) as $record) {
+    if (!$record['success']) {
+        continue;
+    }
+    $company = $record['company'];
+    echo $record['domain'], ' ',
+        $company['financial']['totalFunding'] ?? '', ' ',
+        $company['workforce']['observedEmployeeCount'] ?? '', ' ',
+        count($company['technologies'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company bulk-enrich stripe.com adyen.com notion.com \
+  --expand financial,workforce,technologies --wait -o enriched.jsonl
+```
+
+</CodeGroup>
+
+The SDK `stream` methods read the results one record at a time, which suits large jobs. Each record looks like this. The example is shortened and shows a fictional company.
+
+```json
+{
+  "index": 0,
+  "domain": "acme-analytics.example",
+  "statusCode": 200,
+  "state": "succeeded",
+  "success": true,
+  "company": {
+    "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+    "name": "Acme Analytics",
+    "domain": "acme-analytics.example",
+    "employees": "201-500",
+    "financial": {
+      "totalFunding": 48000000,
+      "fundingStage": "Series B",
+      "fundingDate": "2023-03-15T00:00:00Z"
+    },
+    "technologies": ["React", "PostgreSQL", "Amazon Web Services"],
+    "workforce": {
+      "observedEmployeeCount": 312,
+      "departmentHeadcount": { "engineeringTechnical": 124, "sales": 58 }
+    }
+  }
+}
+```
+
+The five expansions are `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. See [Get funding, headcount, and tech stack in one call](/docs/get-funding-headcount-and-tech-stack) for what each one returns.
+
+## See which domains were not enriched
+
+Every result has a `success` flag. A record with `success` set to `false` has the HTTP `statusCode` and an `error` in place of the `company`.
+
+<CodeGroup>
+
+```bash cURL
+# Download the results as NDJSON and keep the failed records. This step needs jq.
+curl -s "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?format=ndjson" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  | jq -c 'select(.success == false) | {index, domain, statusCode}'
+```
+
+```javascript JavaScript
+const failed = [];
+
+for await (const record of client.companies.bulkEnrichment.stream(job.id)) {
+  if (!record.success) failed.push(record);
+}
+
+for (const record of failed) {
+  console.log(record.index, record.domain, record.statusCode);
+}
+```
+
+```python Python
+failed = [
+    record
+    for record in client.companies.bulk_enrichment.stream(job["id"])
+    if not record["success"]
+]
+
+for record in failed:
+    print(record["index"], record["domain"], record.get("statusCode"))
+```
+
+```ruby Ruby
+failed = client.companies.bulk_enrichment.stream(job["id"]).reject { |record| record["success"] }
+
+failed.each do |record|
+  puts "#{record['index']} #{record['domain']} #{record['statusCode']}"
+end
+```
+
+```php PHP
+$failed = [];
+
+foreach ($client->companies->bulkEnrichment->stream($job['id']) as $record) {
+    if (!$record['success']) {
+        $failed[] = $record;
+    }
+}
+
+foreach ($failed as $record) {
+    echo $record['index'], ' ', $record['domain'], ' ', $record['statusCode'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich batch results BATCH_ID --format jsonl \
+  | jq -c 'select(.success == false) | {index, domain, statusCode}'
+```
+
+</CodeGroup>
+
+A `404` means no company was found for that domain, and it costs nothing. For any other status, the `error` field says what went wrong.
+
+## Enrich 50 domains or fewer in one request
+
+For a short list, a batch request returns every result in the same response, with no job to wait for. The CLI reads the same file and sends the domains 50 at a time:
+
+```bash
+companyenrich company enrich -f domains.txt -o companies.csv
+```
+
+A batch enriches a duplicate domain once, and domains that resolve to the same company are charged once. See [Enrich up to 50 domains in one request](/docs/company-enrichment-api-examples#enrich-up-to-50-domains-in-one-request) for the same request in cURL and the SDKs.
+
+## Enrich more than 10,000 domains
+
+A bulk job takes at most 10,000 domains and a request body of 10 MiB. Split a longer list into parts and create one job for each part:
+
+```bash
+split -l 10000 domains.txt part-
+
+for file in part-*; do
+  companyenrich company bulk-enrich -f "$file" --wait -o "$file.csv"
+done
+```
+
+## Common questions
+
+### How much does it cost to enrich a list of domains?
+
+1 credit for each company found, plus 1 credit per company for each expansion. Domains with no match cost nothing. For example, if you send 1,000 domains with the `technologies` expansion and 900 are found, the job costs 900 × 2 = 1,800 credits.
+
+### How do I enrich a CSV file that has other columns?
+
+Read the domain column into a list, enrich the list, and join the results back by position. Results come back in input order, and each record has the `index` of its input row.
+
+### Can I enrich a list of company names?
+
+Batch requests and bulk jobs take domains only. To enrich by name, send one request per company. See [Find a company's domain from its name](/docs/find-company-domain-by-name).
+
+### Which format should I download?
+
+Use CSV for spreadsheets and data imports. Use NDJSON for large jobs that you read one record at a time, and JSON for small jobs that you load in one piece.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Bulk jobs and exports" icon="layer-group" href="/docs/bulk-jobs-and-exports">
+    Job status, progress, downloads, and cancelling.
+  </Card>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup and expansion costs.
+  </Card>
+</CardGroup>

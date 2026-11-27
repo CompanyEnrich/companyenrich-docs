@@ -1,0 +1,329 @@
+---
+title: "Get funding, headcount, and tech stack in one call"
+sidebarTitle: "Funding, headcount, tech stack"
+description: "Get a company's profile, funding history, headcount by department, and technology stack from its domain in a single Company Enrichment API request."
+---
+
+One [Company Enrichment API](/docs/company-enrichment-api) request can return a company's profile together with its funding history, its headcount by department with 12 months of history, and the technologies it uses. Send the company's domain with the `financial`, `workforce`, and `technologies` expansions. The request costs 4 credits: 1 for the company and 1 for each expansion.
+
+## Request funding, headcount, and technologies together
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=financial&expand=workforce&expand=technologies" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['financial', 'workforce', 'technologies'],
+});
+
+console.log(company.name, company.employees, company.revenue);
+console.log(company.financial?.totalFunding, company.financial?.fundingStage);
+console.log(company.workforce?.observedEmployeeCount);
+console.log(company.technologies);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich(
+    "stripe.com",
+    expand=["financial", "workforce", "technologies"],
+)
+
+financial = company.get("financial") or {}
+workforce = company.get("workforce") or {}
+
+print(company.get("name"), company.get("employees"), company.get("revenue"))
+print(financial.get("totalFunding"), financial.get("fundingStage"))
+print(workforce.get("observedEmployeeCount"))
+print(company.get("technologies"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich(
+  "stripe.com",
+  expand: ["financial", "workforce", "technologies"]
+)
+
+puts company["name"], company["employees"], company["revenue"]
+puts company.dig("financial", "totalFunding"), company.dig("financial", "fundingStage")
+puts company.dig("workforce", "observedEmployeeCount")
+p company["technologies"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrich(
+    'stripe.com',
+    expand: ['financial', 'workforce', 'technologies'],
+);
+
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', ' ', $company['revenue'] ?? '', PHP_EOL;
+echo $company['financial']['totalFunding'] ?? '', ' ', $company['financial']['fundingStage'] ?? '', PHP_EOL;
+echo $company['workforce']['observedEmployeeCount'] ?? '', PHP_EOL;
+print_r($company['technologies'] ?? []);
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand financial,workforce,technologies
+```
+
+</CodeGroup>
+
+The response is one [company record](/docs/company-schema) with the three expansions added. This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "employees": "201-500",
+  "revenue": "10m-50m",
+  "industry": "Software Publishers",
+  "updatedAt": "2026-10-01T12:00:00Z",
+  "financial": {
+    "totalFunding": 48000000,
+    "fundingStage": "Series B",
+    "fundingDate": "2023-03-15T00:00:00Z",
+    "fundingRounds": [
+      {
+        "date": "2023-03-15T00:00:00Z",
+        "amount": "$36M",
+        "type": "Series B",
+        "investors": "Example Ventures, Sample Capital"
+      }
+    ]
+  },
+  "technologies": ["React", "PostgreSQL", "Amazon Web Services"],
+  "workforce": {
+    "observedEmployeeCount": 312,
+    "employeeCountRange": "201-500",
+    "departmentHeadcount": {
+      "engineeringTechnical": 124,
+      "sales": 58,
+      "marketing": 27
+    },
+    "historyFrom": "2025-11-01",
+    "historyTo": "2026-11-01",
+    "history": [
+      { "date": "2026-10-01", "observedEmployeeCount": 312 },
+      { "date": "2026-04-01", "observedEmployeeCount": 287 }
+    ]
+  }
+}
+```
+
+Fields with no known value are omitted or `null`, so read them defensively. The later examples on this page reuse the `client` created here.
+
+## What each expansion adds
+
+| Expansion      | Adds                                                             | Extra credits per company |
+| -------------- | ---------------------------------------------------------------- | ------------------------- |
+| `financial`    | Total funding, latest stage and date, funding rounds, stock listing | 1                      |
+| `workforce`    | Headcount by department, with 12 months of history               | 1                         |
+| `technologies` | Technologies the company uses                                    | 1                         |
+| `keywords`     | Keywords associated with the company                             | 1                         |
+| `naicsCodes`   | NAICS industry codes                                             | 1                         |
+
+Request all five and the call costs 6 credits. Expansions are charged only for companies that are returned, so a domain with no match costs nothing. The [company schema](/docs/company-schema#expansions) lists every field each expansion returns.
+
+## Get the same data for a list of domains
+
+A batch request takes up to 50 domains and the same `expand` values. Each company found costs 4 credits with these three expansions.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.com"],
+    "expand": ["financial", "workforce", "technologies"]
+  }'
+```
+
+```javascript JavaScript
+const { items } = await client.companies.enrichBatch({
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
+  expand: ['financial', 'workforce', 'technologies'],
+});
+
+for (const item of items) {
+  if (item.status !== 'found') continue;
+  const { company } = item;
+  console.log(
+    item.domain,
+    company.financial?.fundingStage,
+    company.workforce?.observedEmployeeCount,
+    company.technologies?.length,
+  );
+}
+```
+
+```python Python
+batch = client.companies.enrich_batch(
+    ["stripe.com", "adyen.com", "notion.com"],
+    expand=["financial", "workforce", "technologies"],
+)
+
+for item in batch["items"]:
+    if item["status"] != "found":
+        continue
+    company = item["company"]
+    print(
+        item["domain"],
+        (company.get("financial") or {}).get("fundingStage"),
+        (company.get("workforce") or {}).get("observedEmployeeCount"),
+        len(company.get("technologies") or []),
+    )
+```
+
+```ruby Ruby
+batch = client.companies.enrich_batch(
+  ["stripe.com", "adyen.com", "notion.com"],
+  expand: ["financial", "workforce", "technologies"]
+)
+
+batch["items"].each do |item|
+  next unless item["status"] == "found"
+
+  company = item["company"]
+  puts [
+    item["domain"],
+    company.dig("financial", "fundingStage"),
+    company.dig("workforce", "observedEmployeeCount"),
+    (company["technologies"] || []).length
+  ].join(" ")
+end
+```
+
+```php PHP
+$batch = $client->companies->enrichBatch(
+    ['stripe.com', 'adyen.com', 'notion.com'],
+    expand: ['financial', 'workforce', 'technologies'],
+);
+
+foreach ($batch['items'] as $item) {
+    if ($item['status'] !== 'found') {
+        continue;
+    }
+    $company = $item['company'];
+    echo $item['domain'], ' ',
+        $company['financial']['fundingStage'] ?? '', ' ',
+        $company['workforce']['observedEmployeeCount'] ?? '', ' ',
+        count($company['technologies'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com adyen.com notion.com \
+  --expand financial,workforce,technologies --format jsonl
+```
+
+</CodeGroup>
+
+For more than 50 domains, run a bulk job with the same `expand` values. See [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains#add-funding-headcount-and-tech-stack-to-every-row).
+
+## Check whether a company uses a technology
+
+`technologies` is a list of technology names, so a lookup is a membership test. This example checks one company for React.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=technologies" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['technologies'],
+});
+
+const usesReact = (company.technologies ?? []).includes('React');
+console.log(usesReact);
+```
+
+```python Python
+company = client.companies.enrich("stripe.com", expand=["technologies"])
+
+uses_react = "React" in (company.get("technologies") or [])
+print(uses_react)
+```
+
+```ruby Ruby
+company = client.companies.enrich("stripe.com", expand: ["technologies"])
+
+uses_react = (company["technologies"] || []).include?("React")
+puts uses_react
+```
+
+```php PHP
+$company = $client->companies->enrich('stripe.com', expand: ['technologies']);
+
+$usesReact = in_array('React', $company['technologies'] ?? [], true);
+var_dump($usesReact);
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand technologies --fields name,technologies
+```
+
+</CodeGroup>
+
+Names must match exactly. Look up the name CompanyEnrich uses for a technology with the free [technology autocomplete](/api-reference/v2/get-technologies-autocomplete) endpoint. To find every company that uses a technology, see [Target companies by technology](/docs/company-search-api-examples#target-companies-by-technology).
+
+## Common questions
+
+### How many credits does one company cost with all of this data?
+
+4 credits: 1 for the company, plus 1 each for `financial`, `workforce`, and `technologies`. With all five expansions the request costs 6 credits. A domain with no match returns `404` and costs nothing.
+
+### How far back does the headcount history go?
+
+The `workforce` expansion includes the latest 12 months. Its `nextCursor` pages back through earlier years with the [workforce endpoint](/api-reference/v2/get-companies-workforce), at 1 credit for each 12-month page. See [Company Headcount API examples](/docs/company-headcount-api-examples).
+
+### Can I get this data for companies I have not listed yet?
+
+Yes. The [Company Search API](/docs/company-search-api) finds companies by funding, headcount growth, technology, and other filters, and accepts the same `expand` values.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Get a company's funding rounds" icon="sack-dollar" href="/docs/get-company-funding-rounds">
+    Read each round, its investors, and the latest funding date.
+  </Card>
+  <Card title="Company Headcount API examples" icon="chart-line" href="/docs/company-headcount-api-examples">
+    Headcount by department and history beyond 12 months.
+  </Card>
+  <Card title="Enrich a list of company domains" icon="list" href="/docs/enrich-a-list-of-company-domains">
+    Run the same request over a file of domains.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+</CardGroup>

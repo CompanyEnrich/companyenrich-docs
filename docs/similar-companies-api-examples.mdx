@@ -1,10 +1,12 @@
 ---
 title: "Similar Companies API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Lookalike basics"
 description: "Ready-to-run lookalike company searches: one seed, several seeds with filters, a minimum similarity score, excluding existing customers, free counts, and CSV exports, in cURL, four SDKs, and the CLI."
 ---
 
 Each example on this page is one [Similar Companies API](/docs/similar-companies-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers seeds, minimum scores, exclusions, counting, and exports. For a specific job, such as finding companies like your customers or a company's competitors, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -125,6 +127,30 @@ companyenrich company similar stripe.com --limit 25
 
 Scores are not probabilities. Keep the companies in the order returned.
 
+The response holds the lookalikes in ranked order, a `scores` object keyed by company ID, and a cursor for the next page. This example is shortened and shows a fictional company, as do the other responses on this page.
+
+```json
+{
+  "items": [
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Acme Payments",
+      "domain": "acme-payments.example",
+      "employees": "201-500",
+      "industry": "Financial Transactions Processing",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "scores": {
+    "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d": 0.87
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
 ## Use several seeds and filter by market
 
 Send up to 10 seeds to describe the kind of company you want, then narrow the lookalikes with filters. This search finds companies like Stripe and Adyen in the United States and Canada with 51 to 200 employees.
@@ -210,14 +236,14 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "lookalike": {"domains": ["notion.so"], "minScore": 0.7},
+    "lookalike": {"domains": ["notion.com"], "minScore": 0.7},
     "pageSize": 25
   }'
 ```
 
 ```javascript JavaScript
 const similar = await client.companies.search({
-  lookalike: { domains: ['notion.so'], minScore: 0.7 },
+  lookalike: { domains: ['notion.com'], minScore: 0.7 },
   pageSize: 25,
 });
 
@@ -228,7 +254,7 @@ for (const company of similar.items) {
 
 ```python Python
 similar = client.companies.search(
-    lookalike={"domains": ["notion.so"], "minScore": 0.7},
+    lookalike={"domains": ["notion.com"], "minScore": 0.7},
     page_size=25,
 )
 
@@ -239,7 +265,7 @@ for company in similar["items"]:
 
 ```ruby Ruby
 similar = client.companies.search(
-  lookalike: { domains: ["notion.so"], minScore: 0.7 },
+  lookalike: { domains: ["notion.com"], minScore: 0.7 },
   page_size: 25
 )
 
@@ -251,7 +277,7 @@ end
 
 ```php PHP
 $similar = $client->companies->search(
-    lookalike: ['domains' => ['notion.so'], 'minScore' => 0.7],
+    lookalike: ['domains' => ['notion.com'], 'minScore' => 0.7],
     pageSize: 25,
 );
 
@@ -261,7 +287,7 @@ foreach ($similar['items'] as $company) {
 ```
 
 ```bash CLI
-companyenrich company similar notion.so --min-score 0.7 --limit 25
+companyenrich company similar notion.com --min-score 0.7 --limit 25
 ```
 
 </CodeGroup>
@@ -392,6 +418,15 @@ companyenrich company count --similar-to stripe.com --country US
 
 </CodeGroup>
 
+The response has two numbers. These values are illustrative.
+
+```json
+{
+  "count": 10000,
+  "total": 54000
+}
+```
+
 `count` is the number of companies your plan can access. For a lookalike query, `total` describes the pool of candidates the similarity search draws from.
 
 ## Export lookalikes to CSV
@@ -482,6 +517,17 @@ companyenrich company export --similar-to stripe.com --country US --limit 1000 -
 ## Find people at lookalike companies
 
 To get people instead of companies, send the same seeds in `company.lookalike` on a people search. See [Find people at companies like your customers](/docs/people-search-api-examples#find-people-at-companies-like-your-customers).
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                              | Page                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Turn a customer list into new accounts            | [Find companies like your best customers](/docs/find-companies-like-your-customers)              |
+| Start from a CRM export of closed-won deals       | [Find lookalikes of your closed-won deals](/docs/find-lookalikes-of-closed-won-deals)            |
+| Start from one company and find its rivals        | [Find a company's competitors](/docs/find-company-competitors)                                   |
+| Score prospects you already have                  | [Rank a prospect list by similarity to your customers](/docs/rank-prospects-by-similarity)       |
 
 ## Related pages
 

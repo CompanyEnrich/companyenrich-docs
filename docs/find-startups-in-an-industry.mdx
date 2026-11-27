@@ -1,0 +1,332 @@
+---
+title: "Find startups in an industry"
+sidebarTitle: "Startups in an industry"
+description: "Find startups in any industry with the Company Search API by combining an industry filter with founding year, company size, and funding stage."
+---
+
+To find startups in an industry, combine an industry filter with a founding year and a size limit in the [Company Search API](/docs/company-search-api). For example, the keyword `fintech`, a `foundedYear` of 2021 or later, and up to 50 employees returns young fintech companies. Counting the matches is free, and each company a search returns costs 1 credit.
+
+CompanyEnrich has no "startup" flag, so you decide what a startup is with these filters:
+
+| What you mean by startup  | Filter                                                 | Example                                     |
+| ------------------------- | ------------------------------------------------------ | ------------------------------------------- |
+| Founded recently          | `foundedYear`                                          | `"foundedYear": {"min": 2021}`              |
+| Small team                | `employees`                                            | `"employees": ["1-10", "11-50"]`            |
+| Early funding stage       | `fundingRounds`                                        | `"fundingRounds": ["seed", "series_a"]`     |
+| Has raised money          | `require`                                              | `"require": "anyFunding"`                   |
+| In an industry            | `keywords`, `naicsCodes`, or `categories`              | `"keywords": "fintech"`                     |
+
+## Find young companies in an industry
+
+This search returns fintech companies founded in 2021 or later that have up to 50 employees.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "keywords": "fintech",
+      "foundedYear": {"min": 2021},
+      "employees": ["1-10", "11-50"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const startups = {
+  keywords: 'fintech',
+  foundedYear: { min: 2021 },
+  employees: ['1-10', '11-50'],
+};
+
+const page = await client.companies.search({ filter: startups, pageSize: 25 });
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.foundedYear, company.employees);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+startups = {
+    "keywords": "fintech",
+    "foundedYear": {"min": 2021},
+    "employees": ["1-10", "11-50"],
+}
+
+page = client.companies.search(filter=startups, page_size=25)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("foundedYear"), company.get("employees"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+startups = {
+  keywords: "fintech",
+  foundedYear: { min: 2021 },
+  employees: ["1-10", "11-50"]
+}
+
+page = client.companies.search(filter: startups, page_size: 25)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['foundedYear']} #{company['employees']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$startups = [
+    'keywords' => 'fintech',
+    'foundedYear' => ['min' => 2021],
+    'employees' => ['1-10', '11-50'],
+];
+
+$page = $client->companies->search(filter: $startups, pageSize: 25);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ',
+        $company['foundedYear'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --keyword fintech --founded 2021.. --employees 1-10,11-50 --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [company record](/docs/company-schema). This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+      "name": "Acme Pay",
+      "domain": "acme-pay.example",
+      "type": "private",
+      "foundedYear": 2022,
+      "employees": "11-50",
+      "industry": "Financial Transactions Processing",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "GB", "name": "United Kingdom" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+A range with only `min` has no upper limit. Swap `keywords` for `naicsCodes` or `categories` to define the industry another way. See [Find companies by industry or NAICS code](/docs/find-companies-by-industry). The later examples on this page reuse the `client` and the `startups` filter created here.
+
+## Keep only startups that have raised money
+
+Add a funding filter to narrow the list to funded companies. `fundingRounds` matches specific rounds, and `"require": "anyFunding"` keeps every company with any disclosed funding. This search returns the same startups with a seed or Series A round.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "keywords": "fintech",
+      "foundedYear": {"min": 2021},
+      "employees": ["1-10", "11-50"],
+      "fundingRounds": ["seed", "series_a"]
+    },
+    "expand": ["financial"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: { ...startups, fundingRounds: ['seed', 'series_a'] },
+  expand: ['financial'],
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.financial?.fundingStage, company.financial?.totalFunding);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={**startups, "fundingRounds": ["seed", "series_a"]},
+    expand=["financial"],
+    page_size=25,
+)
+
+for company in page["items"]:
+    financial = company.get("financial") or {}
+    print(company.get("name"), company["domain"], financial.get("fundingStage"), financial.get("totalFunding"))
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: startups.merge(fundingRounds: ["seed", "series_a"]),
+  expand: ["financial"],
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts [
+    company["name"],
+    company["domain"],
+    company.dig("financial", "fundingStage"),
+    company.dig("financial", "totalFunding")
+  ].join(" ")
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [...$startups, 'fundingRounds' => ['seed', 'series_a']],
+    expand: ['financial'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ',
+        $company['financial']['fundingStage'] ?? '', ' ', $company['financial']['totalFunding'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --keyword fintech --founded 2021.. --employees 1-10,11-50 \
+  --funding-round seed,series_a --expand financial --limit 25
+```
+
+</CodeGroup>
+
+The `financial` expansion adds each company's funding details and 1 credit per company, so this search costs 2 credits per company. Leave it out to pay 1 credit.
+
+## Count startups by country for free
+
+The count endpoint takes the same filter and costs nothing. Call it once per country to see where an industry's startups are before you pay for any records.
+
+<CodeGroup>
+
+```bash cURL
+for country in US GB DE FR; do
+  curl -s -X POST https://api.companyenrich.com/v2/companies/search/count \
+    -H "Authorization: Bearer YOUR_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"filter\": {
+        \"keywords\": \"fintech\",
+        \"foundedYear\": {\"min\": 2021},
+        \"employees\": [\"1-10\", \"11-50\"],
+        \"country\": \"$country\"
+      }
+    }"
+  echo
+done
+```
+
+```javascript JavaScript
+for (const country of ['US', 'GB', 'DE', 'FR']) {
+  const { total } = await client.companies.count({
+    filter: { ...startups, country },
+  });
+  console.log(country, total);
+}
+```
+
+```python Python
+for country in ["US", "GB", "DE", "FR"]:
+    result = client.companies.count(filter={**startups, "country": country})
+    print(country, result["total"])
+```
+
+```ruby Ruby
+["US", "GB", "DE", "FR"].each do |country|
+  result = client.companies.count(filter: startups.merge(country: country))
+  puts "#{country} #{result['total']}"
+end
+```
+
+```php PHP
+foreach (['US', 'GB', 'DE', 'FR'] as $country) {
+    $result = $client->companies->count(filter: [...$startups, 'country' => $country]);
+    echo $country, ' ', $result['total'], PHP_EOL;
+}
+```
+
+```bash CLI
+for country in US GB DE FR; do
+  companyenrich company count --keyword fintech --founded 2021.. --employees 1-10,11-50 \
+    --country "$country"
+done
+```
+
+</CodeGroup>
+
+`total` is the number of companies that match. To download every match in one file, run an export with the same filter. See [Export the whole list to CSV](/docs/build-an-icp-company-list#export-the-whole-list-to-csv).
+
+## Common questions
+
+### How does the API decide what a startup is?
+
+It does not. There is no startup field, so you set the definition with filters: a founding year, an employee range, a funding stage, or all three.
+
+### How do I find startups at a specific funding stage?
+
+Use `fundingRounds` with one or more values, such as `seed`, `series_a`, or `series_b`. See [Funding rounds](/docs/field-values#funding-rounds) for the full list, and [Find recently funded companies](/docs/find-recently-funded-companies) to filter by funding year and amount.
+
+### How do I find startups that are growing fast?
+
+Add a `workforceGrowth` filter, which matches headcount growth over 6 months, 1 year, or 2 years. See [Find companies that are growing](/docs/company-headcount-api-examples#find-companies-that-are-growing).
+
+### What if I can describe the startups but not filter for them?
+
+Use a semantic search, which takes a description such as "AI startups building developer tools in Europe" and costs 2 credits per company. See [Semantic Company Search API](/docs/semantic-company-search-api).
+
+### What does a startup list cost?
+
+1 credit for each company returned, plus 1 credit per company for each expansion. Counts are free. A search that returns no companies costs 1 credit, so count the matches first.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find companies by industry or NAICS code" icon="building" href="/docs/find-companies-by-industry">
+    Choose between NAICS codes, categories, and keywords.
+  </Card>
+  <Card title="Find recently funded companies" icon="sack-dollar" href="/docs/find-recently-funded-companies">
+    Filter by funding year, round, and amount.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Count, search, and export a full list.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+</CardGroup>

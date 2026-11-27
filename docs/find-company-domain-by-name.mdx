@@ -1,0 +1,266 @@
+---
+title: "Find a company's domain from its name"
+sidebarTitle: "Domain from a name"
+description: "Turn a company name or LinkedIn URL into its website domain and a full company record with the Company Enrichment API properties lookup."
+---
+
+To find a company's domain from its name, send the name to the [Company Enrichment API](/docs/company-enrichment-api) properties lookup, `POST /v2/companies/enrich`. The response is the full company record, with the website domain in `domain`. A match costs 1 credit. A name alone can match several companies, so add the company's LinkedIn URL when you have it.
+
+## Find the domain from a company name
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Stripe"
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrichByProperties({ name: 'Stripe' });
+console.log(company.name, company.domain, company.website);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich_by_properties(name="Stripe")
+print(company.get("name"), company["domain"], company["website"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich_by_properties(name: "Stripe")
+puts company["name"], company["domain"], company["website"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrichByProperties(name: 'Stripe');
+echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['website'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich --name "Stripe" --fields name,domain,website
+```
+
+</CodeGroup>
+
+The response is one [company record](/docs/company-schema). `domain` and `website` are present on every record. This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "website": "https://acme-analytics.example",
+  "industry": "Software Publishers",
+  "employees": "201-500",
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+  },
+  "updatedAt": "2026-10-01T12:00:00Z"
+}
+```
+
+When several companies share a name, the API returns the highest-ranked one. A name that matches no company returns `404`. See [When a company is not found](/docs/company-enrichment-api#when-a-company-is-not-found). The later examples on this page reuse the `client` created here.
+
+## Find the domain from a LinkedIn URL
+
+A LinkedIn company URL identifies one company, so it is a more exact input than a name. Send it on its own, or with the name. When you send several properties, all of them must match.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "linkedinUrl": "https://www.linkedin.com/company/stripe"
+  }'
+```
+
+```javascript JavaScript
+const company = await client.companies.enrichByProperties({
+  linkedinUrl: 'https://www.linkedin.com/company/stripe',
+});
+console.log(company.name, company.domain);
+```
+
+```python Python
+company = client.companies.enrich_by_properties(
+    linkedin_url="https://www.linkedin.com/company/stripe",
+)
+print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+company = client.companies.enrich_by_properties(
+  linkedin_url: "https://www.linkedin.com/company/stripe"
+)
+puts company["name"], company["domain"]
+```
+
+```php PHP
+$company = $client->companies->enrichByProperties(
+    linkedinUrl: 'https://www.linkedin.com/company/stripe',
+);
+echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich --linkedin-url https://www.linkedin.com/company/stripe \
+  --fields name,domain
+```
+
+</CodeGroup>
+
+The lookup also accepts `linkedinId`, `twitterUrl`, `facebookUrl`, `instagramUrl`, and `youtubeUrl`.
+
+## Resolve a list of company names
+
+The properties lookup takes one company per request, so send one request for each name. This example prints the domain for each name and marks the names that match no company.
+
+<CodeGroup>
+
+```bash cURL
+for name in "Stripe" "Adyen" "Notion"; do
+  curl -s -X POST https://api.companyenrich.com/v2/companies/enrich \
+    -H "Authorization: Bearer YOUR_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\": \"$name\"}"
+  echo
+done
+```
+
+```javascript JavaScript
+import { NotFoundError } from '@companyenrich/sdk';
+
+const names = ['Stripe', 'Adyen', 'Notion'];
+
+for (const name of names) {
+  try {
+    const company = await client.companies.enrichByProperties({ name });
+    console.log(name, company.domain);
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error;
+    console.log(name, 'no match');
+  }
+}
+```
+
+```python Python
+from companyenrich import NotFoundError
+
+names = ["Stripe", "Adyen", "Notion"]
+
+for name in names:
+    try:
+        company = client.companies.enrich_by_properties(name=name)
+        print(name, company["domain"])
+    except NotFoundError:
+        print(name, "no match")
+```
+
+```ruby Ruby
+names = ["Stripe", "Adyen", "Notion"]
+
+names.each do |name|
+  company = client.companies.enrich_by_properties(name: name)
+  puts "#{name} #{company['domain']}"
+rescue CompanyEnrich::NotFoundError
+  puts "#{name} no match"
+end
+```
+
+```php PHP
+use CompanyEnrich\Exception\NotFoundException;
+
+$names = ['Stripe', 'Adyen', 'Notion'];
+
+foreach ($names as $name) {
+    try {
+        $company = $client->companies->enrichByProperties(name: $name);
+        echo $name, ' ', $company['domain'], PHP_EOL;
+    } catch (NotFoundException) {
+        echo $name, ' no match', PHP_EOL;
+    }
+}
+```
+
+```bash CLI
+for name in "Stripe" "Adyen" "Notion"; do
+  companyenrich company enrich --name "$name" --fields name,domain --format jsonl
+done
+```
+
+</CodeGroup>
+
+Once you have the domains, use them for everything else. Enrichment by domain is the preferred lookup, and batch requests and bulk jobs take domains only. See [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains).
+
+## Check that you got the right company
+
+A name is not unique, so compare the record with what you already know before you store the domain:
+
+* **Name.** Compare `name` and `legalName` with the name you sent.
+* **Location.** Compare `location.country.code` with the country you expect.
+* **LinkedIn.** Compare `socials.linkedinUrl` with the profile you have.
+
+When a check fails, send the name again together with `linkedinUrl` or another social profile. The API then returns a company only when every property matches.
+
+## Common questions
+
+### Can I find a domain from a company's LinkedIn URL?
+
+Yes. Send `linkedinUrl` or `linkedinId` to the same endpoint. Twitter/X, Facebook, Instagram, and YouTube URLs work too.
+
+### What if two companies have the same name?
+
+The API returns the highest-ranked company that matches. Add a social profile such as `linkedinUrl` to pick out one company, then check the `domain` in the response.
+
+### Can I go the other way, from a domain to a company name?
+
+Yes. Enrich the domain with [`GET /v2/companies/enrich`](/api-reference/v2/get-companies-enrich) and read `name` from the record. That lookup costs 1 credit.
+
+### Can I look up many names in one request?
+
+No. The properties lookup takes one company per request. Batch requests and bulk jobs take domains only.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+  <Card title="Enrich a list of company domains" icon="list" href="/docs/enrich-a-list-of-company-domains">
+    Enrich the domains you found in one batch or job.
+  </Card>
+  <Card title="Identify the company behind a signup email" icon="at" href="/docs/identify-company-from-email">
+    Start from an email address when you have no name or domain.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema">
+    Every field in a company record.
+  </Card>
+</CardGroup>

@@ -29,6 +29,20 @@ The Company Enrichment API takes something you know about a company, such as its
   Moving from People Data Labs, Explorium, Crustdata, or Coresignal? See [Migrate from People Data Labs](/docs/migrate-from-people-data-labs), [Migrate from Explorium](/docs/migrate-from-explorium), [Migrate from Crustdata](/docs/migrate-from-crustdata), or [Migrate from Coresignal](/docs/migrate-from-coresignal) for the endpoint and field mapping.
 </Tip>
 
+## Common tasks
+
+Each of these pages works through one job from start to finish, with code in cURL, the four SDKs, and the CLI.
+
+| Task                                         | Page                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Enrich a CSV or a file of domains            | [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains)                       |
+| Get several kinds of data in one request     | [Get funding, headcount, and tech stack in one call](/docs/get-funding-headcount-and-tech-stack) |
+| Read funding rounds and investors            | [Get a company's funding rounds](/docs/get-company-funding-rounds)                               |
+| Classify a company by industry               | [Look up a company's NAICS codes](/docs/look-up-company-naics-codes)                             |
+| Show a company's logo                        | [Get a company logo by domain](/docs/get-company-logo-by-domain)                                 |
+| Start from a company name or a LinkedIn URL  | [Find a company's domain from its name](/docs/find-company-domain-by-name)                       |
+| Start from an email address                  | [Identify the company behind a signup email](/docs/identify-company-from-email)                  |
+
 ## Enrich your first company
 
 This request enriches a company by its domain. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
@@ -171,7 +185,7 @@ The two differ in how they treat duplicates and credits:
 * **Bulk** treats each input as its own request, so duplicates are processed separately. It keeps the input order.
 * **Bulk** checks your balance when you create the job and returns `402` unless it covers every domain, including the expansions you asked for. Credits are not reserved, and you are charged as results complete.
 
-A bulk result has one record per input domain with its `index`, `domain`, `statusCode`, a `success` flag, and either the `company` or an `error`. See [Enrich thousands of domains in the background](/docs/company-enrichment-api-examples#enrich-thousands-of-domains-in-the-background).
+A bulk result has one record per input domain with its `index`, `domain`, `statusCode`, a `success` flag, and either the `company` or an `error`. See [Enrich thousands of domains in the background](/docs/company-enrichment-api-examples#enrich-thousands-of-domains-in-the-background), or [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains) for a file of domains from start to finish.
 
 ## Add more data with expand
 
@@ -209,7 +223,7 @@ For example, enriching `stripe.com` with `technologies` and `workforce` costs 1 
 
 ### Can I enrich a company by name?
 
-Yes. Send `name` to [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich). A name alone can match several companies, in which case the API returns the highest-ranked one. Add a social profile such as `linkedinUrl` to narrow the match, or use the domain when you have it.
+Yes. Send `name` to [`POST /v2/companies/enrich`](/api-reference/v2/post-companies-enrich). A name alone can match several companies, in which case the API returns the highest-ranked one. Add a social profile such as `linkedinUrl` to narrow the match, or use the domain when you have it. See [Find a company's domain from its name](/docs/find-company-domain-by-name).
 
 ### Can I enrich a company by its LinkedIn URL?
 

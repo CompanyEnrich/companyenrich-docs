@@ -1,10 +1,12 @@
 ---
 title: "People Search API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "People search basics"
 description: "Ready-to-run People Search API queries: decision makers at a company, job titles, recent hires, former employees, people in a city or state, semantic search, people at lookalike companies, audience sizing, CSV exports, and work emails."
 ---
 
 Each example on this page is one [People Search API](/docs/people-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers the filters, the company query, expansions, counting, exports, and the work email lookup. For a specific job, such as finding decision makers or sourcing candidates, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -143,6 +145,43 @@ companyenrich people search --domain stripe.com --seniority vp,c-suite --departm
 
 `domain`, `seniority`, and `department` match a person's current job. An array matches any of its values.
 
+The response holds the matching people and a cursor for the next page. This example is shortened and shows a fictional person, as do the other responses on this page. Every search on this page returns the same shape.
+
+```json
+{
+  "items": [
+    {
+      "id": 9000000000001,
+      "name": "Jane Doe",
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+      },
+      "experiences": [
+        {
+          "startDate": "2021-03-01",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "VP of Sales",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        }
+      ],
+      "updatedAt": "2026-09-15T08:30:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
 ## Find people by job title
 
 Find heads of growth at SaaS companies with 51 to 200 employees. The `position` filter matches phrases in the current job title, and the `company` field narrows the search to the kind of company they work at.
@@ -228,7 +267,7 @@ curl -X POST https://api.companyenrich.com/v2/people/search \
   -H "Content-Type: application/json" \
   -d '{
     "filter": {
-      "domain": "notion.so",
+      "domain": "notion.com",
       "currentCompanyStartDate": {"after": "2026-08-01T00:00:00Z"}
     },
     "pageSize": 25
@@ -238,7 +277,7 @@ curl -X POST https://api.companyenrich.com/v2/people/search \
 ```javascript JavaScript
 const page = await client.people.search({
   filter: {
-    domain: 'notion.so',
+    domain: 'notion.com',
     currentCompanyStartDate: { after: '2026-08-01T00:00:00Z' },
   },
   pageSize: 25,
@@ -252,7 +291,7 @@ for (const person of page.items) {
 ```python Python
 page = client.people.search(
     filter={
-        "domain": "notion.so",
+        "domain": "notion.com",
         "currentCompanyStartDate": {"after": "2026-08-01T00:00:00Z"},
     },
     page_size=25,
@@ -265,7 +304,7 @@ for person in page["items"]:
 ```ruby Ruby
 page = client.people.search(
   filter: {
-    domain: "notion.so",
+    domain: "notion.com",
     currentCompanyStartDate: { after: "2026-08-01T00:00:00Z" }
   },
   page_size: 25
@@ -279,7 +318,7 @@ end
 ```php PHP
 $page = $client->people->search(
     filter: [
-        'domain' => 'notion.so',
+        'domain' => 'notion.com',
         'currentCompanyStartDate' => ['after' => '2026-08-01T00:00:00Z'],
     ],
     pageSize: 25,
@@ -291,7 +330,7 @@ foreach ($page['items'] as $person) {
 ```
 
 ```bash CLI
-companyenrich people search --domain notion.so --joined-after 2026-08-01 --limit 25
+companyenrich people search --domain notion.com --joined-after 2026-08-01 --limit 25
 ```
 
 </CodeGroup>
@@ -815,6 +854,15 @@ companyenrich people count --seniority director --department marketing --country
 
 </CodeGroup>
 
+The response has two numbers. These values are illustrative.
+
+```json
+{
+  "count": 4820,
+  "total": 4820
+}
+```
+
 `total` is the number of people who match. `count` is the number your plan can access.
 
 ## Export a people search to CSV
@@ -939,7 +987,19 @@ companyenrich people email 9000000000001
 
 </CodeGroup>
 
-`status` is `found`, `not-found`, `unavailable`, or `pending`. When it is `found`, the response includes `email` and a `certainty` level. See [Email lookup status](/docs/field-values#email-lookup-status).
+`status` is `found`, `not-found`, `unavailable`, or `pending`. When it is `found`, the response includes `email` and a `certainty` level. See [Email lookup status](/docs/field-values#email-lookup-status), and [Find a person's work email](/docs/find-a-work-email) for more ways to use the lookup.
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                              | Page                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Find the leaders at one company or a list         | [Find decision makers at your target accounts](/docs/find-decision-makers)            |
+| List the people who work at a company             | [Find the employees of a company](/docs/find-employees-of-a-company)                  |
+| Find job changes, promotions, and new hires       | [Find people who recently started a new role](/docs/find-people-who-recently-started-a-role) |
+| Search by title, past employer, and school        | [Source candidates for a role](/docs/source-candidates-for-a-role)                    |
+| Get an email address for a person                 | [Find a person's work email](/docs/find-a-work-email)                                 |
 
 ## Related pages
 

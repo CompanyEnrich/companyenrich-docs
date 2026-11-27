@@ -1,0 +1,327 @@
+---
+title: "Find companies by industry or NAICS code"
+sidebarTitle: "By industry"
+description: "Find companies in an industry with the Company Search API, using NAICS codes, categories such as SaaS, or keywords such as fintech. Code lookups are free."
+---
+
+To find companies in an industry, filter the [Company Search API](/docs/company-search-api) by NAICS code, category, or keyword. `naicsCodes` takes a code or a prefix of 2 to 6 digits, `categories` takes a business model such as `saas`, and `keywords` takes topics such as `fintech`. A filter search costs 1 credit per company returned.
+
+| Filter       | Takes                                                                | An array matches | Best for                                  |
+| ------------ | -------------------------------------------------------------------- | ---------------- | ----------------------------------------- |
+| `naicsCodes` | NAICS codes or prefixes, as strings of 2 to 6 digits                 | Any code         | Standard industry classification          |
+| `categories` | One of nine [company categories](/docs/field-values#company-categories), such as `saas` or `e-commerce` | Every category | Business model          |
+| `keywords`   | Keywords that describe the company, such as `fintech`                | Every keyword    | Niches that have no industry code         |
+
+## Find companies by NAICS code
+
+This search returns companies in the United States whose NAICS code starts with `5112`. A shorter prefix covers a broader industry group, and a full six-digit code covers one industry.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "naicsCodes": ["5112"],
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  filter: { naicsCodes: ['5112'], country: 'US' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.industry);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    filter={"naicsCodes": ["5112"], "country": "US"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("industry"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  filter: { naicsCodes: ["5112"], country: "US" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['industry']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    filter: ['naicsCodes' => ['5112'], 'country' => 'US'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['industry'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --naics 5112 --country US --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [company record](/docs/company-schema), with the name of its primary industry in `industry`. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "employees": "201-500",
+      "industry": "Software Publishers",
+      "industries": ["Software Publishers"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+An array of codes matches companies that have any of them. To require every code, use `all`, as in `"naicsCodes": {"all": ["5112", "5182"]}`. Add `naicsCodes` to `expand` to return each company's own codes, for 1 extra credit per company. The later examples on this page reuse the `client` created here.
+
+## Look up the code for an industry
+
+The industries endpoint lists every industry name with its NAICS code prefixes, and it costs no credits. Codes differ between NAICS editions, so take them from this list instead of from memory.
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.companyenrich.com/v2/industries \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const { items } = await client.industries.list();
+
+const matches = items.filter((industry) => industry.name.toLowerCase().includes('software'));
+
+for (const industry of matches) {
+  console.log(industry.name, industry.naicsCodes);
+}
+```
+
+```python Python
+industries = client.industries.list()
+
+matches = [i for i in industries["items"] if "software" in i["name"].lower()]
+
+for industry in matches:
+    print(industry["name"], industry["naicsCodes"])
+```
+
+```ruby Ruby
+industries = client.industries.list
+
+matches = industries["items"].select { |industry| industry["name"].downcase.include?("software") }
+
+matches.each do |industry|
+  puts "#{industry['name']} #{industry['naicsCodes'].join(',')}"
+end
+```
+
+```php PHP
+$industries = $client->industries->list();
+
+foreach ($industries['items'] as $industry) {
+    if (str_contains(strtolower($industry['name']), 'software')) {
+        echo $industry['name'], ' ', implode(',', $industry['naicsCodes']), PHP_EOL;
+    }
+}
+```
+
+```bash CLI
+companyenrich industries software
+```
+
+</CodeGroup>
+
+Each item has an industry `name` and the `naicsCodes` to send in the filter. This example is shortened.
+
+```json
+{
+  "items": [
+    { "name": "Software Publishers", "naicsCodes": ["5112"] }
+  ]
+}
+```
+
+## Find companies by category and keyword
+
+Categories describe the business model, and keywords describe what the company does. This search returns SaaS companies that match the keyword `fintech` or the keyword `payments`.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "categories": "saas",
+      "keywords": {"in": ["fintech", "payments"]}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    categories: 'saas',
+    keywords: { in: ['fintech', 'payments'] },
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.categories);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "categories": "saas",
+        "keywords": {"in": ["fintech", "payments"]},
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("categories"))
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    categories: "saas",
+    keywords: { in: ["fintech", "payments"] }
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{(company['categories'] || []).join(',')}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'categories' => 'saas',
+        'keywords' => ['in' => ['fintech', 'payments']],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', implode(',', $company['categories'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --category saas --any-keyword fintech,payments --limit 25
+```
+
+</CodeGroup>
+
+A plain array of keywords requires every keyword, so use `in` when any one of them is enough. Find the keywords CompanyEnrich uses with the free [keyword autocomplete](/api-reference/v2/get-keywords-autocomplete), or `companyenrich keywords fint` in the CLI.
+
+## Exclude an industry
+
+Use `notIn` to remove an industry from the results. This filter returns e-commerce companies that are not agencies:
+
+```json
+{
+  "filter": {
+    "categories": "e-commerce",
+    "keywords": { "notIn": ["agency"] }
+  }
+}
+```
+
+In the CLI, put `exclude-` in front of the flag: `--category e-commerce --exclude-keyword agency`.
+
+## Common questions
+
+### Which industry filter should I use?
+
+Use `naicsCodes` when you work with standard industry codes. Use `categories` for the business model, such as SaaS or e-commerce. Use `keywords` for a niche that has no code of its own, such as fintech. You can combine all three, and a company must match every filter you send.
+
+### Can I filter by industry name?
+
+No. There is no filter for the `industry` name. Look up the NAICS codes for the industry with [`GET /v2/industries`](/api-reference/v2/get-industries) and send them in `naicsCodes`.
+
+### How many companies are in an industry?
+
+Send the same filter to the count endpoint, which is free. See [Count the companies that share a NAICS code](/docs/look-up-company-naics-codes#count-the-companies-that-share-a-naics-code).
+
+### How do I get the NAICS codes of one company?
+
+Enrich its domain with the `naicsCodes` expansion. See [Look up a company's NAICS codes](/docs/look-up-company-naics-codes).
+
+### How do I find only young companies in an industry?
+
+Add a founding year and a size limit to the industry filter. See [Find startups in an industry](/docs/find-startups-in-an-industry).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Look up a company's NAICS codes" icon="building" href="/docs/look-up-company-naics-codes">
+    Get the codes for one company or a list.
+  </Card>
+  <Card title="Find startups in an industry" icon="rocket" href="/docs/find-startups-in-an-industry">
+    Narrow an industry to young, small companies.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Combine industry with size, location, and other criteria.
+  </Card>
+</CardGroup>

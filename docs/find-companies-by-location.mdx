@@ -1,0 +1,457 @@
+---
+title: "Find companies in a country, state, or city"
+sidebarTitle: "By location"
+description: "Find companies by location with the Company Search API: filter by country code, or look up a state or city ID for free and filter by that."
+---
+
+To find companies in a place, filter the [Company Search API](/docs/company-search-api) by `country`, `state`, `city`, or `region`. Countries take two-letter codes such as `US`. States and cities take CompanyEnrich IDs, which you look up by name with the free geo endpoints. A filter search costs 1 credit per company returned.
+
+| Filter    | Takes                                 | Look up values with                                                  |
+| --------- | ------------------------------------- | -------------------------------------------------------------------- |
+| `country` | Two-letter country code, such as `DE` | [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries)     |
+| `state`   | State ID (integer)                    | [`POST /v2/geo/states`](/api-reference/v2/post-geo-states)           |
+| `city`    | City ID (integer)                     | [`POST /v2/geo/cities`](/api-reference/v2/post-geo-cities)           |
+| `region`  | Region ID (string)                    | [`GET /v2/geo/regions`](/api-reference/v2/get-geo-regions)           |
+
+Every geo endpoint is free. An array of values matches companies in any of the places.
+
+## Find companies in a country
+
+This search returns companies with 51 to 500 employees in Germany, Austria, or Switzerland.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "country": ["DE", "AT", "CH"],
+      "employees": ["51-200", "201-500"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  filter: { country: ['DE', 'AT', 'CH'], employees: ['51-200', '201-500'] },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.location?.country?.code);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    filter={"country": ["DE", "AT", "CH"], "employees": ["51-200", "201-500"]},
+    page_size=25,
+)
+
+for company in page["items"]:
+    country = ((company.get("location") or {}).get("country") or {}).get("code")
+    print(company.get("name"), company["domain"], country)
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  filter: { country: ["DE", "AT", "CH"], employees: ["51-200", "201-500"] },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company.dig('location', 'country', 'code')}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    filter: ['country' => ['DE', 'AT', 'CH'], 'employees' => ['51-200', '201-500']],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['location']['country']['code'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --country DE,AT,CH --employees 51-200,201-500 --limit 25
+```
+
+</CodeGroup>
+
+The response is a page of [company records](/docs/company-schema), each with the company's headquarters in `location`. The later examples on this page reuse the `client` created here.
+
+## Find companies in a city
+
+The `city` filter takes an ID, so look up the city first. The lookup matches any city whose name contains your text, and `countryCodes` keeps it to one country.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/geo/cities \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "san francisco", "countryCodes": ["US"]}'
+```
+
+```javascript JavaScript
+const { items } = await client.geo.searchCities({
+  query: 'san francisco',
+  countryCodes: ['US'],
+});
+
+for (const city of items) {
+  console.log(city.id, city.name, city.stateId);
+}
+```
+
+```python Python
+result = client.geo.search_cities(query="san francisco", country_codes=["US"])
+
+for city in result["items"]:
+    print(city["id"], city["name"], city.get("stateId"))
+```
+
+```ruby Ruby
+result = client.geo.search_cities(query: "san francisco", country_codes: ["US"])
+
+result["items"].each do |city|
+  puts "#{city['id']} #{city['name']} #{city['stateId']}"
+end
+```
+
+```php PHP
+$result = $client->geo->searchCities(query: 'san francisco', countryCodes: ['US']);
+
+foreach ($result['items'] as $city) {
+    echo $city['id'], ' ', $city['name'], ' ', $city['stateId'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich geo cities "san francisco" --country US
+```
+
+</CodeGroup>
+
+Check the name and `stateId` of each result before you pick one, because several cities can share a name. This response is shortened.
+
+```json
+{
+  "items": [
+    { "id": 125634, "name": "San Francisco", "countryCode": "US", "stateId": 1416 }
+  ]
+}
+```
+
+Then send the ID in `filter.city`. Replace `125634` with the ID from your own lookup.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "city": 125634,
+      "categories": "saas"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: { city: 125634, categories: 'saas' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.location?.city?.name);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={"city": 125634, "categories": "saas"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    city = ((company.get("location") or {}).get("city") or {}).get("name")
+    print(company.get("name"), company["domain"], city)
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: { city: 125634, categories: "saas" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company.dig('location', 'city', 'name')}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: ['city' => 125634, 'categories' => 'saas'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['location']['city']['name'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --city 125634 --category saas --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full company record. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "employees": "201-500",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" },
+        "state": { "id": 1416, "name": "California", "code": "US-CA" },
+        "city": { "id": 125634, "name": "San Francisco" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+The state and city IDs in a record are the same IDs the filters accept.
+
+## Find companies in a state or province
+
+States work the same way: look up the ID, then send it in `filter.state`.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Look up the state ID.
+curl -X POST https://api.companyenrich.com/v2/geo/states \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "california", "countryCodes": ["US"]}'
+
+# 2. Search with the ID from the response.
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "state": 1416,
+      "categories": "saas"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const states = await client.geo.searchStates({ query: 'california', countryCodes: ['US'] });
+const state = states.items[0];
+
+const page = await client.companies.search({
+  filter: { state: state.id, categories: 'saas' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.location?.city?.name);
+}
+```
+
+```python Python
+states = client.geo.search_states(query="california", country_codes=["US"])
+state = states["items"][0]
+
+page = client.companies.search(
+    filter={"state": state["id"], "categories": "saas"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    city = ((company.get("location") or {}).get("city") or {}).get("name")
+    print(company.get("name"), company["domain"], city)
+```
+
+```ruby Ruby
+states = client.geo.search_states(query: "california", country_codes: ["US"])
+state = states["items"].first
+
+page = client.companies.search(
+  filter: { state: state["id"], categories: "saas" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company.dig('location', 'city', 'name')}"
+end
+```
+
+```php PHP
+$states = $client->geo->searchStates(query: 'california', countryCodes: ['US']);
+$state = $states['items'][0];
+
+$page = $client->companies->search(
+    filter: ['state' => $state['id'], 'categories' => 'saas'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['location']['city']['name'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich geo states california --country US
+companyenrich company search --state 1416 --category saas --limit 25
+```
+
+</CodeGroup>
+
+Each state in the lookup has an `id`, a `name`, a `countryCode`, and its ISO 3166-2 `code` when one exists. The SDK examples take the first match, so check its name before you rely on it.
+
+## Find companies in a region
+
+A region groups several countries. List the regions to get their IDs, then send one in `filter.region`.
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.companyenrich.com/v2/geo/regions \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const regions = await client.geo.regions();
+
+for (const region of regions.items) {
+  console.log(region.id, region.name, region.countryCodes.length);
+}
+```
+
+```python Python
+regions = client.geo.regions()
+
+for region in regions["items"]:
+    print(region["id"], region["name"], len(region["countryCodes"]))
+```
+
+```ruby Ruby
+regions = client.geo.regions
+
+regions["items"].each do |region|
+  puts "#{region['id']} #{region['name']} #{region['countryCodes'].length}"
+end
+```
+
+```php PHP
+$regions = $client->geo->regions();
+
+foreach ($regions['items'] as $region) {
+    echo $region['id'], ' ', $region['name'], ' ', count($region['countryCodes']), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich geo regions
+```
+
+</CodeGroup>
+
+Each region has an `id`, a `name`, the `countryCodes` it covers, and a `parentId` when it is part of a larger region. In a search, send the ID as a string, as in `"region": "REGION_ID"`, or `--region REGION_ID` in the CLI.
+
+## Exclude a place
+
+Use `notIn` to leave a place out. This filter returns SaaS companies outside the United States:
+
+```json
+{
+  "filter": {
+    "categories": "saas",
+    "country": { "notIn": ["US"] }
+  }
+}
+```
+
+In the CLI, this is `--category saas --exclude-country US`.
+
+## Common questions
+
+### Why do the state and city filters take IDs?
+
+Place names are not unique, so the filters take IDs that identify one state or one city. The geo endpoints turn a name into an ID for free, and the same IDs work in people search.
+
+### Which location does the filter match?
+
+The location in the company record, which holds the company's headquarters. The response returns it in `location`, down to the city, address, and postal code when known.
+
+### Can I search by postal code or radius?
+
+No. The location filters are `country`, `region`, `state`, and `city`.
+
+### Can I combine several locations?
+
+Yes. An array matches any of its values, so `"country": ["DE", "AT", "CH"]` returns companies in all three countries. Different location filters must all match, so a `country` and a `city` in the same request both apply.
+
+### How do I make sure every result has a city?
+
+Add `"require": "city"` to the filter. It keeps only companies that have a city on record. `country` and `state` work the same way.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema#location">
+    Every field in the location object.
+  </Card>
+  <Card title="Build a list of companies that match your ICP" icon="list" href="/docs/build-an-icp-company-list">
+    Combine location with industry, size, and other criteria.
+  </Card>
+  <Card title="People Search API examples" icon="user" href="/docs/people-search-api-examples#find-people-in-a-city-or-state">
+    Use the same IDs to find people in a city or state.
+  </Card>
+</CardGroup>

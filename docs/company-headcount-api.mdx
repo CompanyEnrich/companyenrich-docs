@@ -23,6 +23,18 @@ The Company Headcount API returns how many people work at a company, split into 
   </Card>
 </CardGroup>
 
+## Common tasks
+
+Each of these pages works through one job from start to finish, with code in cURL, the four SDKs, and the CLI.
+
+| Task                                              | Page                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Get the number of employees at a company          | [Get a company's employee count](/docs/get-company-employee-count)                    |
+| Get headcount month by month, back through years  | [Get a company's headcount history](/docs/get-company-headcount-history)              |
+| Watch a list of accounts for growth or decline    | [Track headcount changes at your accounts](/docs/track-headcount-changes)             |
+| Measure one team, such as sales or engineering    | [Track headcount growth by department](/docs/track-headcount-by-department)           |
+| Find new companies by how fast they are growing   | [Find fast-growing companies](/docs/find-fast-growing-companies)                      |
+
 ## Get a company's headcount
 
 This request returns the current headcount for a company, by domain. You need an API key, which you can create at [app.companyenrich.com/access-keys](https://app.companyenrich.com/access-keys).
@@ -192,6 +204,8 @@ This search finds companies whose sales team grew at least 15% in the last year 
 ```
 
 A growth ratio of `0.15` means 15%. A negative ratio means the headcount fell, so `"max": -0.1` finds companies that shrank by 10% or more. Department names in these filters use underscores, such as `engineering_technical`.
+
+`workforceGrowth` needs both a `period` and a `department` whenever you set `min` or `max`. Use `"department": "overall"` to measure the whole company. Without them, the request returns `422`.
 
 ## What headcount data costs
 
