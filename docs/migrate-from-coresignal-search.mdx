@@ -1,0 +1,271 @@
+---
+title: "Translate Coresignal search queries"
+sidebarTitle: "Search queries"
+description: "Rewrite Coresignal Elasticsearch DSL queries and Search Filters as CompanyEnrich V2 search filters, with a pattern table, the clauses that do not translate, and free ways to check the result."
+---
+
+{/* Tables between "generated" markers come from migrations/coresignal.json. Edit the JSON, then run npm run sync:migrations. */}
+
+Coresignal searches take either an Elasticsearch DSL query, a tree of `bool` clauses on index fields, or Search Filters, a flat object of named parameters. Both return record IDs. CompanyEnrich V2 search takes a flat `filter` object in which every filter must match, and returns full records. Most clauses translate to one filter, but the field names, value formats, and operators differ. This page shows each pattern and the clauses that have no equivalent.
+
+A translation that silently drops a clause returns, and charges for, the wrong records. Translate each clause, and check the result with the free count endpoint.
+
+## How the two search models differ
+
+| | Coresignal | CompanyEnrich |
+| --- | --- | --- |
+| Request | An Elasticsearch DSL `query`, or Search Filters parameters such as `hq_country_iso2` and `employees_count_gte` | `filter`, an object with one key per filter. Company search also takes `semantic` or `lookalike`; people search takes `semantic` and a `company` query. |
+| Combining conditions | Any mix of `must`, `filter`, `should`, and `must_not`, nested. Search Filters combine parameters with AND. | Every filter must match. Within a filter, `in` matches any value and `notIn` excludes values. A plain array matches any value, except on `keywords`, `technologies`, and `categories`, where it requires every value. There is no OR across different filters. |
+| Operators | Elasticsearch queries such as `term`, `match`, `match_phrase`, `range`, `nested`, `exists`, `wildcard`, and `query_string`. Search Filters use `_gte` and `_lte` suffixes, an `exclude_` prefix, and `\|`, `+`, and `-` in text. | A value or an array, `in` and `notIn` rules, `min` and `max` ranges, `after` and `before` dates, and `require` for features a company must have |
+| Field names | Index fields, such as `hq_country_iso2` and `experience.position_title` | Filter names, such as `country` and `position`. They are listed in the [company filters](/docs/company-search-api-filters) and [people filters](/docs/people-search-api-filters). |
+| Values | Labels such as `Privately Held`, `51-200 employees`, and `C-Level` | Exact values from [field values](/docs/field-values), ISO alpha-2 country codes, and IDs from the free lookup endpoints |
+| Results | IDs, up to 1,000 per page, then a collect call per record | Full records, up to 100 per page |
+| Sorting | `_score`, `id`, or a numeric field | None. Results come in relevance order. |
+| Totals | The `x-total-results` header | The free [company](/api-reference/v2/post-companies-search-count) and [people](/api-reference/v2/post-people-search-count) count endpoints |
+
+## Translate a search in four steps
+
+<Steps>
+  <Step title="Flatten the query">
+    Write down each leaf clause with its field, query type, and value. Clauses in `must` and `filter` must all match. Note every `should` group: a `should` across different fields cannot be sent as one CompanyEnrich search. Clauses in `must_not`, and Search Filters parameters that start with `exclude_`, become exclusions.
+  </Step>
+  <Step title="Map each clause">
+    Find the pattern for the field in the tables below. A pattern applies whatever the clause's query type: `term`, `terms`, `match`, and `match_phrase` on the same field translate the same way, as does the Search Filters parameter the note names. The exception is `match_phrase` on a title field sent to a `semantic_search` endpoint, which adds synonyms that CompanyEnrich does not: see [Semantic and agentic search](#semantic-and-agentic-search). Convert values with the [value translations](/docs/migrate-from-coresignal-field-mapping#value-translations), and look up IDs and names with the free [geo](/api-reference/v2/post-geo-states), [industry](/api-reference/v2/get-industries), [keyword](/api-reference/v2/get-keywords-autocomplete), [technology](/api-reference/v2/get-technologies-autocomplete), and [position](/api-reference/v2/get-positions-autocomplete) endpoints.
+  </Step>
+  <Step title="Count it for free">
+    Send the filter to the [company](/api-reference/v2/post-companies-search-count) or [people](/api-reference/v2/post-people-search-count) count endpoint. Compare `total` with the `x-total-results` you recorded from Coresignal. A large gap usually means a clause was dropped or a value was not converted.
+  </Step>
+  <Step title="Fetch one page">
+    Run the search with a small `pageSize` and check the records against what you expect. An empty search still costs one result's base price.
+  </Step>
+</Steps>
+
+For example, this Coresignal query:
+
+<CodeGroup>
+
+```json Elasticsearch DSL
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "hq_country_iso2": "US" } },
+        { "terms": { "size_range": ["51-200 employees", "201-500 employees"] } },
+        { "range": { "founded_year": { "gte": 2020 } } },
+        { "terms": { "last_funding_round.type": ["Series A", "Series B"] } }
+      ],
+      "must_not": [
+        { "term": { "type": "Nonprofit" } }
+      ]
+    }
+  }
+}
+```
+
+```json Search Filters
+{
+  "hq_country_iso2": "US",
+  "size_range": ["51-200 employees", "201-500 employees"],
+  "founded_year_gte": 2020,
+  "last_funding_round_type": ["Series A", "Series B"],
+  "exclude_type": "Nonprofit"
+}
+```
+
+</CodeGroup>
+
+becomes this CompanyEnrich search:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer $COMPANYENRICH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pageSize": 100,
+    "expand": ["financial"],
+    "filter": {
+      "country": "US",
+      "reportedEmployees": ["51-200", "201-500"],
+      "foundedYear": { "min": 2020 },
+      "fundingRounds": ["series_a", "series_b"],
+      "type": { "notIn": ["nonprofit"] }
+    }
+  }'
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+query = {
+    "country": "US",
+    "reportedEmployees": ["51-200", "201-500"],  # the self-reported range, like size_range
+    "foundedYear": {"min": 2020},
+    "fundingRounds": ["series_a", "series_b"],
+    "type": {"notIn": ["nonprofit"]},
+}
+
+print(client.companies.count(filter=query)["total"])  # free
+page = client.companies.search(filter=query, page_size=100, expand=["financial"])
+for company in page["items"]:
+    print(company["name"], company["domain"], (company.get("financial") or {}).get("fundingStage"))
+```
+
+</CodeGroup>
+
+The results are full company records, so the collect calls that followed the Coresignal search go away. Funding is an expansion, so the request adds `expand` only because the code reads `fundingStage`.
+
+## How clause types translate
+
+| Coresignal clause | CompanyEnrich |
+| --- | --- |
+| `bool.must` and `bool.filter`, or several Search Filters parameters | Put each clause in `filter`. Every filter must match. |
+| `bool.should` on one field, or a list value in Search Filters | An `in` rule on that filter. A plain array works too, except on `keywords`, `technologies`, and `categories`, where it requires every value. |
+| `bool.should` across different fields | No equivalent. Run one search per branch and merge the results on `id`. |
+| `bool.must_not`, or an `exclude_` parameter | `notIn` on the same filter |
+| `term`, `terms`, `match`, and `match_phrase` | The value, or an array of values, on the field's filter |
+| `range` with `gte` and `lte`, or `_gte` and `_lte` parameters | `min` and `max`, which are inclusive. For `gt` and `lt` on whole numbers, such as counts and years, move the bound by one. Date filters take date-times, such as `2026-08-01T00:00:00Z`. |
+| `nested` on `experience`, `education`, or `technologies_used` | Map the inner clause by its field. On `experience`, `active_experience` set to `1` points to the current-job filters, and `0` to `pastExperience`. |
+| `exists` | `require`, for the 13 features it covers |
+| `query_string`, `wildcard`, `prefix`, `fuzzy`, and `multi_match` | Only where CompanyEnrich has a text filter: `query` for names, `keywords`, and `position`. Otherwise no equivalent. |
+| `sort` | Drop `_score`. Other sorts have no equivalent. |
+| `\|`, `+`, and `-` in Search Filters text | `in`, an array, and `notIn`. For `keywords` and `technologies`, an array requires every value. |
+
+## Company search patterns
+
+{/* generated: coresignal search:company */}
+
+| Coresignal query | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"terms": {"website.domain_only": ["acme.example", "globex.example"]}}` | `{"filter": {"domain": ["acme.example", "globex.example"]}}` | same | Also for `website_domain` and `website`. Search Filters: `website`, `exact_website`. Send bare domains. |
+| `{"match": {"company_name": "acme"}}` | `{"filter": {"query": "acme"}}` | lossy | Matches company names, keywords, or domain prefixes. Search Filters: `name`, `exact_name`. |
+| `{"match": {"professional_network_url": "https://www.linkedin.com/company/acme-example"}}` | None | none | No search by profile URL. To look up one company, use `POST /v2/companies/enrich` with `linkedinUrl`. |
+| `{"terms": {"hq_country_iso2": ["US", "CA"]}}` | `{"filter": {"country": ["US", "CA"]}}` | same | Search Filters: `hq_country_iso2`. |
+| `{"match": {"hq_country": "Germany"}}` | `{"filter": {"country": "DE"}}` | transformed | ISO 3166-1 alpha-2 codes instead of names. Look up codes with `POST /v2/geo/countries`. Search Filters: `hq_country`, `exact_hq_country`. |
+| `{"bool": {"must_not": [{"terms": {"hq_country_iso2": ["CN"]}}]}}` | `{"filter": {"country": {"notIn": ["CN"]}}}` | same | A `must_not` clause, or an `exclude_` Search Filters parameter, becomes `notIn` on the same filter. |
+| `{"match": {"hq_state": "California"}}` | `{"filter": {"state": "STATE_ID"}}` | transformed | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Search Filters: `hq_state`. |
+| `{"match": {"hq_city": "Austin"}}` | `{"filter": {"city": "CITY_ID"}}` | transformed | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Search Filters: `hq_city`. |
+| `{"match": {"hq_region": "EMEA"}}` | `{"filter": {"region": "REGION_ID"}}` | lossy | Replace `REGION_ID` with a region ID from `GET /v2/geo/regions`. The regions cover different country lists. |
+| `{"match": {"hq_location": "Austin, TX"}}` | None | none | No location text filter. Use the country, state, or city filter. Search Filters: `hq_location`. |
+| `{"terms": {"size_range": ["51-200 employees", "201-500 employees"]}}` | `{"filter": {"reportedEmployees": ["51-200", "201-500"]}}` | renamed | See the company size table. `employees` filters on the calculated range instead. Search Filters: `size_range`. |
+| `{"range": {"employees_count": {"gte": 50, "lte": 500}}}` | `{"filter": {"workforceSize": [{"department": "overall", "min": 50, "max": 500}]}}` | lossy | Counts from CompanyEnrich employee data. `min` and `max` are inclusive, as `gte` and `lte` are, so `gt` 50 becomes `min` 51. Search Filters: `employees_count_gte`, `employees_count_lte`. |
+| `{"range": {"employees_count_change.change_yearly_percentage": {"gte": 20}}}` | `{"filter": {"workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2}}}` | lossy | A ratio instead of a percentage: divide by 100. Growth comes from CompanyEnrich employee data. Periods are `m6`, `y1`, and `y2`, so `change_monthly_percentage` and `change_quarterly_percentage` have no equivalent. |
+| `{"range": {"employees_count_breakdown_by_department.employees_count_technical": {"gt": 50}}}` | `{"filter": {"workforceSize": [{"department": "engineering_technical", "min": 51}]}}` | lossy | 14 departments instead of Coresignal's 20. |
+| `{"range": {"founded_year": {"gte": 2018}}}` | `{"filter": {"foundedYear": {"min": 2018}}}` | renamed | Search Filters: `founded_year_gte`, `founded_year_lte`. |
+| `{"term": {"type": "Privately Held"}}` | `{"filter": {"type": "private"}}` | renamed | See the company type table. Search Filters: `type`. |
+| `{"term": {"is_public": true}}` | `{"filter": {"type": "public"}}` | transformed | Search Filters: `is_public`. |
+| `{"match": {"industry": "Software Development"}}` | `{"filter": {"naicsCodes": ["5112"]}}` | lossy | No industry-label filter. Pick NAICS codes or prefixes from `GET /v2/industries`, or describe the companies in a semantic search. Search Filters: `industry`, `exact_industry`. |
+| `{"match": {"naics_codes": "541511"}}` | `{"filter": {"naicsCodes": ["541511"]}}` | renamed | Codes have 2 to 6 digits, so a shorter code matches every code that starts with it. Check codes against `GET /v2/industries`. |
+| `{"match": {"sic_codes": "7372"}}` | None | none | No SIC filter. Use NAICS codes. |
+| `{"match": {"categories_and_keywords": "fintech"}}` | `{"filter": {"keywords": "fintech"}}` | lossy | Check the keyword with `GET /v2/keywords/autocomplete`. Also for `business_areas` and `offerings`. In Search Filters text, `\|` becomes `in`, `+` becomes an array, which requires every keyword, and `-` becomes `notIn`. |
+| `{"query_string": {"default_field": "description", "query": "observability"}}` | `{"filter": {"keywords": "observability"}}` | lossy | No description text filter. Match keywords, or describe the companies in a semantic search. Search Filters: `description`. |
+| `{"nested": {"path": "technologies_used", "query": {"match": {"technologies_used.technology": "Salesforce"}}}}` | `{"filter": {"technologies": "salesforce"}}` | lossy | Look up names with `GET /v2/technologies/autocomplete`. Several technologies that must all match become an array. Search Filters: `technologies_used`. |
+| `{"bool": {"should": [{"nested": {"path": "technologies_used", "query": {"match": {"technologies_used.technology": "Salesforce"}}}}, {"nested": {"path": "technologies_used", "query": {"match": {"technologies_used.technology": "HubSpot"}}}}]}}` | `{"filter": {"technologies": {"in": ["salesforce", "hubspot"]}}}` | lossy | Use `in` to match any of them, as `Salesforce \| HubSpot` does in Search Filters. |
+| `{"technologies_used": "Salesforce \| HubSpot"}` | `{"filter": {"technologies": {"in": ["salesforce", "hubspot"]}}}` | lossy | A Search Filters parameter. `\|` becomes `in`, `+` becomes an array, which requires every technology, and `-` becomes `notIn`. |
+| `{"term": {"is_saas": true}}` | `{"filter": {"categories": "saas"}}` | lossy | Search Filters: `is_saas`. |
+| `{"match": {"business_model": "B2B"}}` | `{"filter": {"categories": "b2b"}}` | lossy | Also for `is_b2b`. Search Filters: `business_model`, `is_b2b`. |
+| `{"range": {"revenue_annual.source_5_annual_revenue.annual_revenue": {"gte": 10000000}}}` | `{"filter": {"revenue": ["10m-50m", "50m-100m", "100m-200m", "200m-1b", "over-1b"]}}` | lossy | Revenue is a set of ranges. List every range above the bound. Search Filters: `revenue_gte`, `revenue_lte`. |
+| `{"terms": {"last_funding_round.type": ["Series A", "Series B"]}}` | `{"filter": {"fundingRounds": ["series_a", "series_b"]}}` | lossy | See the funding round table. Coresignal matches the latest round only. To keep only companies whose latest round is one of these, check `financial.fundingStage` on each result. Search Filters: `last_funding_round_type`. |
+| `{"range": {"last_funding_round.announced_date": {"gte": "2025-01-01"}}}` | `{"filter": {"fundingYear": {"min": 2025}}}` | lossy | Year of the latest funding, not a date. Search Filters: `last_funding_round_date_gte`, `last_funding_round_date_lte`. |
+| `{"range": {"last_funding_round.amount_raised": {"gte": 10000000}}}` | `{"filter": {"fundingAmount": {"min": 10000000}}}` | lossy | CompanyEnrich `fundingAmount` is total funding, not the latest round's amount. |
+| `{"exists": {"field": "last_funding_round.type"}}` | `{"filter": {"require": "anyFunding"}}` | renamed | `require` covers 13 features: social profiles, location parts, `revenue`, `foundedYear`, and `anyFunding`. Other `exists` checks have no equivalent. |
+| `{"range": {"active_job_postings_count": {"gte": 10}}}` | None | none | No job posting, follower, review, traffic, or product filters. Search Filters: `active_job_postings_count_gte`, `active_job_postings_title`. |
+| `{"term": {"is_deleted": 0}}` | `{}` | lossy | Drop it. CompanyEnrich has no deleted-record flag. |
+| `{"bool": {"should": [{"match": {"industry": "Software Development"}}, {"range": {"last_funding_round.amount_raised": {"gt": 5000000}}}], "minimum_should_match": 1}}` | None | none | No OR across different filters. Run one search per branch and merge the results on `id`. OR within one filter works: send an array. |
+| `{"sort": ["_score"]}` | `{}` | same | Drop it. Results come in relevance order. |
+| `{"sort": ["employees_count"]}` | None | none | No sorting. To reproduce a top list by a field, count the matches for free, fetch every page, then sort in your code. Sorting by `id` has no equivalent either. |
+| `?items_per_page=1000&after=NEXT_PAGE_AFTER` | `{"pageSize": 100, "cursor": "NEXT_CURSOR"}` | transformed | Up to 100 records per page. Send `nextCursor` from the last response as `cursor`, until it is omitted. |
+
+{/* end generated */}
+
+## People search patterns
+
+Person filters such as `domain`, `position`, `seniority`, and `department` match the person's current job. Conditions on the employer, such as its size, industry, or headquarters country, go in a `company` query, which takes the [company search filters](/docs/company-search-api-filters). Past jobs go in `pastExperience`.
+
+Coresignal's `experience` fields cover current and past jobs, so check how a nested clause treats `experience.active_experience`. Search Filters parameters that start with `experience_` match past or current jobs, which CompanyEnrich splits between the current-job filters and `pastExperience`.
+
+Use `filter.state` and `filter.city` for the person's location. They take integer IDs from the free [state](/api-reference/v2/post-geo-states) and [city](/api-reference/v2/post-geo-cities) endpoints, also returned as `location.state.id` and `location.city.id`. A single ID, an array, or an `in` rule matches only people whose reported location has been resolved to those places. A `notIn` exclusion keeps people without a resolved state or city. Compare coverage before replacing a search that depends on location text.
+
+{/* generated: coresignal search:person */}
+
+| Coresignal query | CompanyEnrich request | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `{"match": {"active_experience_company_website.domain_only": "stripe.com"}}` | `{"filter": {"domain": "stripe.com"}}` | same | Search Filters have no current-employer website parameter, because `experience_company_website` also matches past employers. |
+| `{"term": {"active_experience_company_id": 123456}}` | `{"filter": {"companyId": "COMPANY_ID"}}` | transformed | Coresignal IDs do not carry over. Filter by `domain`, or by CompanyEnrich company IDs. Search Filters: `active_experience_company_id`. |
+| `{"active_experience_company_name": "Stripe"}` | `{"company": {"filter": {"query": "Stripe"}}}` | lossy | A Search Filters parameter. `query` matches company names, keywords, or domain prefixes, so it can match more than one employer. Filter by `domain` when you know it. |
+| `{"match_phrase": {"active_experience_title": "head of growth"}}` | `{"filter": {"position": "head of growth"}}` | lossy | Matches the phrase in current positions. Check titles with `GET /v2/positions/autocomplete`. Search Filters: `active_experience_title`. |
+| `{"bool": {"should": [{"match_phrase": {"active_experience_title": "CTO"}}, {"match_phrase": {"active_experience_title": "VP Engineering"}}]}}` | `{"filter": {"position": ["CTO", "VP Engineering"]}}` | lossy | OR within one field becomes an array, which matches any phrase. |
+| `{"active_experience_management_level": ["C-Level", "President/Vice President"]}` | `{"filter": {"seniority": ["c-suite", "vp"]}}` | renamed | See the seniority table. Also for a `match` or `terms` clause on the same field. |
+| `{"active_experience_department": "Engineering and Technical"}` | `{"filter": {"department": ["engineering-technical", "information-technology"]}}` | lossy | See the department table. Also for a `match` or `terms` clause on the same field. |
+| `{"term": {"is_decision_maker": 1}}` | `{"filter": {"seniority": ["owner", "founder", "c-suite", "partner", "vp", "head", "director"]}}` | lossy | Coresignal derives the flag from the title. List the seniority levels you treat as decision makers. Search Filters: `is_decision_maker`. |
+| `{"terms": {"location_country_iso2": ["US", "CA"]}}` | `{"filter": {"country": ["US", "CA"]}}` | same | Search Filters: `location_country_iso2`. |
+| `{"term": {"location_country": "Germany"}}` | `{"filter": {"country": "DE"}}` | transformed | ISO 3166-1 alpha-2 codes instead of names. Search Filters: `location_country`. |
+| `{"match": {"location_state": "California"}}` | `{"filter": {"state": "STATE_ID"}}` | lossy | Replace `STATE_ID` with the integer ID from `POST /v2/geo/states`. Matches only people whose reported location has been resolved to that state. A `notIn` exclusion keeps people without a resolved state. |
+| `{"match": {"location_city": "San Francisco"}}` | `{"filter": {"city": "CITY_ID"}}` | lossy | Replace `CITY_ID` with the integer ID from `POST /v2/geo/cities`. Matches only people whose reported location has been resolved to that city. A `notIn` exclusion keeps people without a resolved city. Search Filters: `location_city`. |
+| `{"match": {"location_full": "Bay Area"}}` | None | none | No location text filter. Use the country, state, or city filter. Search Filters: `location_full`. |
+| `{"nested": {"path": "experience", "query": {"bool": {"must": [{"term": {"experience.active_experience": 1}}, {"range": {"experience.date_from": {"gte": "2026-08-01"}}}]}}}}` | `{"filter": {"currentPositionStartDate": {"after": "2026-08-01T00:00:00Z"}}}` | renamed | Dates are date-times. For the date the person joined the company rather than started the role, use `currentCompanyStartDate`. Search Filters `experience_date_from_gte` matches past roles too. |
+| `{"nested": {"path": "experience", "query": {"bool": {"must": [{"term": {"experience.active_experience": 0}}, {"match": {"experience.company_website.domain_only": "google.com"}}]}}}}` | `{"filter": {"pastExperience": {"domain": "google.com"}}}` | renamed | Past jobs only. A clause without `experience.active_experience`, like Search Filters `experience_company_website`, matches past or current employers: run one search with `pastExperience` and one with `domain`, and merge on `id`. |
+| `{"nested": {"path": "experience", "query": {"match_phrase": {"experience.position_title": "product manager"}}}}` | `{"filter": {"pastExperience": {"position": "product manager"}}}` | lossy | Coresignal matches past and current titles here. CompanyEnrich `pastExperience` matches past jobs, and `position` current ones. Search Filters: `experience_position_title`. |
+| `{"nested": {"path": "education", "query": {"match_phrase": {"education.institution_name": "Stanford University"}}}}` | `{"filter": {"education": {"institutionName": "Stanford University"}}}` | lossy | Or match the school's LinkedIn page with `institutionLinkedinHandle`. Degree and year filters have no equivalent. Search Filters: `education_institution_name`. |
+| `{"nested": {"path": "experience", "query": {"bool": {"must": [{"term": {"experience.active_experience": 1}}, {"term": {"experience.company_size_range": "51-200 employees"}}]}}}}` | `{"company": {"filter": {"reportedEmployees": "51-200"}}}` | renamed | Employer conditions go in a `company` query, which takes any company search filter. |
+| `{"nested": {"path": "experience", "query": {"bool": {"must": [{"term": {"experience.active_experience": 1}}, {"term": {"experience.company_hq_country_iso2": "US"}}]}}}}` | `{"company": {"filter": {"country": "US"}}}` | same | The employer's country, not the person's. |
+| `{"active_experience_company_industry": "Financial Services"}` | `{"company": {"filter": {"naicsCodes": ["5221"]}}}` | lossy | A Search Filters parameter, or `experience.company_industry` in a nested query. Pick NAICS codes from `GET /v2/industries`, or put a `semantic` query in the `company` query. |
+| `{"match": {"full_name": "Jane Doe"}}` | `{"filter": {"query": "Jane Doe"}}` | lossy | Matches person names. Combine it with `domain` to find one person at a company. Search Filters: `full_name`. |
+| `{"match": {"headline": "founder"}}` | None | none | No headline, summary, or keyword filter. Match current titles with `position`. Search Filters: `headline`, `summary`, `keyword`. |
+| `{"match": {"inferred_skills": "Python"}}` | None | none | No skill, certification, salary, career-length, or employment-status filters. |
+| `{"bool": {"should": [{"match_phrase": {"active_experience_title": "developer"}}, {"match": {"active_experience_department": "Engineering and Technical"}}], "minimum_should_match": 1}}` | None | none | No OR across different filters. Run one search per branch and merge on `id`. |
+| `{"sort": ["_score"]}` | `{}` | same | Drop it. Results come in relevance order. |
+| `{"sort": ["id"]}` | None | none | No sorting. Page with the cursor. |
+
+{/* end generated */}
+
+## Clauses that do not translate
+
+* **OR across different fields.** Run one search per branch and merge the results on `id`. OR across values of one field works: send `in`.
+* **Sorting.** Sort the records in your code. To reproduce a top list, such as the largest companies, count the matches for free, fetch every page, then sort.
+* **Text queries on most fields.** `query_string`, `wildcard`, `fuzzy`, and phrase matching translate only where CompanyEnrich has a text filter: `query` for names, `keywords`, and `position`. Descriptions, headlines, summaries, and location text have no filter.
+* **Job postings, followers, web traffic, reviews, salaries, SIC codes, and technology dates.**
+* **Skills, certifications, career length, employment status, and social activity.**
+* **`exists` checks**, except the 13 company features `require` covers, such as `anyFunding` and `linkedin`.
+* **Index details**, such as `.exact` and `.domain_only` subfields, `boost`, and `function_score`. Map the clause by its field and drop the rest.
+
+## Totals and pagination
+
+Search responses do not include a total. The free count endpoints return `total`, the number of matching records, and `count`, the number your plan lets you retrieve.
+
+Pages hold 1 to 100 full records, set with `pageSize`, against up to 1,000 IDs per Coresignal page. Pass the `nextCursor` of one page as `cursor` to get the next, until `nextCursor` is omitted. A cursor expires 24 hours after the first page. A Coresignal `after` value does not work on CompanyEnrich, so restart any paging job from the first page.
+
+## Semantic and agentic search
+
+Coresignal's `semantic_search` endpoints add job titles with the same meaning to `match_phrase` clauses on title fields. CompanyEnrich `position` matches the phrase inside current titles but does not add synonyms. List the variants you want, such as `["software engineer", "software developer"]`, or describe the people in a [semantic people search](/docs/people-search-api).
+
+If your code sends a prompt to Coresignal's Agentic Search API, send the same text as a semantic query:
+
+```json
+{
+  "semantic": { "query": "developer tooling companies building observability products" },
+  "filter": { "country": "US" }
+}
+```
+
+Semantic search ranks results by meaning and reports the filters it inferred in `interpretation`. It returns records, not a generated query. It costs 2 credits per company returned instead of 1. For companies like ones you already know, use a [lookalike search](/docs/similar-companies-api), which takes up to 10 seed domains and costs 5 per company.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-coresignal">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-coresignal-field-mapping">
+    Every field, with value translations.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every company filter and its matching rules.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters">
+    Every people filter and the company query.
+  </Card>
+</CardGroup>

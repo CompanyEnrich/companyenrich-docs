@@ -82,7 +82,7 @@ Fidelity compares definitions, not data. The two providers build their records f
 | `funding.total_investment_usd` | `financial.totalFunding` | `financial` | renamed |   |
 | `funding.last_round_type` | `financial.fundingStage` | `financial` | transformed | A label such as `Series A`, where Crustdata returns `series_a`. The labels are not a fixed list, so map them to your own values if your code compares them. |
 | `funding.last_fundraise_date` | `financial.fundingDate` | `financial` | transformed | A date-time instead of a date. |
-| `funding.last_round_amount_usd` | `financial.fundingRounds[].amount` | `financial` | transformed | Take the latest round by `date`. The amount is a string. |
+| `funding.last_round_amount_usd` | `financial.fundingRounds[].amount` | `financial` | transformed | Take the latest round by `date`. The amount is text with its currency, such as `$36M`. |
 | `funding.milestones` | `financial.fundingRounds` | `financial` | transformed | Each round has `type`, `date`, `amount`, `investors`, and `url`. |
 | `funding.investors` | `financial.fundingRounds[].investors` | `financial` | transformed | Listed per round, as text. |
 | `funding.investors_detailed`, `funding.acquisitions`, `funding.acquired_by` | — |   | none |   |

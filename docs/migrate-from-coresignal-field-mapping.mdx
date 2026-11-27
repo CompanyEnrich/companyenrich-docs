@@ -1,0 +1,428 @@
+---
+title: "Coresignal field mapping"
+sidebarTitle: "Field mapping"
+description: "Every Coresignal Multi-source company and employee field next to its CompanyEnrich V2 field, with the expansion it needs, value translations, and the fields that have no counterpart."
+---
+
+{/* Tables between "generated" markers come from migrations/coresignal.json. Edit the JSON, then run npm run sync:migrations. */}
+
+This page maps the fields Coresignal's Multi-source Company and Employee APIs return to the CompanyEnrich V2 [company record](/docs/company-schema) and [person record](/docs/person-schema). Use it to rewrite the code that reads Coresignal responses and to migrate the records you stored.
+
+Company fields come from Company collect, enrich, and Bulk Collect. Person fields come from Employee collect and enrich, and from the Contact Enrichment API. Base and Clean records use other field names and are not covered.
+
+The same mapping is available as JSON at [/migrations/coresignal.json](https://docs.companyenrich.com/migrations/coresignal.json), for scripts and [coding agents](/docs/migrate-from-coresignal-agent).
+
+## How to read this page
+
+Paths use dots for nested objects and `[]` for arrays, as in `experiences[].company.domain`. **Expand** names the [expansion](/docs/credits#expansions) you must request to get the field. Each one adds credits.
+
+Coresignal returns the full record, or the core bundle plus the bundles you name. CompanyEnrich always returns the base record and adds the expansions you name in `expand`. So a Coresignal `bundle` or `fields` list becomes an `expand` list that holds only the expansions your code reads.
+
+Coresignal's documentation and its OpenAPI specification spell some fields differently: `professional_network_url` and `linkedin_url`, `financial_website_url` and `crunchbase_url`, and `company_id` and `id`. Rows list both spellings. Match whichever your code reads.
+
+**Fidelity** describes how the definitions compare:
+
+{/* generated: coresignal fidelity */}
+
+| Fidelity | Meaning |
+| --- | --- |
+| `same` | Same meaning and format. |
+| `renamed` | Same meaning and values under a different name or label. |
+| `transformed` | Same information in a different format, casing, or structure. Convert it in code. |
+| `lossy` | Related but not equivalent. Values can differ, so check the fields your code depends on. |
+| `none` | No CompanyEnrich equivalent. |
+
+{/* end generated */}
+
+Fidelity compares definitions, not data. The two providers build their records from different sources, so a value can differ even when the fields mean the same thing.
+
+## Company fields
+
+{/* generated: coresignal fields:company */}
+
+### Identity
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `id`, `company_id` | `id` |   | lossy | A separate ID space. Coresignal IDs are integers and CompanyEnrich IDs are UUIDs. Store the CompanyEnrich ID next to the Coresignal ID. |
+| `company_name` | `name` |   | renamed |   |
+| `company_legal_name` | `legalName` |   | renamed |   |
+| `website_domain` | `domain` |   | renamed |   |
+| `website` | `website` |   | transformed | Both are full URLs. Normalize the scheme, `www.`, and trailing slash before comparing. |
+| `company_logo_url`, `company_logo` | `logoUrl` |   | transformed |   |
+| `description`, `description_enriched` | `description` |   | transformed | Written from different sources, so the text differs. |
+| `type` | `type` |   | renamed | See [Company type](#company-type). |
+| `is_public` | `type` |   | transformed | Public companies have a `type` of `public`. |
+| `founded_year` | `foundedYear` |   | transformed | An integer instead of a string. |
+| `last_updated_at` | `updatedAt` |   | transformed | A date-time instead of a date. |
+| `company_name_alias`, `website_alias`, `tagline`, `description_metadata_raw`, `status`, `created_at`, `processed_at`, `is_deleted`, `quality`, `source_id`, `unique_website`, `unique_domain`, `expired_domain` | — |   | none | One domain and one name per company. No record-quality or deletion flags. |
+
+### Size and headcount
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `size_range` | `employees` |   | lossy | Coresignal returns the self-reported range from the company profile. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range. CompanyEnrich records do not return the self-reported range; it is only a search filter, `reportedEmployees`. See [Company size](#company-size). |
+| `employees_count`, `employees_count_inferred` | `workforce.observedEmployeeCount` | `workforce` | lossy | Coresignal counts the profiles that list the company. CompanyEnrich counts employees observed in its own data. Without the expansion, read the `employees` range. |
+| `employees_count_by_month[].employees_count` | `workforce.history[].observedEmployeeCount` | `workforce` | lossy | The `workforce` expansion holds the latest 12 months, newest first. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`. |
+| `employees_count_by_month[].date` | `workforce.history[].date` | `workforce` | transformed | The first day of the month. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`. |
+| `employees_count_change` | `workforce.history[].observedEmployeeCount` |   | transformed | Not returned. Compare two `workforce.history` entries. To filter on growth, use the `workforceGrowth` search filter. |
+| `employees_count_breakdown_by_department` | `workforce.departmentHeadcount` | `workforce` | lossy | Counts for 14 departments instead of Coresignal's 20. |
+| `employees_count_breakdown_by_department_by_month` | `workforce.history[].departmentHeadcount` | `workforce` | lossy | By department. The `workforce` expansion holds the latest 12 months, newest first. For earlier months, call `GET /v2/companies/workforce` with `nextCursor`, where the entries are under `history`. |
+| `employees_count_breakdown_by_seniority.employees_count_clevel` | `workforce.departmentHeadcount.cSuite` | `workforce` | lossy | The only seniority count. CompanyEnrich counts C-suite as a department. |
+| `employees_count_breakdown_by_seniority`, `employees_count_breakdown_by_region`, `employees_count_by_country`, `avg_tenure_by_seniority_months`, `avg_tenure_by_department_months`, `departures_count`, `employee_attrition_rate`, `top_previous_companies`, `top_next_companies`, `followers_count_professional_network`, `followers_count_linkedin`, `followers_count_twitter`, `followers_count_owler` | — |   | none |   |
+
+### Historical Headcount API
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `headcount` | `history[].observedEmployeeCount` from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) |   | lossy | Employees observed in CompanyEnrich data, newest first, 12 months per page. The API describes the entries as change points, so do not assume one entry per month: carry the last value forward when you chart months. Pass `nextCursor` for each earlier 12 months. The response is an object, not a list of rows. |
+| `created` | `history[].date` from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) |   | transformed | The first day of the month the entry describes, instead of when the row was recorded. |
+| `size` | `history[].employeeCountRange` from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) |   | lossy | A calculated range, such as `51-200`, instead of the self-reported label. |
+| `company_id`, `website` | `companyId`, `domain` from [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce) |   | lossy | The CompanyEnrich company UUID and the bare domain. |
+| `follower_count`, `source_id`, `professional_network_url`, `shorthand_name`, `canonical_shorthand_name`, `name`, `industry`, `type`, `location`, `country` | — |   | none | The workforce response holds counts only. Read company details from the company record. |
+
+### Revenue
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `revenue_annual_range`, `revenue_annual` | `revenue` |   | lossy | A range label, such as `10m-50m`, instead of an amount or bounds for each source. |
+| `stock_ticker` | `financial.stockSymbol` or `financial.stockExchange` | `financial` | transformed | One symbol and exchange instead of a list. |
+| `revenue_quarterly`, `income_statements`, `stock_information`, `ipo_date`, `ipo_share_price`, `ipo_share_price_currency` | — |   | none |   |
+
+### Funding
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `last_funding_round.type` | `financial.fundingStage` | `financial` | transformed | A label such as `Series A`. The labels are not a fixed list, so compare them without case and map them to your own values. |
+| `last_funding_round.announced_date` | `financial.fundingDate` | `financial` | transformed | A date-time instead of a date. |
+| `last_funding_round.amount_raised` | `financial.fundingRounds[].amount` | `financial` | transformed | Take the latest round by `date`. Text with the currency, such as `$36M`, so parse it before you compare it or store it as a number. |
+| `funding_rounds` | `financial.fundingRounds` | `financial` | transformed | Each round has `type`, `date`, `amount`, `investors`, and `url`. |
+| `funding_rounds[].type` | `financial.fundingRounds[].type` | `financial` | transformed |   |
+| `funding_rounds[].announced_date` | `financial.fundingRounds[].date` | `financial` | transformed |   |
+| `funding_rounds[].amount_raised` | `financial.fundingRounds[].amount` | `financial` | transformed | Text with the currency, such as `$36M`, so parse it before you compare it or store it as a number. |
+| `funding_rounds[].investors[].name`, `last_funding_round.investors[].name` | `financial.fundingRounds[].investors` | `financial` | transformed | Investor names, as text. |
+| `last_funding_round.amount_raised_currency`, `funding_rounds[].investors[].is_lead`, `funding_rounds[].num_investors`, `acquired_by_summary`, `acquisition_list_source_1`, `parent_company_information`, `ownership_status` | — |   | none | No lead investors, acquisitions, or parent company. |
+
+### Location
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `hq_country_iso2` | `location.country.code` |   | same | ISO 3166-1 alpha-2 on both. |
+| `hq_country` | `location.country.name` |   | renamed |   |
+| `hq_country_iso3` | `location.country.code` |   | transformed | Alpha-2 instead of alpha-3. |
+| `hq_state` | `location.state.name` |   | renamed | Coresignal fills it for US companies only. CompanyEnrich also returns `location.state.id` and, when known, the ISO 3166-2 code in `location.state.code`. |
+| `hq_city` | `location.city.name` |   | renamed | Coresignal fills it for US companies only. |
+| `hq_zipcode` | `location.postalCode` |   | renamed |   |
+| `hq_street`, `hq_full_address` | `location.address` |   | lossy | The street address. |
+| `hq_location` | `location.city.name` or `location.state.name` or `location.country.name` |   | transformed | Build the location string from its parts. |
+| `company_phone_numbers` | `location.phone` |   | lossy | One headquarters phone number instead of a list. |
+| `company_locations_full`, `hq_region`, `hq_latitude`, `hq_longitude`, `hq_apartment`, `hq_suite`, `company_emails` | — |   | none | Headquarters only, with no coordinates or emails. Regions are a search filter, not a record field. |
+
+### Industry and classification
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `industry` | `industries` |   | lossy | A list of industries. Values can differ. CompanyEnrich `industry` is a NAICS industry title, such as `Software Publishers`. |
+| `naics_codes` | `naicsCodes` | `naicsCodes` | renamed | Both are lists of codes. Check codes against `GET /v2/industries`. |
+| `categories_and_keywords`, `business_areas`, `offerings` | `keywords` | `keywords` | lossy | Keywords that describe what the company does, from different sources. |
+| `business_model`, `is_b2b` | `categories` |   | lossy | Lowercase values, such as `b2b`, `b2c`, and `b2g`, in one list with other categories such as `saas`. Coresignal is replacing `is_b2b` with `business_model`. |
+| `is_saas` | `categories` |   | transformed | SaaS companies have `saas` in `categories`. |
+| `sic_codes` | — |   | none | No SIC codes. Use NAICS codes. |
+
+### Technologies
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `technologies_used[].technology` | `technologies` | `technologies` | lossy | One flat list of technology names from different detection. |
+| `num_technologies_used` | `technologies` | `technologies` | transformed | Count the list. |
+| `technologies_used[].first_verified_at`, `technologies_used[].last_verified_at` | — |   | none | No detection dates. |
+
+### Social profiles
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `canonical_professional_network_url`, `professional_network_url`, `canonical_linkedin_url`, `linkedin_url` | `socials.linkedinUrl` |   | transformed | The documentation uses the `professional_network_` names and the API specification the `linkedin_` names. Normalize the scheme, `www.`, and trailing slash before comparing. |
+| `canonical_professional_network_shorthand_name`, `professional_network_shorthand_name`, `canonical_linkedin_shorthand_name`, `linkedin_shorthand_name` | `socials.linkedinUrl` |   | transformed | The shorthand name is the last part of the URL. |
+| `twitter_url` | `socials.twitterUrl` |   | transformed | One URL instead of a list. |
+| `facebook_url` | `socials.facebookUrl` |   | transformed | One URL instead of a list. |
+| `instagram_url` | `socials.instagramUrl` |   | transformed | One URL instead of a list. |
+| `youtube_url` | `socials.youtubeUrl` |   | transformed | One URL instead of a list. |
+| `github_url` | `socials.githubUrl` |   | transformed | One URL instead of a list. |
+| `financial_website_url`, `crunchbase_url` | `socials.crunchbaseUrl` |   | renamed | The documentation uses `financial_website_url` and the API specification `crunchbase_url`. |
+| `professional_network_shorthand_names`, `linkedin_shorthand_names`, `reddit_url`, `discord_url`, `pinterest_url`, `tiktok_url` | — |   | none |   |
+
+### Other sections
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `key_executives`, `featured_employees`, `key_executive_arrivals`, `key_executive_departures`, `key_employee_change_events` | — |   | none | Not part of the company record. Search people at the company's domain with a `seniority` of `c-suite`, `founder`, or `vp`. For recent arrivals, add `currentCompanyStartDate`. |
+| `competitors`, `competitors_websites`, `similar_pages`, `affiliated_pages` | — |   | none | A lookalike search on the company's domain returns similar companies, ranked by similarity, which is a different list. |
+| `active_job_postings`, `active_job_postings_count`, `active_job_postings_count_change`, `base_salary`, `additional_pay`, `total_salary`, `total_website_visits_monthly`, `rank_global`, `visits_breakdown_by_country`, `company_employee_reviews_aggregate_score`, `product_reviews_aggregate_score`, `news_articles`, `company_updates`, `pricing_available`, `free_trial_available`, `demo_available` | — |   | none | No job postings, salaries, web traffic, reviews, news, posts, or product signals. Monthly variants of these fields have no equivalent either. |
+
+{/* end generated */}
+
+## Person fields
+
+Fields under **Current job** come from the person's current experience. Coresignal repeats the current job in `active_experience_*` fields and marks it in `experience[]` with `active_experience` set to `1`. CompanyEnrich returns one `experiences` list and marks current jobs with `isCurrent`. A person can have more than one current job. After a lookup by work email with [`POST /v2/people/enrich`](/api-reference/v2/post-people-enrich), the experience at the email's company has `isMatched` set to `true`. After a search, `isMatched` marks the experience that matched your filters.
+
+Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email), a separate call that replaces the Contact Enrichment API.
+
+{/* generated: coresignal fields:person */}
+
+### Identity
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `id` | `id` |   | lossy | A separate ID space. Both are integers, so keep them in separate columns. |
+| `full_name` | `name` |   | renamed |   |
+| `first_name` | `firstName` |   | renamed |   |
+| `last_name` | `lastName` |   | renamed |   |
+| `picture_url` | `imageUrl` |   | transformed |   |
+| `updated_at` | `updatedAt` |   | renamed |   |
+| `parent_id`, `public_profile_id`, `historical_ids`, `is_parent`, `profile_score`, `is_deleted`, `middle_name`, `headline`, `summary`, `services`, `interests`, `created_at`, `checked_at`, `changed_at`, `processed_at` | — |   | none |   |
+
+### Current job
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `active_experience_title` | `position` |   | renamed | One current title. When a person has several current jobs and the employer matters, read `experiences[].position` from the experience with `isMatched` set. |
+| `active_experience_management_level` | `seniority` or `experiences[].seniority` |   | transformed | See [Seniority](#seniority). |
+| `active_experience_department` | `department` or `experiences[].department` |   | transformed | CompanyEnrich departments can include a sub-department, such as `sales/customer-success`. See [Department](#department). |
+| `active_experience_company_id` | `experiences[].company.id` |   | lossy | A CompanyEnrich company UUID, from the experience with `isCurrent` set. |
+| `active_experience_company_website` | `experiences[].company.domain` or `experiences[].company.website` |   | transformed | Coresignal returns a full URL. `domain` is the bare domain. |
+| `active_experience_company_shorthand_name` | `experiences[].company.socials.linkedinUrl` | `company` | transformed | The shorthand name is the last part of the URL. |
+| `active_experience_company_logo_url` | `experiences[].company.logoUrl` |   | transformed |   |
+| `is_working` | `experiences[].isCurrent` |   | transformed | A person is working when any experience has `isCurrent` set to `true`. |
+| `is_decision_maker`, `active_experience_description` | — |   | none | No decision-maker flag. Check `seniority` against the levels you treat as decision makers. |
+
+### Work history
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `experience` | `experiences` |   | transformed | One list for current and past jobs in both APIs. |
+| `experience[].active_experience` | `experiences[].isCurrent` |   | transformed | A boolean instead of `1` or `0`. |
+| `experience[].position_title` | `experiences[].position` |   | renamed |   |
+| `experience[].management_level` | `experiences[].seniority` |   | transformed | See [Seniority](#seniority). |
+| `experience[].department` | `experiences[].department` |   | transformed | See [Department](#department). |
+| `experience[].date_from` | `experiences[].startDate` |   | transformed | Coresignal dates can be ISO dates or text such as `Oct 2024`. Parse both. |
+| `experience[].date_to` | `experiences[].endDate` |   | transformed |   |
+| `experience[].company_id` | `experiences[].company.id` |   | lossy | A CompanyEnrich company UUID. |
+| `experience[].company_name` | `experiences[].company.name` or `experiences[].companyName` |   | transformed | `companyName` is set when no company record matched. |
+| `experience[].company_website` | `experiences[].company.domain` or `experiences[].company.website` |   | transformed |   |
+| `experience[].company_professional_network_url`, `experience[].company_linkedin_url` | `experiences[].company.socials.linkedinUrl` | `company` | transformed |   |
+| `experience[].company_industry` | `experiences[].company.industries` | `company` | lossy |   |
+| `experience[].company_size_range` | `experiences[].company.employees` | `company` | lossy | Calculated range, not the self-reported one. See [Company size](#company-size). |
+| `experience[].company_type` | `experiences[].company.type` | `company` | renamed | See [Company type](#company-type). |
+| `experience[].company_founded_year` | `experiences[].company.foundedYear` | `company` | renamed |   |
+| `experience[].company_hq_country` | `experiences[].company.location.country.name` | `company` | renamed |   |
+| `experience[].company_hq_country_iso2` | `experiences[].company.location.country.code` | `company` | same |   |
+| `experience[].location`, `experience[].description`, `experience[].duration_months`, `experience[].company_employees_count`, `experience[].company_annual_revenue_source_1`, `experience[].company_last_funding_round_date`, `experience[].company_categories_and_keywords`, `total_experience_duration_months`, `months_in_management`, `tenure_stats`, `internal_promotion_rate`, `experience_recently_started`, `experience_recently_closed` | — |   | none | Work out durations from `experiences[].startDate` and `endDate`. To find recent job changes, search with `currentCompanyStartDate` or `currentPositionStartDate`. |
+
+### Education
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `education` | `education` | `education` | transformed |   |
+| `education[].institution_name` | `education[].institutionName` | `education` | renamed |   |
+| `education[].degree` | `education[].degree` | `education` | lossy | An array that holds the degree and field of study. |
+| `education[].date_from_year` | `education[].startYear` | `education` | renamed |   |
+| `education[].date_to_year` | `education[].endYear` | `education` | renamed |   |
+| `education[].description`, `education[].activities_and_societies`, `education[].institution_full_address`, `last_graduation_date`, `institution_ranking_score`, `education_degrees` | — |   | none |   |
+
+### Location
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `location_country` | `location.country.name` |   | renamed |   |
+| `location_country_iso2` | `location.country.code` |   | same |   |
+| `location_country_iso3` | `location.country.code` |   | transformed | Alpha-2 instead of alpha-3. |
+| `location_state` | `location.state.name` |   | lossy | Present only when the person's reported location has been resolved to a state. `location.state.id` is the integer ID accepted by people search. |
+| `location_city` | `location.city.name` |   | lossy | Present only when the person's reported location has been resolved to a city. `location.city.id` is the integer ID accepted by people search. |
+| `location_full` | `location.address` |   | lossy | The person's reported location text. It can be present even when the state or city has not been resolved. |
+| `location_regions`, `location_latitude`, `location_longitude` | — |   | none |   |
+
+### Social profiles
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `professional_network_url`, `linkedin_url` | `socials.linkedinUrl` |   | transformed | The documentation uses `professional_network_url` and the API specification `linkedin_url`. Normalize both URLs before comparing. |
+| `professional_network_canonical_shorthand_name`, `linkedin_canonical_shorthand_name` | `socials.linkedinUrl` |   | transformed | The shorthand name is the last part of the URL. |
+| `twitter_url`, `facebook_url`, `github_url`, `website`, `financial_website_url`, `crunchbase_url` | — |   | none | Person records hold a LinkedIn URL only. |
+
+### Contact
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `data.email` | `email` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | renamed | At the top level of the response. |
+| `message`, `code` | `status` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | transformed | `found`, `not-found`, `unavailable`, or `pending`, in place of `FOUND` or `NOT_FOUND` and a numeric code. |
+| `data.email_status`, `data.email_confidence` | `certainty` from [`GET /v2/people/{personId}/email`](/api-reference/v2/get-people-personid-email) |   | lossy | `certainty` is `very-high`, `high`, `medium`, or `unknown`. A status such as `catch_all` and a numeric confidence have no direct counterpart. |
+
+### Other
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `inferred_skills`, `historical_skills`, `languages`, `certifications`, `courses`, `awards`, `patents`, `publications`, `projects`, `organizations`, `recommendations`, `activity`, `personal_investments`, `partner_investments`, `exits`, `events`, `github_username`, `github_repos_summary`, `connections_count`, `followers_count`, `influence_score`, `post_frequency_yearly`, `projected_base_salary_median`, `projected_total_salary_median`, `profile_root_field_changes_summary` | — |   | none | No skills, certifications, publications, investments, GitHub data, social activity, salary estimates, or change history. Related fields with other suffixes have no equivalent either. |
+
+{/* end generated */}
+
+## Account fields
+
+Coresignal reports your balance in the `x-credits-remaining` header. CompanyEnrich returns it from [`GET /v2/me`](/api-reference/v2/get-me), which is free, and reports it on paid responses in `x-credit-remaining`.
+
+{/* generated: coresignal fields:account */}
+
+### Credits
+
+| Coresignal | CompanyEnrich | Expand | Fidelity | Notes |
+| --- | --- | --- | --- | --- |
+| `x-credits-remaining` | `credits.total` |   | transformed | Subtract `credits.used` from `credits.total` to get the balance. Both can be fractional. Paid responses also carry an `x-credit-remaining` header. |
+
+{/* end generated */}
+
+## Value translations
+
+These tables translate fixed values. Values not listed have no counterpart. Use them to convert stored values and search filters, and keep the original Coresignal value when you store converted data.
+
+{/* generated: coresignal values */}
+
+### Company size
+
+Coresignal `size_range`, `experience[].company_size_range` → CompanyEnrich `employees`, `reportedEmployees`. Coresignal ranges are self-reported, so search them with `reportedEmployees`. CompanyEnrich `employees` is calculated from its employee data, so a company can fall in a different range. Coresignal writes some ranges more than one way, so match every spelling.
+
+| Coresignal | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Myself Only`, `1 employee`, `2-10`, `2-10 employees`, `1-10 employees` | `1-10` | lossy | One range covers these. |
+| `11-50 employees` | `11-50` | renamed |   |
+| `51-200 employees` | `51-200` | renamed |   |
+| `201-500 employees` | `201-500` | renamed |   |
+| `501-1000 employees`, `501-1,000 employees` | `501-1K` | renamed |   |
+| `1001-5000 employees`, `1,001-5,000 employees` | `1K-5K` | renamed |   |
+| `5001-10,000 employees`, `5,001-10,000 employees` | `5K-10K` | renamed |   |
+| `10,001+ employees` | `over-10K` | renamed |   |
+
+### Company type
+
+Coresignal `type`, `experience[].company_type` → CompanyEnrich `type`. Coresignal records can carry other labels, such as `Private Company`. Map any label you store.
+
+| Coresignal | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Privately Held` | `private` | renamed |   |
+| `Public Company` | `public` | renamed |   |
+| `Nonprofit` | `nonprofit` | renamed |   |
+| `Educational` | `educational` | renamed |   |
+| `Government Agency` | `government` | renamed |   |
+| `Self-Employed` | `self-employed` | renamed |   |
+| `Self-Owned` | `self-owned` | renamed |   |
+| `Partnership` | `partnership` | renamed |   |
+
+### Seniority
+
+Coresignal `active_experience_management_level`, `experience[].management_level` → CompanyEnrich `seniority`, `experiences[].seniority`. Use these for stored values and search filters.
+
+| Coresignal | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `C-Level` | `c-suite` | renamed |   |
+| `President/Vice President` | `vp` | lossy | Some presidents are C-suite in CompanyEnrich. |
+| `Director` | `director` | renamed |   |
+| `Head` | `head` | renamed |   |
+| `Manager` | `manager` | renamed |   |
+| `Senior` | `senior` | renamed |   |
+| `Founder` | `founder` | renamed |   |
+| `Owner` | `owner` | renamed |   |
+| `Partner` | `partner` | renamed |   |
+| `Intern` | `intern` | renamed |   |
+| `Specialist` | — | none | Individual contributors with no level in the title. `entry` and `senior` each cover part of it. |
+
+### Department
+
+Coresignal `active_experience_department`, `experience[].department` → CompanyEnrich `department`, `experiences[].department`. CompanyEnrich departments have sub-departments, such as `sales/customer-success`. A top-level value matches its sub-departments.
+
+| Coresignal | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Sales` | `sales` | lossy | Sales leaders can fall under `c-suite/sales-executive`, so add it when you search for them. |
+| `Marketing` | `marketing` | renamed |   |
+| `Engineering and Technical` | `engineering-technical`, `information-technology` | lossy | CompanyEnrich splits engineering and IT. |
+| `Product` | `product-management` | renamed |   |
+| `Design` | `design` | renamed |   |
+| `Finance & Accounting` | `finance` | renamed |   |
+| `Human Resources` | `human-resources` | renamed |   |
+| `Legal` | `legal` | renamed |   |
+| `Operations` | `operations` | renamed |   |
+| `Consulting` | `consulting` | renamed |   |
+| `Education` | `education` | renamed |   |
+| `Medical` | `medical-health` | renamed |   |
+| `Customer Service` | `operations/customer-service-support`, `sales/customer-success` | lossy |   |
+| `General Management` | `c-suite` | lossy | Executives. Other general managers have no department. |
+| `Administrative` | `operations/office-operations` | lossy |   |
+| `Project Management` | `engineering-technical/project-management`, `information-technology/project-program-management` | lossy |   |
+| `Research` | `engineering-technical/research-development`, `medical-health/medical-research` | lossy |   |
+| `Real Estate` | `operations/real-estate`, `finance/real-estate-finance` | lossy |   |
+| `Trades` | `engineering-technical/technician`, `engineering-technical/mechanic`, `operations/construction` | lossy |   |
+| `Other` | — | none |   |
+
+### Funding round
+
+Coresignal `last_funding_round.type`, `funding_rounds[].type` → CompanyEnrich `fundingRounds`. These are search filter values. Company records return labels such as `Series A` in `financial.fundingStage`.
+
+| Coresignal | CompanyEnrich | Fidelity | Notes |
+| --- | --- | --- | --- |
+| `Seed` | `seed` | renamed |   |
+| `Angel` | `angel` | renamed |   |
+| `Series A`, `Series B`, `Series C`, `Series D`, `Series E`, `Series F`, `Series G`, `Series H` | `series_a`, `series_b`, `series_c`, `series_d`, `series_e`, `series_f`, `series_g`, `series_h` | renamed | Same round for each value. Coresignal also writes `Serie B`. |
+| `Debt financing` | `debt_financing` | renamed |   |
+| `Pre seed`, `Series I`, `Series J`, `Series unknown`, `Convertible note`, `Corporate round`, `Equity crowdfunding`, `Grant`, `Initial coin offering`, `Non equity assistance`, `Post IPO debt`, `Post IPO equity`, `Post IPO secondary`, `Private equity`, `Product crowdfunding`, `Secondary market`, `Undisclosed` | — | none | No exact value. CompanyEnrich also has `venture` and `other`. |
+
+{/* end generated */}
+
+### Country
+
+Coresignal returns full country names in `hq_country` and `location_country`, and ISO 3166-1 alpha-2 codes in `hq_country_iso2` and `location_country_iso2`. CompanyEnrich returns `location.country.code`, the same alpha-2 code, and `location.country.name`, and filters on the code. To convert stored names, look up the codes with [`POST /v2/geo/countries`](/api-reference/v2/post-geo-countries), which is free.
+
+### Growth periods
+
+Coresignal reports headcount change in `employees_count_change` as monthly, quarterly, and yearly counts and percentages. CompanyEnrich filters on growth with `workforceGrowth` periods `m6`, `y1`, and `y2`, as a ratio: 20% growth is `0.2`. To read growth for one company, compare two entries of `workforce.history`, or page further back with [`GET /v2/companies/workforce`](/api-reference/v2/get-companies-workforce).
+
+## CompanyEnrich fields Coresignal does not return
+
+### Company
+
+{/* generated: coresignal ceOnly:company */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `financial.totalFunding` | `financial` | Total funding raised, as one amount. |
+| `socials.linkedinId` |   | The company's LinkedIn ID. |
+| `socials.angellistUrl`, `socials.g2Url` |   | Other profiles. |
+| `location.state.code` |   | The ISO 3166-2 code of the state, when known. |
+| `workforce.unclassifiedHeadcount` | `workforce` | Employees without a department. |
+
+{/* end generated */}
+
+### Person
+
+{/* generated: coresignal ceOnly:person */}
+
+| Field | Expand | Notes |
+| --- | --- | --- |
+| `experiences[].isMatched` |   | Which experience matched your search filters or your email lookup. |
+| `education[].institution` | `education` | The school as a company summary. |
+| `location.state.id`, `location.city.id` |   | IDs that people search accepts as `state` and `city` filters. |
+
+{/* end generated */}
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-coresignal">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-coresignal-search">
+    Translate Elasticsearch DSL queries and Search Filters.
+  </Card>
+  <Card title="Company schema" icon="building" href="/docs/company-schema">
+    Every field in a CompanyEnrich company record.
+  </Card>
+  <Card title="Person schema" icon="user" href="/docs/person-schema">
+    Every field in a CompanyEnrich person record.
+  </Card>
+</CardGroup>

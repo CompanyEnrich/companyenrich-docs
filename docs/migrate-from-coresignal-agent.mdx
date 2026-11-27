@@ -1,0 +1,180 @@
+---
+title: "Migrate from Coresignal with a coding agent"
+sidebarTitle: "With a coding agent"
+description: "Instructions a coding agent such as Claude Code, Codex, or Cursor follows to migrate a codebase, its scripts, and its MCP setup from the Coresignal API to the CompanyEnrich V2 API, using the published mapping file."
+---
+
+A coding agent can find every Coresignal API call, MCP server entry, and stored Coresignal value in your codebase, rewrite the calls to the official CompanyEnrich SDK, and list what should stay on Coresignal. This page holds the instructions it follows. The agent reads them together with the [mapping file](https://docs.companyenrich.com/migrations/coresignal.json), the same data behind the [field mapping](/docs/migrate-from-coresignal-field-mapping) and [search query](/docs/migrate-from-coresignal-search) tables.
+
+The instructions work in any language and cover Coresignal's Multi-source Company and Employee APIs, the Contact Enrichment API, and Bulk Collect.
+
+## Start the migration
+
+Open your agent in the repository and give it this prompt:
+
+```text
+Migrate this codebase from Coresignal to CompanyEnrich. Follow https://docs.companyenrich.com/docs/migrate-from-coresignal-agent.md and use the mapping at https://docs.companyenrich.com/migrations/coresignal.json. Show me the migration report before changing any code.
+```
+
+The URL ends in `.md`, which serves this page as plain Markdown for the agent to read.
+
+If your agent cannot open URLs, download the [mapping file](https://docs.companyenrich.com/migrations/coresignal.json) and the [API specification](https://docs.companyenrich.com/openapi/v2.json) into the repository, and paste the [instructions](#instructions) into the agent's instruction file, such as `AGENTS.md`, `CLAUDE.md`, or a Cursor rule. Then tell it where the files are and ask it to follow the instructions.
+
+## What the agent does
+
+| Step | The agent | You |
+| --- | --- | --- |
+| 1. Inventory | Finds Coresignal HTTP calls, scripts, MCP configuration, prompts that name Coresignal tools, keys, field reads, stored Coresignal data, and tests | Nothing |
+| 2. Report | Writes `coresignal-migration-report.md`, classifying each call site as moves, needs redesign, or keep Coresignal. Then it stops. | Approve, change, or exclude call sites |
+| 3. Rewrite | Replaces approved calls with SDK calls behind a feature flag | Name the flag, if you have a convention |
+| 4. Searches | Translates queries whose clauses all map, and marks the rest | Decide on searches that need a redesign |
+| 5. MCP and scripts | Adds the CompanyEnrich MCP server, updates tool names in prompts, and rewrites approved scripts | Sign in to the server, or set its key |
+| 6. Stored data | Writes migration files for new ID columns and converted values, without running them | Review and run them |
+| 7. Tests | Adds tests with mocked HTTP and runs your suite | Review the diff |
+| 8. Final report | Lists what moved, what stays on Coresignal, open TODOs, and the expansions each call requests | Run the [parity check](/docs/migrate-from-coresignal#verify-parity-on-your-own-data) |
+
+## Guardrails
+
+The instructions tell the agent to:
+
+* **Stop for review.** No code changes before you approve the report.
+* **Spend nothing.** No paid CompanyEnrich requests and no Coresignal requests. Tests use mocked HTTP. With your key, the agent may call only free endpoints: `GET /v2/me`, the counts, and the lookups for filter values.
+* **Keep Coresignal working.** The Coresignal path stays behind the flag until you remove it.
+* **Not guess.** Any field, input, or clause without an entry in the mapping file gets a TODO and a line in the report.
+* **Protect keys.** Keys come from environment variables and are never printed or committed.
+
+Review the diff as you would any other change. Pay most attention to the `lossy` fields your code depends on, the searches the agent marked for redesign, and the call sites it kept on Coresignal.
+
+## Instructions
+
+Copy this block if you want to keep the instructions in your repository.
+
+````markdown
+# Migrate from Coresignal to CompanyEnrich V2
+
+You are migrating this codebase from the Coresignal API, its Multi-source Company and Employee APIs, Contact Enrichment API, Bulk Collect, and MCP server, to the CompanyEnrich V2 API, CLI, and MCP server. Coresignal keeps running, so a call site with no CompanyEnrich equivalent stays on Coresignal.
+
+## Sources
+
+Read the mapping file first. It is authoritative for endpoints, inputs, fields, values, search patterns, and MCP tools.
+
+- Mapping: https://docs.companyenrich.com/migrations/coresignal.json
+- Guide: https://docs.companyenrich.com/docs/migrate-from-coresignal.md
+- Field mapping: https://docs.companyenrich.com/docs/migrate-from-coresignal-field-mapping.md
+- Search translation: https://docs.companyenrich.com/docs/migrate-from-coresignal-search.md
+- Credits: https://docs.companyenrich.com/docs/credits.md
+- MCP server: https://docs.companyenrich.com/docs/mcp-server.md
+- CLI: https://docs.companyenrich.com/docs/cli.md
+- API specification: https://docs.companyenrich.com/openapi/v2.json
+- SDKs: https://docs.companyenrich.com/docs/python-sdk.md (methods: https://github.com/CompanyEnrich/companyenrich-python-sdk#readme), https://docs.companyenrich.com/docs/javascript-typescript-sdk.md, https://docs.companyenrich.com/docs/ruby-sdk.md, https://docs.companyenrich.com/docs/php-sdk.md
+
+If you cannot read the mapping file, stop and ask the user to add it to the repository.
+
+## Rules
+
+1. Use only the mappings in the mapping file and the endpoints in the API specification. If a Coresignal field, input, search clause, or tool has no entry, do not guess: leave the Coresignal code in place, list it in the report, and, once the user approves the rewrite, add a `TODO(companyenrich-migration)` comment that names it.
+2. Do not change code until the user approves the migration report from step 2.
+3. Do not make Coresignal requests. Do not make paid CompanyEnrich requests. If the user has set `COMPANYENRICH_API_KEY`, you may call `GET /v2/me`, `POST /v2/companies/search/count`, `POST /v2/people/search/count`, and the lookups for filter values (autocomplete, the industry list, and the `geo` endpoints), which are free. Any other live call needs the user's explicit approval and a credit budget.
+4. Read the CompanyEnrich key from the `COMPANYENRICH_API_KEY` environment variable. Never hardcode, print, log, or commit an API key.
+5. Keep the Coresignal integration and its configuration. Put each CompanyEnrich path behind a feature flag or configuration switch, using the project's existing convention if there is one. Prompts, MCP configuration, and scripts change without a flag: keep their Coresignal entries until the user approves removing them.
+6. Request only the expansions for fields the code reads. Each expansion adds credits per record. A Coresignal `bundle` or `fields` list does not carry over as is.
+7. Translate a search only when every clause has a pattern. Never drop a clause, and never replace clauses with a semantic query, unless the user approves it.
+8. Use the official CompanyEnrich SDK for the repository's language. Use HTTP only when no SDK exists for it.
+9. Do not run database migrations or backfills. Write migration files for the user to review.
+
+## Step 1: Inventory
+
+Find every use of Coresignal:
+
+- HTTP requests to `api.coresignal.com`, usually with an `apikey` header, and wrappers around them. Coresignal has no official SDK, so look for the paths in the mapping file's `endpoints`. Paths that start with `/v2/` sit under `https://api.coresignal.com/cdapi`; `/enrichment/contacts` and `/rtapi/` paths sit at `https://api.coresignal.com`. Paths for `company_base`, `company_clean`, `employee_base`, and `employee_clean` appear in the same rows as their Multi-source counterparts, but their record fields and index fields are not in the mapping: treat each field the code reads or searches on as unmapped unless it has an entry.
+- Shell scripts, Makefiles, CI jobs, and notebooks that call the API with `curl` or similar.
+- MCP configuration that points at `mcp.coresignal.com`, in files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, or agent code.
+- Prompts, tool lists, and agent code that name Coresignal MCP tools, such as `entity_search`, `entity_fetch`, and `email_enrich`. The mapping file's `mcp` lists them.
+- Configuration: Coresignal API keys, environment variables such as `CORESIGNAL_API_KEY`, and settings.
+- Reads of Coresignal response fields: every `coresignal` path in the mapping file's `fields`. Coresignal's documentation and specification spell some fields differently, such as `professional_network_url` and `linkedin_url`, and `company_id` and `id`. The rows list both, so match either. Also look for reads of the `x-total-results`, `x-total-pages`, `x-next-page-after`, and `x-credits-remaining` headers, and of `request_id`, `code`, `message`, and `data`.
+- Bulk Collect jobs, file downloads, webhook subscriptions, and webhook handlers.
+- Stored Coresignal data: models, columns, and serializers with Coresignal field names, IDs, or values such as size ranges, company types, management levels, and departments.
+- Tests, fixtures, and mocks for Coresignal.
+
+## Step 2: Write the migration report, then stop
+
+Write `coresignal-migration-report.md` at the repository root, unless the user names another place. Include:
+
+1. A table of call sites with: file and line, Coresignal endpoint or tool and its inputs, fields read, classification, CompanyEnrich replacement, expansions needed, and notes. Classify each call site as:
+   - **moves**: the endpoint or tool has a mapping other than `none`, every input the call sends has a mapping in `inputs` or is listed in `drop`, every field the code reads has a mapping other than `none`, and every search clause has a pattern. `lossy` and `transformed` mappings still move. List them in the notes.
+   - **needs redesign**: the call can move, but behavior the code relies on changes. This applies when the call sends an input listed in the endpoint's `redesign`, such as `sort`, `webhook_url`, or a preview `page`, or uses a query clause listed there, such as `match_phrase` on a `semantic_search` endpoint, or when the code compares, scores, or stores values whose labels or definitions change, such as size ranges or management levels. A search with a clause that has no pattern, or whose pattern maps to `null`, or with a `should` group across different fields, also needs redesign: list the clauses that translate and the ones that do not, and the call stays on Coresignal until the user decides.
+   - **keep Coresignal**: the endpoint has no equivalent, the call sends an input that is not a search clause and has no entry in `inputs`, `drop`, or `redesign`, or the code needs a field that has no row in `fields` or whose fidelity is `none`.
+
+   Search followed by collect is one call site. Coresignal search returns IDs and the code collects each one; CompanyEnrich search returns full records, so the collect calls go away and the fields the code reads afterwards come from the search results. The same holds for a people search followed by `GET /enrichment/contacts` on its results: business emails come from `GET /v2/people/{personId}/email` with each result's CompanyEnrich `id`. The call site moves when the search translates and every field the code reads afterwards maps. A collect or contact call on IDs that come from storage, not from a search in the same flow, keeps Coresignal. The Historical Headcount API is the exception: its ID input is listed under `redesign`, because the replacement needs only the company's domain. Other chains are one call site too: a Bulk Collect request and the download of its files, and an agentic search followed by running its generated query and collecting the results.
+
+   An MCP server entry and the prompts and agent code that use its tools are one call site. It moves when at least one tool it uses maps to a CompanyEnrich tool. A tool that maps to `null`, such as `entity_fields`, does not change that: the CompanyEnrich server is added next to the Coresignal one, so that step keeps the Coresignal tool. List those tools, and prompt steps whose behavior changes, in the notes.
+
+   Response wrappers and headers are not fields. A `404` check carries over. Reading `x-total-results` becomes a count call, reading `x-next-page-after` becomes `nextCursor`, a semantic search's `results` becomes `items`, `request_id` becomes `id`, and listing `data_request_files` becomes the job's results endpoint, as step 3 describes. Contact Enrichment fields follow their rows in `fields`: `code` and `message` become `status`, and `data.email` becomes `email`. A search sent only to read `x-total-results` or `x-credits-remaining` becomes the count call or `GET /v2/me`, and its query and paging inputs go with it. None of these alone makes a call site need a redesign. A sort on `_score` alone, or an `is_deleted` clause, is dropped without a redesign. A `lossy` number that the code stores, such as `employees_count`, still moves: store it in a new column, as step 6 describes.
+2. Billing behavior that changes for each call: search is no longer free and is charged per result, an empty search is charged one result's base price, each expansion adds credits, and work emails are a separate call.
+3. Stored data that changes, and the ID plan: add CompanyEnrich ID columns next to Coresignal IDs and re-key company data on its domain.
+4. Open questions, such as which current job to use when a person has several, and the feature flag name.
+
+Stop and ask the user to approve, change, or exclude call sites.
+
+## Step 3: Rewrite approved call sites
+
+- Replace each call with the CompanyEnrich endpoint from `endpoints`, and map its inputs with `inputs`. Leave out inputs listed in `drop`, and rework inputs listed in `redesign` the way the user approved. Replace the `apikey` header with the SDK client.
+- Coresignal enrich and collect take one company or person per request, as CompanyEnrich does. Send a bare domain to `GET /v2/companies/enrich`: strip the scheme, `www.`, and any path from website values. Enrich lists of domains with `POST /v2/companies/enrich/batch`, 50 per request, or a bulk job for up to 10,000.
+- Convert field reads with `fields`. A row with `in: workEmail` comes from `GET /v2/people/{personId}/email`, a separate call that takes a CompanyEnrich person ID. A row with `expand` needs that expansion in the request.
+- Convert enum values with `values`. Coresignal writes some size ranges in more than one way, such as `501-1000 employees` and `501-1,000 employees`, so match every spelling.
+- A person can have several current experiences, marked with `isCurrent`. Use the one with `isMatched` set: after `POST /v2/people/enrich`, that is the job at the email's company, and after a search, the job that matched the filters. `GET /v2/people/{personId}/email` returns only the email result. If none or several qualify, follow the policy the user approved. Do not silently take the first one.
+- Search returns `items`, full records, in place of an array of IDs, and `nextCursor` in place of the `x-next-page-after` header. Totals come from the free count endpoints in place of `x-total-results`. Bulk jobs return an `id` in place of `request_id`; poll `GET /v2/batches/{id}`, then download from the job's results endpoint.
+- No match returns `404` and is not charged, as in Coresignal. The SDKs raise a not-found error. `402` can also mean a plan without the feature, so do not retry it. Coresignal's `503` search timeouts have no counterpart. Let the SDK handle retries: it retries free requests after a `5xx`, but not paid requests or requests that start a job, which may already have been charged.
+- Page searches with `pageSize` (1 to 100) and `cursor`, taken from `nextCursor`. `nextCursor` is omitted on the last page.
+- CompanyEnrich returns ISO alpha-2 country codes, booleans instead of `1` and `0`, and lowercase enum values such as `private` and `c-suite`. Normalize explicitly where the code compares values.
+
+## Step 4: Translate searches
+
+For each Elasticsearch DSL query or Search Filters object, flatten it into leaf clauses and map each clause with the `search` patterns, by the field it targets. A pattern applies to its field whatever the query type: `term`, `terms`, `match`, and `match_phrase` translate the same way, except where an endpoint lists a clause type under `redesign`, as the `semantic_search` endpoints do for `match_phrase`, and a Search Filters parameter follows the pattern whose note names it. Clauses in `must` and `filter`, and separate Search Filters parameters, must all match. Clauses in `must_not` and `exclude_` parameters become `notIn`. A `range` becomes `min` and `max`, which are inclusive, or `after` and `before` for dates, which take date-times. A plain array requires every value on `keywords`, `technologies`, and `categories`, so use `in` for OR there. A `nested` clause maps by its inner field; on `experience`, check `experience.active_experience` to choose between the current-job filters and `pastExperience`. If any clause has no pattern, or its pattern maps to `null`, leave the Coresignal search in place, add a TODO, and list it in the report as needs redesign. Patterns with `STATE_ID`, `CITY_ID`, `REGION_ID`, or `COMPANY_ID` need an ID from the free lookup endpoints. Other values in a pattern, such as NAICS codes, keywords, and technology names, are examples: confirm them with the free lookups when a key is set, or list them in the report for the user to confirm. Without a key, leave a TODO that names the value to look up. A `should` across different fields becomes separate searches only if the user approves, because each search is charged. Conditions on a person's employer that the people `filter` has no key for, such as its size, industry, or headquarters country, go in the `company` query, as the patterns show. Add a test that asserts the exact filter your code builds.
+
+People state and city filters use CompanyEnrich geo IDs. Inclusion matches only resolved locations; `notIn` keeps people without a resolved state or city. Record this coverage difference in the report and preserve missing location fields when converting records. Do not treat a city name in `location.address` as proof that `location.city` is present.
+
+## Step 5: MCP and scripts
+
+- Add the CompanyEnrich MCP server, `https://mcp.companyenrich.com/mcp`, next to each Coresignal MCP server entry, following the MCP server guide for that client. Remove the Coresignal entry only if the user approves. Do not put a key in a committed file; use the client's sign-in or an environment variable.
+- Update prompts, tool allow-lists, and agent code that name Coresignal tools, using `mcp` in the mapping file. Where a tool maps to several CompanyEnrich tools, name the ones that fit the prompt's inputs, such as `enrich_company` for a domain. For a tool with no equivalent, keep the Coresignal tool in that step, or remove the step if the user approves.
+- Rewrite approved scripts that call Coresignal with `curl` to use the `companyenrich` CLI, using the table in the guide's "Scripts that call Coresignal" section, or the SDK. CLI search flags are named after CompanyEnrich filters, so translate each clause with the `search` patterns. A lookup that finds nothing exits with code 4, so handle that code in scripts that use `set -e`.
+
+## Step 6: Stored data
+
+Write, but do not run, migrations that add columns for CompanyEnrich IDs and values next to the Coresignal columns. Keep the original Coresignal values, and do not overwrite Coresignal columns with CompanyEnrich data. A stored Coresignal value converted with `values` has a CompanyEnrich label but is still Coresignal data. Keep it apart from values the API returns, or record where each value came from. Coresignal IDs and CompanyEnrich person IDs are both integers, so never store them in the same column. Do not backfill records through the API without approval.
+
+## Step 7: Tests
+
+- Mock HTTP for every new CompanyEnrich call: `httpx.MockTransport` through the Python SDK's `http_client`, a stub `fetch` for the JavaScript SDK, or a stub server through `base_url` or `baseUrl` for Ruby and PHP. Start from the records under `fixtures` in the mapping file, and build other responses from the response schemas in the API specification.
+- Cover a match, `404`, `402`, `429`, and an empty search.
+- Run the project's test suite. Tests must not call live APIs.
+
+## Step 8: Final report
+
+Update `coresignal-migration-report.md` with the files changed, the call sites that moved, the ones kept on Coresignal, the remaining TODOs, the expansions each call requests, how to switch the feature flag, the MCP and script changes, and a link to the parity check: https://docs.companyenrich.com/docs/migrate-from-coresignal.md#verify-parity-on-your-own-data
+````
+
+## Limitations
+
+* The mapping covers Coresignal's Multi-source APIs as documented on November 25, 2026. Check the `checkedAt` date in the mapping file.
+* Base and Clean record fields are not mapped, so the agent marks them as TODOs.
+* The agent cannot decide whether a `lossy` field is good enough for your product. The report lists those fields for you.
+* Search translations change results by design, because the two APIs rank and match differently. Compare totals with the free count endpoints before you switch.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Migration overview" icon="route" href="/docs/migrate-from-coresignal">
+    Endpoint mapping, request and response differences, and the parity check.
+  </Card>
+  <Card title="Field mapping" icon="table" href="/docs/migrate-from-coresignal-field-mapping">
+    The human-readable version of the mapping file.
+  </Card>
+  <Card title="Search queries" icon="magnifying-glass" href="/docs/migrate-from-coresignal-search">
+    How Coresignal queries become CompanyEnrich filters.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Connect your AI client to CompanyEnrich.
+  </Card>
+</CardGroup>
