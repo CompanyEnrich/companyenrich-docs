@@ -1,0 +1,27 @@
+---
+title: "MCP server 3.0"
+description: "MCP server 3.0, released November 17, 2026."
+---
+
+**November 17, 2026**
+
+Version 3 of the [MCP server](/docs/mcp-server) moves every tool from the V1 API to [API V2](/changelog/api-v2). The hosted server at `https://mcp.companyenrich.com/mcp` runs it, and `npx -y @companyenrich/mcp` installs it.
+
+## What's new
+
+* **One company search tool.** `search_companies` takes filters, a plain-language description, or lookalike seed domains. It replaces `find_similar_companies`.
+* **Free counts.** `count_companies` and `count_people` return how many records a search would match, without spending credits.
+* **Pay for the fields you use.** Technologies, keywords, NAICS codes, funding, and workforce data are `expand` options. Each one adds 1 credit per company returned.
+* **Cheaper headcount data.** `get_company_workforce` costs 1 credit per 12 months of history, down from 5 credits per call.
+* **Cursor pagination.** Search tools return `nextCursor`. Send it back as `cursor` to get the next page.
+* **Stricter inputs.** A tool rejects arguments it does not define, so a mistyped filter fails and never runs as a broader paid search.
+
+## Prices
+
+Tools now cost what the matching V2 endpoint costs. A company search costs 1 credit per company with filters, 2 with a description, and 5 for lookalikes. A people search costs 2 credits per person. See [Tools and credits](/docs/mcp-server#tools-and-credits) for every tool.
+
+## Upgrading
+
+Tool names and inputs changed, so update prompts, tool allow-lists, and agent code written for version 2. See the [package upgrade guide](https://github.com/CompanyEnrich/mcp-server#upgrading-from-2x) for the full list.
+
+Version 2 of the npm package still calls the V1 API, which is open only to accounts created before December 1, 2026.

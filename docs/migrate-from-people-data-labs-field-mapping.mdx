@@ -206,7 +206,7 @@ Fields under **Current job** and **Current company** come from the person's curr
 | `location_country` | `location.country.name` |   | transformed | PDL uses a lowercase name. CompanyEnrich adds `location.country.code`. |
 | `location_region` | `location.state.name` |   | transformed | Present only when the reported location has been resolved to a state. CompanyEnrich adds `location.state.id` and, when available, the ISO 3166-2 code in `location.state.code`. |
 | `location_locality` | `location.city.name` |   | transformed | Present only when the reported location has been resolved to a city. CompanyEnrich adds `location.city.id`. |
-| `location_name` | `location.address` |   | lossy | The person's reported location as free text. |
+| `location_name` | `location.address` |   | lossy | The person's location as free text, in a standard form when it names a city or a more precise place and otherwise as reported. |
 | `location_metro`, `location_postal_code`, `location_street_address`, `location_geo`, `location_continent` | — |   | none |   |
 
 ### Social profiles

@@ -385,7 +385,7 @@
       { "group": "History", "explorium": ["skills", "interests"], "ce": null, "fidelity": "none" },
       { "group": "Location", "explorium": "country_name", "ce": "location.country.name", "fidelity": "transformed" },
       { "group": "Location", "explorium": "region_name", "ce": "location.state.name", "fidelity": "transformed", "note": "Present once the reported location has been resolved to a state. `location.state.id` is the integer ID accepted by the people search `state` filter." },
-      { "group": "Location", "explorium": "city", "ce": "location.city.name", "fidelity": "transformed", "note": "Present once the reported location has been resolved to a city. `location.city.id` is the integer ID accepted by the people search `city` filter. `location.address` retains the reported location text." },
+      { "group": "Location", "explorium": "city", "ce": "location.city.name", "fidelity": "transformed", "note": "Present once the reported location has been resolved to a city. `location.city.id` is the integer ID accepted by the people search `city` filter. `location.address` holds the location as text, in a standard form when it names a city or a more precise place." },
       { "group": "Social", "explorium": "linkedin", "ce": "socials.linkedinUrl", "fidelity": "transformed", "note": "Explorium often returns member-ID URLs such as `linkedin.com/in/ACoAA...`, which do not match profile URLs." },
       { "group": "Social", "explorium": "linkedin_url_array", "ce": null, "fidelity": "none" },
       { "group": "Contact", "explorium": ["professional_email", "professions_email"], "ce": "email", "in": "workEmail", "fidelity": "transformed", "note": "`professions_email` is the v1 name." },

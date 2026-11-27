@@ -1036,7 +1036,7 @@
         "pdl": "location_name",
         "ce": "location.address",
         "fidelity": "lossy",
-        "note": "The person's reported location as free text."
+        "note": "The person's location as free text, in a standard form when it names a city or a more precise place and otherwise as reported."
       },
       {
         "group": "Location",

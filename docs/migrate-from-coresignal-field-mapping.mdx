@@ -238,7 +238,7 @@ Fields under **Contact** come from [`GET /v2/people/{personId}/email`](/api-refe
 | `location_country_iso3` | `location.country.code` |   | transformed | Alpha-2 instead of alpha-3. |
 | `location_state` | `location.state.name` |   | lossy | Present only when the person's reported location has been resolved to a state. `location.state.id` is the integer ID accepted by people search. |
 | `location_city` | `location.city.name` |   | lossy | Present only when the person's reported location has been resolved to a city. `location.city.id` is the integer ID accepted by people search. |
-| `location_full` | `location.address` |   | lossy | The person's reported location text. It can be present even when the state or city has not been resolved. |
+| `location_full` | `location.address` |   | lossy | The person's location as text, in a standard form when it names a city or a more precise place and otherwise as reported. It can be present even when the state or city has not been resolved. |
 | `location_regions`, `location_latitude`, `location_longitude` | — |   | none |   |
 
 ### Social profiles
