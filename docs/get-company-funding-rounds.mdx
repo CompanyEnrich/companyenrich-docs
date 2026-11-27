@@ -1,0 +1,316 @@
+---
+title: "Get a company's funding rounds"
+sidebarTitle: "Funding rounds"
+description: "Get a company's total funding, latest round, and every disclosed funding round with its investors from a domain, using the Company Enrichment API."
+---
+
+To get a company's funding history, enrich its domain with the [Company Enrichment API](/docs/company-enrichment-api) and add `expand=financial`. The response includes the total disclosed funding in USD, the latest funding stage and date, and each disclosed round with its date, amount, type, investors, and a source link. The request costs 2 credits: 1 for the company and 1 for the expansion.
+
+## Get funding rounds from a domain
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=financial" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['financial'],
+});
+
+const financial = company.financial ?? {};
+console.log(financial.totalFunding, financial.fundingStage, financial.fundingDate);
+
+for (const round of financial.fundingRounds ?? []) {
+  console.log(round.date, round.type, round.amount, round.investors);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com", expand=["financial"])
+
+financial = company.get("financial") or {}
+print(financial.get("totalFunding"), financial.get("fundingStage"), financial.get("fundingDate"))
+
+for funding_round in financial.get("fundingRounds") or []:
+    print(
+        funding_round.get("date"),
+        funding_round.get("type"),
+        funding_round.get("amount"),
+        funding_round.get("investors"),
+    )
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+company = client.companies.enrich("stripe.com", expand: ["financial"])
+
+financial = company["financial"] || {}
+puts financial["totalFunding"], financial["fundingStage"], financial["fundingDate"]
+
+(financial["fundingRounds"] || []).each do |round|
+  puts "#{round['date']} #{round['type']} #{round['amount']} #{round['investors']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$company = $client->companies->enrich('stripe.com', expand: ['financial']);
+
+$financial = $company['financial'] ?? [];
+echo $financial['totalFunding'] ?? '', ' ', $financial['fundingStage'] ?? '', ' ', $financial['fundingDate'] ?? '', PHP_EOL;
+
+foreach ($financial['fundingRounds'] ?? [] as $round) {
+    echo $round['date'] ?? '', ' ', $round['type'] ?? '', ' ', $round['amount'] ?? '', ' ', $round['investors'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand financial --fields name,domain,financial
+```
+
+</CodeGroup>
+
+The funding data is in the `financial` object of the [company record](/docs/company-schema#financial). This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "updatedAt": "2026-10-01T12:00:00Z",
+  "financial": {
+    "totalFunding": 48000000,
+    "fundingStage": "Series B",
+    "fundingDate": "2023-03-15T00:00:00Z",
+    "fundingRounds": [
+      {
+        "date": "2023-03-15T00:00:00Z",
+        "amount": "$36M",
+        "type": "Series B",
+        "url": "https://acme-analytics.example/blog/series-b",
+        "investors": "Example Ventures, Sample Capital"
+      },
+      {
+        "date": "2019-06-04T00:00:00Z",
+        "amount": "$12M",
+        "type": "Series A",
+        "investors": "Example Ventures"
+      }
+    ]
+  }
+}
+```
+
+| Field                                 | Type               | Description                                     |
+| ------------------------------------- | ------------------ | ----------------------------------------------- |
+| `financial.totalFunding`              | integer            | The total disclosed funding in USD.             |
+| `financial.fundingStage`              | string             | The latest funding stage, such as `Series B`.   |
+| `financial.fundingDate`               | string (date-time) | The date of the latest funding round.           |
+| `financial.fundingRounds[].date`      | string (date-time) | The funding round date.                         |
+| `financial.fundingRounds[].amount`    | string             | The disclosed amount and currency.              |
+| `financial.fundingRounds[].type`      | string             | The funding round type.                         |
+| `financial.fundingRounds[].investors` | string             | The disclosed investors.                        |
+| `financial.fundingRounds[].url`       | string             | A source URL for the funding round.             |
+| `financial.stockSymbol`               | string             | The stock symbol, for listed companies.         |
+| `financial.stockExchange`             | string             | The stock exchange where the company is listed. |
+
+Every field is returned only when known. A round's `amount` is display text, so use `totalFunding` when you need a number to compare. The later examples on this page reuse the `client` created here.
+
+## Check whether a company raised money recently
+
+`financial.fundingDate` is the date of the latest round. This example checks whether it falls within the last 12 months.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com&expand=financial" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({
+  domain: 'stripe.com',
+  expand: ['financial'],
+});
+
+const fundingDate = company.financial?.fundingDate;
+const oneYearAgo = new Date();
+oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+const raisedRecently = fundingDate ? new Date(fundingDate) >= oneYearAgo : false;
+console.log(company.name, fundingDate, raisedRecently);
+```
+
+```python Python
+from datetime import datetime, timedelta, timezone
+
+company = client.companies.enrich("stripe.com", expand=["financial"])
+
+funding_date = (company.get("financial") or {}).get("fundingDate")
+one_year_ago = datetime.now(timezone.utc) - timedelta(days=365)
+
+raised_recently = (
+    funding_date is not None
+    and datetime.fromisoformat(funding_date.replace("Z", "+00:00")) >= one_year_ago
+)
+print(company.get("name"), funding_date, raised_recently)
+```
+
+```ruby Ruby
+require "time"
+
+company = client.companies.enrich("stripe.com", expand: ["financial"])
+
+funding_date = company.dig("financial", "fundingDate")
+one_year_ago = Time.now.utc - (365 * 24 * 60 * 60)
+
+raised_recently = !funding_date.nil? && Time.parse(funding_date) >= one_year_ago
+puts company["name"], funding_date, raised_recently
+```
+
+```php PHP
+$company = $client->companies->enrich('stripe.com', expand: ['financial']);
+
+$fundingDate = $company['financial']['fundingDate'] ?? null;
+$oneYearAgo = new DateTimeImmutable('-1 year');
+
+$raisedRecently = $fundingDate !== null && new DateTimeImmutable($fundingDate) >= $oneYearAgo;
+echo $company['name'] ?? '', ' ', $fundingDate ?? '', ' ', var_export($raisedRecently, true), PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --expand financial \
+  --fields name,financial.fundingDate,financial.fundingStage
+```
+
+</CodeGroup>
+
+## Get funding for a list of companies
+
+A batch request takes up to 50 domains. With the `financial` expansion, each company found costs 2 credits.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.com"],
+    "expand": ["financial"]
+  }'
+```
+
+```javascript JavaScript
+const { items } = await client.companies.enrichBatch({
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
+  expand: ['financial'],
+});
+
+for (const item of items) {
+  const financial = item.company?.financial;
+  console.log(item.domain, item.status, financial?.totalFunding, financial?.fundingStage);
+}
+```
+
+```python Python
+batch = client.companies.enrich_batch(
+    ["stripe.com", "adyen.com", "notion.com"],
+    expand=["financial"],
+)
+
+for item in batch["items"]:
+    financial = (item.get("company") or {}).get("financial") or {}
+    print(item["domain"], item["status"], financial.get("totalFunding"), financial.get("fundingStage"))
+```
+
+```ruby Ruby
+batch = client.companies.enrich_batch(
+  ["stripe.com", "adyen.com", "notion.com"],
+  expand: ["financial"]
+)
+
+batch["items"].each do |item|
+  financial = item.dig("company", "financial") || {}
+  puts "#{item['domain']} #{item['status']} #{financial['totalFunding']} #{financial['fundingStage']}"
+end
+```
+
+```php PHP
+$batch = $client->companies->enrichBatch(
+    ['stripe.com', 'adyen.com', 'notion.com'],
+    expand: ['financial'],
+);
+
+foreach ($batch['items'] as $item) {
+    $financial = $item['company']['financial'] ?? [];
+    echo $item['domain'], ' ', $item['status'], ' ',
+        $financial['totalFunding'] ?? '', ' ', $financial['fundingStage'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com adyen.com notion.com --expand financial \
+  --fields domain,status,company.financial.totalFunding,company.financial.fundingStage
+```
+
+</CodeGroup>
+
+For more than 50 domains, see [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains).
+
+## Common questions
+
+### How do I find companies that raised funding recently?
+
+Enrichment answers the question for a company you already know. To find companies by funding, use the [Company Search API](/docs/company-search-api), which filters on funding round, amount, and year. See [Find recently funded companies](/docs/company-search-api-examples#find-recently-funded-companies).
+
+### Does the funding data include investors?
+
+Yes. Each entry in `financial.fundingRounds` has an `investors` field with the disclosed investors, and a `url` that points to a source for the round when one is known.
+
+### What do I get for a public company?
+
+`financial.stockSymbol` and `financial.stockExchange` hold the listing, when known.
+
+### What does funding data cost?
+
+The `financial` expansion adds 1 credit for each company returned, on top of the 1 credit for the company. A domain with no match returns `404` and costs nothing.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Get funding, headcount, and tech stack in one call" icon="layer-group" href="/docs/get-funding-headcount-and-tech-stack">
+    Combine funding with headcount and technologies.
+  </Card>
+  <Card title="Find recently funded companies" icon="magnifying-glass" href="/docs/company-search-api-examples#find-recently-funded-companies">
+    Search for companies by round, amount, and year.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema#financial">
+    Every field in the financial object.
+  </Card>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+</CardGroup>

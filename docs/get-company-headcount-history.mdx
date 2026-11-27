@@ -1,0 +1,390 @@
+---
+title: "Get a company's headcount history"
+sidebarTitle: "Headcount history"
+description: "Get historical headcount for any company with the Company Headcount API: the last 12 months, a month-by-month series, and earlier years one page at a time."
+---
+
+To get a company's headcount history, call the [Company Headcount API](/docs/company-headcount-api), `GET /v2/companies/workforce`. Each response covers 12 months and lists the months in which the headcount changed, overall and by department. Send the `nextCursor` from a response to get the 12 months before it. Each 12-month page costs 1 credit.
+
+## Get the last 12 months
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+console.log(workforce.historyFrom, workforce.historyTo);
+
+for (const point of workforce.history ?? []) {
+  console.log(point.date, point.observedEmployeeCount);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain="stripe.com")
+
+print(workforce.get("historyFrom"), workforce.get("historyTo"))
+
+for point in workforce.get("history") or []:
+    print(point["date"], point.get("observedEmployeeCount"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain: "stripe.com")
+
+puts workforce["historyFrom"], workforce["historyTo"]
+
+(workforce["history"] || []).each do |point|
+  puts "#{point['date']} #{point['observedEmployeeCount']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+echo $workforce['historyFrom'] ?? '', ' ', $workforce['historyTo'] ?? '', PHP_EOL;
+
+foreach ($workforce['history'] ?? [] as $point) {
+    echo $point['date'], ' ', $point['observedEmployeeCount'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company workforce stripe.com
+```
+
+</CodeGroup>
+
+The history is in `history`, newest first. This example is shortened and shows a fictional company.
+
+```json
+{
+  "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "domain": "acme-analytics.example",
+  "observedEmployeeCount": 312,
+  "employeeCountRange": "201-500",
+  "historyFrom": "2025-11-01",
+  "historyTo": "2026-11-01",
+  "history": [
+    {
+      "date": "2026-10-01",
+      "observedEmployeeCount": 312,
+      "employeeCountRange": "201-500",
+      "departmentHeadcount": { "engineeringTechnical": 124, "sales": 58 },
+      "unclassifiedHeadcount": 41
+    },
+    {
+      "date": "2026-04-01",
+      "observedEmployeeCount": 287,
+      "employeeCountRange": "201-500",
+      "departmentHeadcount": { "engineeringTechnical": 113, "sales": 52 },
+      "unclassifiedHeadcount": 38
+    },
+    {
+      "date": "2025-11-01",
+      "observedEmployeeCount": 261,
+      "employeeCountRange": "201-500",
+      "departmentHeadcount": { "engineeringTechnical": 101, "sales": 47 },
+      "unclassifiedHeadcount": 35
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+How to read it:
+
+* **The window.** `historyFrom` is the first month covered, and `historyTo` is the end of the window and is not included.
+* **Only changes are listed.** `history` has one point for each month in which the headcount changed, not one for every month. Each point's `date` is the first day of its month.
+* **The first point.** A point at the start of the window carries forward the last known earlier headcount when there is one.
+
+The later examples on this page reuse the `client` and the `workforce` response from this one.
+
+## Build a month-by-month series
+
+Because `history` lists only the months with a change, fill the gaps by carrying each value forward until the next change. This example turns one response into one row per month.
+
+<CodeGroup>
+
+```javascript JavaScript
+function nextMonth(date) {
+  const [year, month] = date.split('-').map(Number);
+  return month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+}
+
+function monthlySeries(workforce) {
+  const points = [...(workforce.history ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  const series = [];
+  let count = null;
+  let index = 0;
+
+  for (let month = workforce.historyFrom; month < workforce.historyTo; month = nextMonth(month)) {
+    while (index < points.length && points[index].date <= month) {
+      count = points[index].observedEmployeeCount;
+      index += 1;
+    }
+    series.push({ month, count });
+  }
+
+  return series;
+}
+
+for (const { month, count } of monthlySeries(workforce)) {
+  console.log(month, count);
+}
+```
+
+```python Python
+def next_month(date):
+    year, month = int(date[:4]), int(date[5:7])
+    return f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01"
+
+
+def monthly_series(workforce):
+    points = sorted(workforce.get("history") or [], key=lambda point: point["date"])
+    series = []
+    count = None
+    index = 0
+    month = workforce["historyFrom"]
+
+    while month < workforce["historyTo"]:
+        while index < len(points) and points[index]["date"] <= month:
+            count = points[index].get("observedEmployeeCount")
+            index += 1
+        series.append((month, count))
+        month = next_month(month)
+
+    return series
+
+
+for month, count in monthly_series(workforce):
+    print(month, count)
+```
+
+```ruby Ruby
+next_month = lambda do |date|
+  year = date[0, 4].to_i
+  month = date[5, 2].to_i
+  month == 12 ? format("%d-01-01", year + 1) : format("%d-%02d-01", year, month + 1)
+end
+
+monthly_series = lambda do |workforce|
+  points = (workforce["history"] || []).sort_by { |point| point["date"] }
+  series = []
+  count = nil
+  index = 0
+  month = workforce["historyFrom"]
+
+  while month < workforce["historyTo"]
+    while index < points.length && points[index]["date"] <= month
+      count = points[index]["observedEmployeeCount"]
+      index += 1
+    end
+    series << [month, count]
+    month = next_month.call(month)
+  end
+
+  series
+end
+
+monthly_series.call(workforce).each do |month, count|
+  puts "#{month} #{count}"
+end
+```
+
+```php PHP
+function nextMonth(string $date): string
+{
+    return (new DateTimeImmutable($date))->modify('first day of next month')->format('Y-m-d');
+}
+
+function monthlySeries(array $workforce): array
+{
+    $points = $workforce['history'] ?? [];
+    usort($points, fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+
+    $series = [];
+    $count = null;
+    $index = 0;
+
+    for ($month = $workforce['historyFrom']; strcmp($month, $workforce['historyTo']) < 0; $month = nextMonth($month)) {
+        while ($index < count($points) && strcmp($points[$index]['date'], $month) <= 0) {
+            $count = $points[$index]['observedEmployeeCount'] ?? null;
+            $index++;
+        }
+        $series[] = ['month' => $month, 'count' => $count];
+    }
+
+    return $series;
+}
+
+foreach (monthlySeries($workforce) as $row) {
+    echo $row['month'], ' ', $row['count'] ?? '', PHP_EOL;
+}
+```
+
+</CodeGroup>
+
+A month before the first point has no known value, so the series leaves its count empty. Dates are `YYYY-MM-DD` strings, which sort correctly as text.
+
+## Go back further than 12 months
+
+When older history exists, the response includes `nextCursor`. Send it as `cursor` to get the 12 months before. This example fetches up to three years and stops early when the history runs out.
+
+<CodeGroup>
+
+```bash cURL
+# The latest 12 months. The response includes "nextCursor" when older history exists.
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# The 12 months before that. Repeat with each new nextCursor to go further back.
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com&cursor=NEXT_CURSOR" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const pages = [];
+let cursor;
+
+for (let year = 0; year < 3; year += 1) {
+  const page = await client.companies.workforce({ domain: 'stripe.com', cursor });
+  pages.push(page);
+  if (!page.nextCursor) break;
+  cursor = page.nextCursor;
+}
+
+const points = pages.flatMap((page) => page.history ?? []);
+console.log(pages.length, 'pages,', points.length, 'points');
+```
+
+```python Python
+pages = []
+cursor = None
+
+for _ in range(3):
+    page = client.companies.workforce(domain="stripe.com", cursor=cursor)
+    pages.append(page)
+    cursor = page.get("nextCursor")
+    if not cursor:
+        break
+
+points = [point for page in pages for point in page.get("history") or []]
+print(len(pages), "pages,", len(points), "points")
+```
+
+```ruby Ruby
+pages = []
+cursor = nil
+
+3.times do
+  page = client.companies.workforce(domain: "stripe.com", cursor: cursor)
+  pages << page
+  cursor = page["nextCursor"]
+  break unless cursor
+end
+
+points = pages.flat_map { |page| page["history"] || [] }
+puts "#{pages.length} pages, #{points.length} points"
+```
+
+```php PHP
+$pages = [];
+$cursor = null;
+
+for ($year = 0; $year < 3; $year++) {
+    $page = $client->companies->workforce(domain: 'stripe.com', cursor: $cursor);
+    $pages[] = $page;
+    $cursor = $page['nextCursor'] ?? null;
+    if ($cursor === null) {
+        break;
+    }
+}
+
+$points = array_merge(...array_map(fn (array $page): array => $page['history'] ?? [], $pages));
+echo count($pages), ' pages, ', count($points), ' points', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company workforce stripe.com --years 3
+```
+
+</CodeGroup>
+
+Things to know about paging:
+
+* **Each page is charged.** Three years of history cost 3 credits. Setting a limit, as this example does, caps the spend.
+* **A cursor expires.** Use `nextCursor` within 30 minutes of the first page.
+* **The end of the history.** When a response has no `nextCursor`, there is no older history. A page that does not exist costs nothing.
+
+## Save the history as a CSV file
+
+The CLI writes the history to a file in one command. The format follows the file extension.
+
+```bash
+companyenrich company workforce stripe.com --years 3 --format csv -o headcount.csv
+```
+
+## Common questions
+
+### How far back does the headcount history go?
+
+It depends on the company. Keep requesting earlier pages with `nextCursor` until a response has none.
+
+### Why are some months missing from the history?
+
+`history` lists only the months in which the headcount changed. A month that is not listed had the same headcount as the point before it. See [Build a month-by-month series](#build-a-month-by-month-series).
+
+### Does the history include departments?
+
+Yes. Each point has a `departmentHeadcount` with the same 14 department keys as the current headcount. See [Track headcount growth by department](/docs/track-headcount-by-department).
+
+### Can I get the history for many companies?
+
+The `workforce` expansion on enrichment and search includes the latest 12 months for each company, at 1 extra credit per company. For earlier years, call the workforce endpoint for each company with the `nextCursor` from its expansion.
+
+### What does headcount history cost?
+
+1 credit for each 12-month page. A company that is not found, an invalid cursor, and a page that does not exist cost nothing.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Headcount API" icon="chart-line" href="/docs/company-headcount-api">
+    Response fields, history, search filters, pricing, and limits.
+  </Card>
+  <Card title="Get a company's employee count" icon="users" href="/docs/get-company-employee-count">
+    The current count and size range for one company or a list.
+  </Card>
+  <Card title="Track headcount changes at your accounts" icon="route" href="/docs/track-headcount-changes">
+    Find the accounts on your list that grew or shrank.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema#workforce">
+    Every field in the workforce object.
+  </Card>
+</CardGroup>

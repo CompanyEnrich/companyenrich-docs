@@ -1,0 +1,330 @@
+---
+title: "Identify the company behind a signup email"
+sidebarTitle: "Company behind an email"
+description: "Turn a signup's work email into a company profile: enrich the address's domain with the Company Enrichment API for 1 credit, then route the lead by size."
+---
+
+To identify the company behind a work email, take the domain after the `@` and enrich it with the [Company Enrichment API](/docs/company-enrichment-api). One request returns the company's name, industry, size, revenue range, and location for 1 credit. Skip addresses at free email providers such as gmail.com, because that domain belongs to the provider and not to an employer.
+
+| You want                     | Use                                                                                          | Credits                                                       |
+| ---------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| The company only             | Enrich the email's domain, as shown on this page                                             | 1 when a company is returned                                  |
+| The person and their company | [Reverse email lookup](/docs/reverse-email-lookup-api) with the `company` expansion          | 5 when a person is returned, plus 1 for each unique company in their work history |
+
+## Enrich the domain of an email address
+
+This example takes the domain from the address, skips free email providers, and enriches what is left. The address shown is a placeholder on a reserved domain, so replace it with a real work email.
+
+<CodeGroup>
+
+```bash cURL
+# The domain is the part of the address after the @.
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=acme-analytics.example" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich, NotFoundError } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const FREE_PROVIDERS = new Set([
+  'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me',
+]);
+
+async function companyForEmail(email) {
+  const domain = email.split('@').pop().trim().toLowerCase();
+  if (FREE_PROVIDERS.has(domain)) return null;
+
+  try {
+    return await client.companies.enrich({ domain });
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
+  }
+}
+
+const company = await companyForEmail('jane.doe@acme-analytics.example');
+console.log(company?.name, company?.industry, company?.employees);
+```
+
+```python Python
+from companyenrich import CompanyEnrich, NotFoundError
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+FREE_PROVIDERS = {
+    "gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
+}
+
+
+def company_for_email(email):
+    domain = email.rsplit("@", 1)[-1].strip().lower()
+    if domain in FREE_PROVIDERS:
+        return None
+
+    try:
+        return client.companies.enrich(domain)
+    except NotFoundError:
+        return None
+
+
+company = company_for_email("jane.doe@acme-analytics.example") or {}
+print(company.get("name"), company.get("industry"), company.get("employees"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+FREE_PROVIDERS = %w[gmail.com outlook.com hotmail.com yahoo.com icloud.com proton.me].freeze
+
+company_for_email = lambda do |email|
+  domain = email.split("@").last.strip.downcase
+  next nil if FREE_PROVIDERS.include?(domain)
+
+  begin
+    client.companies.enrich(domain)
+  rescue CompanyEnrich::NotFoundError
+    nil
+  end
+end
+
+company = company_for_email.call("jane.doe@acme-analytics.example") || {}
+puts company["name"], company["industry"], company["employees"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+use CompanyEnrich\Exception\NotFoundException;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+const FREE_PROVIDERS = ['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me'];
+
+function companyForEmail(Client $client, string $email): ?array
+{
+    $parts = explode('@', $email);
+    $domain = strtolower(trim(end($parts)));
+    if (in_array($domain, FREE_PROVIDERS, true)) {
+        return null;
+    }
+
+    try {
+        return $client->companies->enrich($domain);
+    } catch (NotFoundException) {
+        return null;
+    }
+}
+
+$company = companyForEmail($client, 'jane.doe@acme-analytics.example') ?? [];
+echo $company['name'] ?? '', ' ', $company['industry'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+email="jane.doe@acme-analytics.example"
+companyenrich company enrich "${email##*@}" --fields name,domain,industry,employees
+```
+
+</CodeGroup>
+
+The response is one [company record](/docs/company-schema). This example is shortened and shows a fictional company.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "industry": "Software Publishers",
+  "employees": "201-500",
+  "revenue": "10m-50m",
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "updatedAt": "2026-10-01T12:00:00Z"
+}
+```
+
+The list of free providers in the example is a starting point. Extend it with the providers your signups use. A domain with no match returns `404` and costs nothing. The later examples on this page reuse the `client` and the `company` from this one.
+
+## Route the signup by company size
+
+`employees` is one of eight [employee ranges](/docs/field-values#employee-ranges), so you can map each range to a sales motion. This example sends companies with more than 1,000 employees to enterprise sales and companies with 201 to 1,000 to the mid-market team.
+
+<CodeGroup>
+
+```javascript JavaScript
+const ENTERPRISE = new Set(['1K-5K', '5K-10K', 'over-10K']);
+const MID_MARKET = new Set(['201-500', '501-1K']);
+
+function segmentFor(company) {
+  if (!company?.employees) return 'unknown';
+  if (ENTERPRISE.has(company.employees)) return 'enterprise';
+  if (MID_MARKET.has(company.employees)) return 'mid-market';
+  return 'self-serve';
+}
+
+console.log(segmentFor(company));
+```
+
+```python Python
+ENTERPRISE = {"1K-5K", "5K-10K", "over-10K"}
+MID_MARKET = {"201-500", "501-1K"}
+
+
+def segment_for(company):
+    employees = (company or {}).get("employees")
+    if not employees:
+        return "unknown"
+    if employees in ENTERPRISE:
+        return "enterprise"
+    if employees in MID_MARKET:
+        return "mid-market"
+    return "self-serve"
+
+
+print(segment_for(company))
+```
+
+```ruby Ruby
+ENTERPRISE = %w[1K-5K 5K-10K over-10K].freeze
+MID_MARKET = %w[201-500 501-1K].freeze
+
+segment_for = lambda do |company|
+  employees = (company || {})["employees"]
+  next "unknown" if employees.nil?
+  next "enterprise" if ENTERPRISE.include?(employees)
+  next "mid-market" if MID_MARKET.include?(employees)
+
+  "self-serve"
+end
+
+puts segment_for.call(company)
+```
+
+```php PHP
+function segmentFor(?array $company): string
+{
+    $employees = $company['employees'] ?? null;
+
+    return match (true) {
+        $employees === null => 'unknown',
+        in_array($employees, ['1K-5K', '5K-10K', 'over-10K'], true) => 'enterprise',
+        in_array($employees, ['201-500', '501-1K'], true) => 'mid-market',
+        default => 'self-serve',
+    };
+}
+
+echo segmentFor($company), PHP_EOL;
+```
+
+</CodeGroup>
+
+The same record has `revenue`, `industry`, `categories`, and `location.country.code`, which work the same way for routing by revenue range, industry, or country.
+
+## Keep your signup form fast
+
+When CompanyEnrich has not stored a company yet, the API enriches it on demand and waits for the result before it responds. Set `waitForEnrichment` to `false` to get an immediate answer from stored data instead. A company that is not stored yet then returns `404`, costs nothing, and is scheduled for background enrichment when eligible.
+
+<CodeGroup>
+
+```bash cURL
+curl -i "https://api.companyenrich.com/v2/companies/enrich?domain=acme-analytics.example&waitForEnrichment=false" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+try {
+  const stored = await client.companies.enrich({
+    domain: 'acme-analytics.example',
+    waitForEnrichment: false,
+  });
+  console.log(stored.name, stored.employees);
+} catch (error) {
+  if (!(error instanceof NotFoundError)) throw error;
+  console.log('Not stored yet. Ask again later.');
+}
+```
+
+```python Python
+try:
+    stored = client.companies.enrich(
+        "acme-analytics.example",
+        wait_for_enrichment=False,
+    )
+    print(stored.get("name"), stored.get("employees"))
+except NotFoundError:
+    print("Not stored yet. Ask again later.")
+```
+
+```ruby Ruby
+begin
+  stored = client.companies.enrich(
+    "acme-analytics.example",
+    wait_for_enrichment: false
+  )
+  puts stored["name"], stored["employees"]
+rescue CompanyEnrich::NotFoundError
+  puts "Not stored yet. Ask again later."
+end
+```
+
+```php PHP
+try {
+    $stored = $client->companies->enrich(
+        'acme-analytics.example',
+        waitForEnrichment: false,
+    );
+    echo $stored['name'] ?? '', ' ', $stored['employees'] ?? '', PHP_EOL;
+} catch (NotFoundException) {
+    echo 'Not stored yet. Ask again later.', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich acme-analytics.example --no-wait-for-enrichment
+```
+
+</CodeGroup>
+
+Let the signup through, then ask again later to get the company once it has been enriched. See [Companies that are not stored yet](/docs/company-enrichment-api#companies-that-are-not-stored-yet).
+
+## Common questions
+
+### What about signups with a personal email address?
+
+A personal address at a provider such as gmail.com has no company domain to enrich, and the reverse email lookup is built for work email addresses. Ask for a work email or a company name on the form. With a name, you can [find the company's domain](/docs/find-company-domain-by-name).
+
+### What if the email domain belongs to a small or unknown company?
+
+Send it anyway. When a company is not stored yet, the API enriches it on demand. If no company is found, the request returns `404` and costs nothing.
+
+### How do I get the person's job title and seniority too?
+
+Use the [Reverse Email Lookup API](/docs/reverse-email-lookup-api), which returns the person behind a work email. Add the `company` expansion to get the full company profile in the same response. See [Get the person with their company profile](/docs/reverse-email-lookup-api-examples#get-the-person-with-their-company-profile).
+
+### What does it cost to enrich every signup?
+
+1 credit for each signup whose domain resolves to a company. Signups at free email providers cost nothing when you skip them, and a domain with no match is not charged.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reverse Email Lookup API" icon="at" href="/docs/reverse-email-lookup-api">
+    Find the person behind a work email address.
+  </Card>
+  <Card title="Company Enrichment API" icon="building" href="/docs/company-enrichment-api">
+    Lookup methods, parameters, pricing, and limits.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Employee ranges, revenue ranges, and company categories.
+  </Card>
+  <Card title="Find a company's domain from its name" icon="magnifying-glass" href="/docs/find-company-domain-by-name">
+    Start from a company name when you have no domain.
+  </Card>
+</CardGroup>

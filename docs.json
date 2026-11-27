@@ -60,7 +60,19 @@
             "group": "Company Enrichment API",
             "pages": [
               "docs/company-enrichment-api",
-              "docs/company-enrichment-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/company-enrichment-api-examples",
+                  "docs/enrich-a-list-of-company-domains",
+                  "docs/get-funding-headcount-and-tech-stack",
+                  "docs/get-company-funding-rounds",
+                  "docs/look-up-company-naics-codes",
+                  "docs/get-company-logo-by-domain",
+                  "docs/find-company-domain-by-name",
+                  "docs/identify-company-from-email"
+                ]
+              }
             ]
           },
           {
@@ -68,7 +80,18 @@
             "pages": [
               "docs/company-search-api",
               "docs/company-search-api-filters",
-              "docs/company-search-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/company-search-api-examples",
+                  "docs/build-an-icp-company-list",
+                  "docs/find-companies-by-industry",
+                  "docs/find-companies-by-location",
+                  "docs/find-companies-using-a-technology",
+                  "docs/find-recently-funded-companies",
+                  "docs/find-startups-in-an-industry"
+                ]
+              }
             ]
           },
           {
@@ -76,7 +99,14 @@
             "pages": [
               "docs/semantic-company-search-api",
               "docs/semantic-company-search-api-filters",
-              "docs/semantic-company-search-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/semantic-company-search-api-examples",
+                  "docs/company-search-tool-for-ai-agents",
+                  "docs/find-companies-in-a-niche"
+                ]
+              }
             ]
           },
           {
@@ -84,14 +114,33 @@
             "pages": [
               "docs/similar-companies-api",
               "docs/similar-companies-api-filters",
-              "docs/similar-companies-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/similar-companies-api-examples",
+                  "docs/find-companies-like-your-customers",
+                  "docs/find-lookalikes-of-closed-won-deals",
+                  "docs/find-company-competitors",
+                  "docs/rank-prospects-by-similarity"
+                ]
+              }
             ]
           },
           {
             "group": "Company Headcount API",
             "pages": [
               "docs/company-headcount-api",
-              "docs/company-headcount-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/company-headcount-api-examples",
+                  "docs/get-company-employee-count",
+                  "docs/get-company-headcount-history",
+                  "docs/track-headcount-changes",
+                  "docs/track-headcount-by-department",
+                  "docs/find-fast-growing-companies"
+                ]
+              }
             ]
           },
           {
@@ -99,14 +148,30 @@
             "pages": [
               "docs/people-search-api",
               "docs/people-search-api-filters",
-              "docs/people-search-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/people-search-api-examples",
+                  "docs/find-decision-makers",
+                  "docs/find-employees-of-a-company",
+                  "docs/find-people-who-recently-started-a-role",
+                  "docs/source-candidates-for-a-role",
+                  "docs/find-a-work-email"
+                ]
+              }
             ]
           },
           {
             "group": "Reverse Email Lookup API",
             "pages": [
               "docs/reverse-email-lookup-api",
-              "docs/reverse-email-lookup-api-examples"
+              {
+                "group": "Examples",
+                "pages": [
+                  "docs/reverse-email-lookup-api-examples",
+                  "docs/enrich-a-signup-from-its-email"
+                ]
+              }
             ]
           },
           {

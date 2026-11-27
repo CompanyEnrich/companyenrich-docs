@@ -1,0 +1,358 @@
+---
+title: "Find a company's competitors"
+sidebarTitle: "Competitors of a company"
+description: "Find potential competitors of any company with the Similar Companies API: use its domain as the seed, keep results to its market, and compare them."
+---
+
+To find a company's competitors, send its domain as the seed of a lookalike search in the [Similar Companies API](/docs/similar-companies-api). The response ranks the companies that most resemble it, which gives you a starting list of potential competitors. Add filters such as country or size to keep the list to the same market. A lookalike search costs 5 credits per company returned.
+
+<Note>
+  A lookalike search finds companies that resemble the seed. It does not confirm that they compete with it. Similar companies can also be partners, or serve a neighboring market, so review the list before you rely on it.
+</Note>
+
+## Find companies that resemble one company
+
+This search returns the 10 companies most similar to the seed and leaves the seed itself out.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"]},
+    "filter": {"domain": {"notIn": ["stripe.com"]}},
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com'] },
+  filter: { domain: { notIn: ['stripe.com'] } },
+  pageSize: 10,
+});
+
+for (const company of similar.items) {
+  console.log(company.name, company.domain, similar.scores?.[company.id]);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com"]},
+    filter={"domain": {"notIn": ["stripe.com"]}},
+    page_size=10,
+)
+
+scores = similar.get("scores") or {}
+for company in similar["items"]:
+    print(company.get("name"), company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com"] },
+  filter: { domain: { notIn: ["stripe.com"] } },
+  page_size: 10
+)
+
+scores = similar["scores"] || {}
+similar["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com']],
+    filter: ['domain' => ['notIn' => ['stripe.com']]],
+    pageSize: 10,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $similar['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com --exclude-domain stripe.com --limit 10
+```
+
+</CodeGroup>
+
+The response lists the companies in ranked order, most similar first, with a `scores` object keyed by company ID. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Acme Payments",
+      "domain": "acme-payments.example",
+      "description": "Acme Payments provides online payment processing for internet businesses.",
+      "employees": "501-1K",
+      "industry": "Financial Transactions Processing",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "scores": {
+    "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d": 0.91
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+Scores are ranking scores, not probabilities. Keep the companies in the order returned. The later examples on this page reuse the `client` created here.
+
+## Keep the list to the same market
+
+A company that resembles the seed but operates in another country, or is far smaller, may not compete with it. Filters remove those, and `minScore` drops the weaker matches. This search keeps companies in the United States and the United Kingdom with more than 200 employees.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"], "minScore": 0.7},
+    "filter": {
+      "country": ["US", "GB"],
+      "employees": ["201-500", "501-1K", "1K-5K", "5K-10K", "over-10K"],
+      "domain": {"notIn": ["stripe.com"]}
+    },
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com'], minScore: 0.7 },
+  filter: {
+    country: ['US', 'GB'],
+    employees: ['201-500', '501-1K', '1K-5K', '5K-10K', 'over-10K'],
+    domain: { notIn: ['stripe.com'] },
+  },
+  pageSize: 10,
+});
+
+for (const company of similar.items) {
+  console.log(company.name, company.domain, company.employees);
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com"], "minScore": 0.7},
+    filter={
+        "country": ["US", "GB"],
+        "employees": ["201-500", "501-1K", "1K-5K", "5K-10K", "over-10K"],
+        "domain": {"notIn": ["stripe.com"]},
+    },
+    page_size=10,
+)
+
+for company in similar["items"]:
+    print(company.get("name"), company["domain"], company.get("employees"))
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com"], minScore: 0.7 },
+  filter: {
+    country: ["US", "GB"],
+    employees: ["201-500", "501-1K", "1K-5K", "5K-10K", "over-10K"],
+    domain: { notIn: ["stripe.com"] }
+  },
+  page_size: 10
+)
+
+similar["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['employees']}"
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com'], 'minScore' => 0.7],
+    filter: [
+        'country' => ['US', 'GB'],
+        'employees' => ['201-500', '501-1K', '1K-5K', '5K-10K', 'over-10K'],
+        'domain' => ['notIn' => ['stripe.com']],
+    ],
+    pageSize: 10,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com --min-score 0.7 --country US,GB \
+  --employees 201-500,501-1K,1K-5K,5K-10K,over-10K --exclude-domain stripe.com --limit 10
+```
+
+</CodeGroup>
+
+`minScore` and `filter` remove different companies. `minScore` drops companies that are not similar enough, and `filter` drops companies that miss an exact criterion, however similar they are.
+
+## Compare the competitors side by side
+
+Add expansions to return each company's funding, headcount, and technologies with the list. Each expansion adds 1 credit per company, so this search costs 5 + 3 = 8 credits per company.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com"]},
+    "filter": {"domain": {"notIn": ["stripe.com"]}},
+    "expand": ["financial", "workforce", "technologies"],
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+const similar = await client.companies.search({
+  lookalike: { domains: ['stripe.com'] },
+  filter: { domain: { notIn: ['stripe.com'] } },
+  expand: ['financial', 'workforce', 'technologies'],
+  pageSize: 10,
+});
+
+for (const company of similar.items) {
+  console.log(
+    company.name,
+    company.financial?.totalFunding,
+    company.workforce?.observedEmployeeCount,
+    company.technologies?.length,
+  );
+}
+```
+
+```python Python
+similar = client.companies.search(
+    lookalike={"domains": ["stripe.com"]},
+    filter={"domain": {"notIn": ["stripe.com"]}},
+    expand=["financial", "workforce", "technologies"],
+    page_size=10,
+)
+
+for company in similar["items"]:
+    print(
+        company.get("name"),
+        (company.get("financial") or {}).get("totalFunding"),
+        (company.get("workforce") or {}).get("observedEmployeeCount"),
+        len(company.get("technologies") or []),
+    )
+```
+
+```ruby Ruby
+similar = client.companies.search(
+  lookalike: { domains: ["stripe.com"] },
+  filter: { domain: { notIn: ["stripe.com"] } },
+  expand: ["financial", "workforce", "technologies"],
+  page_size: 10
+)
+
+similar["items"].each do |company|
+  puts [
+    company["name"],
+    company.dig("financial", "totalFunding"),
+    company.dig("workforce", "observedEmployeeCount"),
+    (company["technologies"] || []).length
+  ].join(" ")
+end
+```
+
+```php PHP
+$similar = $client->companies->search(
+    lookalike: ['domains' => ['stripe.com']],
+    filter: ['domain' => ['notIn' => ['stripe.com']]],
+    expand: ['financial', 'workforce', 'technologies'],
+    pageSize: 10,
+);
+
+foreach ($similar['items'] as $company) {
+    echo $company['name'] ?? '', ' ',
+        $company['financial']['totalFunding'] ?? '', ' ',
+        $company['workforce']['observedEmployeeCount'] ?? '', ' ',
+        count($company['technologies'] ?? []), PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com --exclude-domain stripe.com \
+  --expand financial,workforce,technologies --limit 10
+```
+
+</CodeGroup>
+
+Ten companies with three expansions cost 10 × 8 = 80 credits. See [Get funding, headcount, and tech stack in one call](/docs/get-funding-headcount-and-tech-stack) for the fields each expansion returns.
+
+## Common questions
+
+### Is every result a competitor?
+
+No. The search ranks companies by how closely they resemble the seed, and resemblance is not the same as competition. Treat the list as candidates, and use filters and your own review to decide which ones compete.
+
+### Can I start from several known competitors?
+
+Yes. Send up to 10 seeds in `lookalike.domains`, such as the company and the competitors you already know, to describe the market you mean. Add all of them to `filter.domain` with `notIn` so that the search returns only companies you do not have yet.
+
+### How do I find competitors without a domain to start from?
+
+Describe the market in plain language with a semantic search, which needs no seed. See [Find companies in a niche from a description](/docs/find-companies-in-a-niche).
+
+### Can I look at the list before I pay?
+
+Yes, if your plan includes previews. The [preview endpoint](/api-reference/v2/post-companies-search-preview) takes the same `lookalike` and `filter` fields and returns up to 25 company summaries with scores for free.
+
+### What does a competitor list cost?
+
+5 credits for each company returned, plus 1 credit per company for each expansion. A search that returns no companies costs 5 credits.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Seeds, ranking, scores, pricing, and limits.
+  </Card>
+  <Card title="Find companies like your best customers" icon="users" href="/docs/find-companies-like-your-customers">
+    Use customers as seeds to find new accounts.
+  </Card>
+  <Card title="Get funding, headcount, and tech stack in one call" icon="layer-group" href="/docs/get-funding-headcount-and-tech-stack">
+    What the expansions return for each company.
+  </Card>
+  <Card title="Find companies in a niche from a description" icon="magnifying-glass" href="/docs/find-companies-in-a-niche">
+    Map a market when you have no seed company.
+  </Card>
+</CardGroup>

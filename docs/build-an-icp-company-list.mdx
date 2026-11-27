@@ -1,0 +1,411 @@
+---
+title: "Build a list of companies that match your ICP"
+sidebarTitle: "Build an ICP list"
+description: "Build a list of companies that match your ideal customer profile with the Company Search API: map criteria to filters, count for free, and export to CSV."
+---
+
+To build a list of companies that match your ideal customer profile (ICP), send your criteria as filters to the [Company Search API](/docs/company-search-api). Filters cover industry, size, revenue, location, technology, funding, and headcount growth, and a company must match all of them. Counting the matches is free. Each company a search returns costs 1 credit.
+
+## Turn your criteria into filters
+
+Each part of an ICP maps to one or more filters in the `filter` object.
+
+| Criterion          | Filter                                              | Example value                                  |
+| ------------------ | --------------------------------------------------- | ---------------------------------------------- |
+| Industry           | `naicsCodes`, `categories`, `keywords`              | `"categories": ["saas", "b2b"]`                |
+| Company size       | `employees`                                         | `"employees": ["51-200", "201-500"]`           |
+| Revenue            | `revenue`                                           | `"revenue": ["10m-50m", "50m-100m"]`           |
+| Location           | `country`, `region`, `state`, `city`                | `"country": ["US", "CA", "GB"]`                |
+| Tech stack         | `technologies`                                      | `"technologies": "Shopify"`                    |
+| Funding            | `fundingRounds`, `fundingAmount`, `fundingYear`     | `"fundingRounds": ["series_a", "series_b"]`    |
+| Headcount growth   | `workforceGrowth`, `workforceSize`                  | `"workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2}` |
+| Company type       | `type`                                              | `"type": "private"`                            |
+| Data you need      | `require`                                           | `"require": "linkedin"`                        |
+
+See [Company Search API filters](/docs/company-search-api-filters) for every filter and its accepted values.
+
+## Count the companies that match
+
+Start with the count endpoint. It takes the same `filter` as a search and costs nothing, so you can adjust your criteria until the list is the size you want. This example counts B2B SaaS companies with 51 to 500 employees in the United States, Canada, and the United Kingdom.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "categories": ["saas", "b2b"],
+      "country": ["US", "CA", "GB"],
+      "employees": ["51-200", "201-500"]
+    }
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const icp = {
+  categories: ['saas', 'b2b'],
+  country: ['US', 'CA', 'GB'],
+  employees: ['51-200', '201-500'],
+};
+
+const { count, total } = await client.companies.count({ filter: icp });
+console.log(count, total);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+icp = {
+    "categories": ["saas", "b2b"],
+    "country": ["US", "CA", "GB"],
+    "employees": ["51-200", "201-500"],
+}
+
+result = client.companies.count(filter=icp)
+print(result["count"], result["total"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+icp = {
+  categories: ["saas", "b2b"],
+  country: ["US", "CA", "GB"],
+  employees: ["51-200", "201-500"]
+}
+
+result = client.companies.count(filter: icp)
+puts result["count"], result["total"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$icp = [
+    'categories' => ['saas', 'b2b'],
+    'country' => ['US', 'CA', 'GB'],
+    'employees' => ['51-200', '201-500'],
+];
+
+$result = $client->companies->count(filter: $icp);
+echo $result['count'], ' ', $result['total'], PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --category saas,b2b --country US,CA,GB --employees 51-200,201-500
+```
+
+</CodeGroup>
+
+The response has two numbers. These values are illustrative.
+
+```json
+{
+  "count": 10000,
+  "total": 18450
+}
+```
+
+`total` is the number of companies that match. `count` is the number your plan can access. An array of countries or employee ranges matches any of the values, and an array of categories requires all of them. The later examples on this page reuse the `client` and the `icp` filter created here.
+
+## Get the companies
+
+Send the same filter to the search endpoint. `pageSize` sets how many companies come back, from 1 to 100, and you pay for every company on the page.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "categories": ["saas", "b2b"],
+      "country": ["US", "CA", "GB"],
+      "employees": ["51-200", "201-500"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({ filter: icp, pageSize: 25 });
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.employees, company.location?.country?.code);
+}
+```
+
+```python Python
+page = client.companies.search(filter=icp, page_size=25)
+
+for company in page["items"]:
+    country = ((company.get("location") or {}).get("country") or {}).get("code")
+    print(company.get("name"), company["domain"], company.get("employees"), country)
+```
+
+```ruby Ruby
+page = client.companies.search(filter: icp, page_size: 25)
+
+page["items"].each do |company|
+  puts [
+    company["name"],
+    company["domain"],
+    company["employees"],
+    company.dig("location", "country", "code")
+  ].join(" ")
+end
+```
+
+```php PHP
+$page = $client->companies->search(filter: $icp, pageSize: 25);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ',
+        $company['employees'] ?? '', ' ', $company['location']['country']['code'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --category saas,b2b --country US,CA,GB \
+  --employees 51-200,201-500 --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [company record](/docs/company-schema). This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "type": "private",
+      "employees": "201-500",
+      "revenue": "10m-50m",
+      "industry": "Software Publishers",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+To get the next page, send the same request with `cursor` set to the `nextCursor` from the response. See [Fetch every result](/docs/company-search-api-examples#fetch-every-result).
+
+## Leave out companies you already have
+
+Use `notIn` on the `domain` filter to exclude your customers, or accounts already in your CRM, so that the list holds only new companies.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "categories": ["saas", "b2b"],
+      "country": ["US", "CA", "GB"],
+      "employees": ["51-200", "201-500"],
+      "domain": {"notIn": ["stripe.com", "adyen.com"]}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const customers = ['stripe.com', 'adyen.com'];
+
+const page = await client.companies.search({
+  filter: { ...icp, domain: { notIn: customers } },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+customers = ["stripe.com", "adyen.com"]
+
+page = client.companies.search(
+    filter={**icp, "domain": {"notIn": customers}},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+customers = ["stripe.com", "adyen.com"]
+
+page = client.companies.search(
+  filter: icp.merge(domain: { notIn: customers }),
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$customers = ['stripe.com', 'adyen.com'];
+
+$page = $client->companies->search(
+    filter: [...$icp, 'domain' => ['notIn' => $customers]],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --category saas,b2b --country US,CA,GB \
+  --employees 51-200,201-500 --exclude-domain stripe.com,adyen.com --limit 25
+```
+
+</CodeGroup>
+
+`notIn` works on every value filter except `require`, so you can exclude countries, keywords, or technologies in the same way.
+
+## Export the whole list to CSV
+
+For more than a few pages, run an export. It pages through the search in the background and stores the results as one file. An export costs the same per company as the search itself, and `limit` sets the most companies it returns.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Start the export. The response includes the batch "id".
+curl -X POST https://api.companyenrich.com/v2/companies/search/export \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 5000,
+    "filter": {
+      "categories": ["saas", "b2b"],
+      "country": ["US", "CA", "GB"],
+      "employees": ["51-200", "201-500"]
+    }
+  }'
+
+# 2. Check the batch until "status" is "completed".
+curl https://api.companyenrich.com/v2/batches/BATCH_ID \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+
+# 3. Download the results as CSV.
+curl "https://api.companyenrich.com/v2/companies/search/export/BATCH_ID/results?format=csv" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -o icp-companies.csv
+```
+
+```javascript JavaScript
+import { writeFile } from 'node:fs/promises';
+
+const job = await client.companies.searchExport.create({ limit: 5000, filter: icp });
+
+await client.batches.waitForCompletion(job.id);
+
+const response = await client.companies.searchExport.csv(job.id);
+await writeFile('icp-companies.csv', await response.text());
+```
+
+```python Python
+job = client.companies.search_export.create(5000, filter=icp)
+
+client.batches.wait_for_completion(job["id"])
+
+with open("icp-companies.csv", "w", encoding="utf-8") as file:
+    file.write(client.companies.search_export.csv(job["id"]))
+```
+
+```ruby Ruby
+job = client.companies.search_export.create(5000, filter: icp)
+
+client.batches.wait_for_completion(job["id"])
+
+File.write("icp-companies.csv", client.companies.search_export.csv(job["id"]))
+```
+
+```php PHP
+$job = $client->companies->searchExport->create(5000, filter: $icp);
+
+$client->batches->waitForCompletion($job['id']);
+
+file_put_contents('icp-companies.csv', $client->companies->searchExport->csv($job['id']));
+```
+
+```bash CLI
+companyenrich company export --category saas,b2b --country US,CA,GB \
+  --employees 51-200,201-500 --limit 5000 --wait -o icp-companies.csv
+```
+
+</CodeGroup>
+
+`limit` can be up to 1,000,000, and no more than your plan's search limit. If your credits run out partway, the export stops and the companies already exported stay downloadable. See [Bulk jobs and exports](/docs/bulk-jobs-and-exports) for job status, progress, and other download formats.
+
+## Common questions
+
+### How much does a company list cost?
+
+1 credit for each company returned, plus 1 credit per company for each expansion you request. Counts are free. You pay for every company on a page you fetch, and a search that returns no companies costs 1 credit, so count the matches first.
+
+### Can I look at sample results before I pay?
+
+Yes, if your plan includes previews. The [preview endpoint](/api-reference/v2/post-companies-search-preview) takes the same filter and returns up to 25 company summaries for free. Each summary has the company's `id`, `name`, `logoUrl`, `industry`, and `updatedAt`.
+
+### What if my ICP is easier to describe than to filter?
+
+Use a semantic search, which takes a plain-language description such as "AI tools for hospitals" and costs 2 credits per company. You can combine it with filters. See [Semantic Company Search API](/docs/semantic-company-search-api).
+
+### How do I find more companies like my best customers?
+
+Use a lookalike search. It takes up to 10 seed domains, returns similar companies, and costs 5 credits per company. See [Similar Companies API](/docs/similar-companies-api).
+
+### How do I find people at the companies on my list?
+
+Search for people at each company by seniority and department with the [People Search API](/docs/people-search-api).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values">
+    Employee ranges, revenue ranges, categories, and funding rounds.
+  </Card>
+  <Card title="Bulk jobs and exports" icon="layer-group" href="/docs/bulk-jobs-and-exports">
+    Job status, progress, downloads, and cancelling.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

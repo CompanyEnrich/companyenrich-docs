@@ -1,0 +1,356 @@
+---
+title: "Find companies in a niche from a description"
+sidebarTitle: "Companies in a niche"
+description: "Find companies in a niche that has no industry code by describing what they do. Check the description for free, then narrow the results with filters."
+---
+
+To find companies in a niche that has no industry code, describe what they do and send the description to the [Semantic Company Search API](/docs/semantic-company-search-api). A query such as `vertical SaaS for dentists` returns companies that match its meaning, with no keyword list to maintain. Checking how a description is read is free, and a search costs 2 credits per company returned.
+
+## Describe the niche
+
+Put the description in `semantic.query`. It can be up to 500 characters.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "vertical SaaS for dentists"},
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  semantic: { query: 'vertical SaaS for dentists' },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.description);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    semantic={"query": "vertical SaaS for dentists"},
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("description"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  semantic: { query: "vertical SaaS for dentists" },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['description']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    semantic: ['query' => 'vertical SaaS for dentists'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['description'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "vertical SaaS for dentists" --limit 25
+```
+
+</CodeGroup>
+
+The response holds the matching companies in ranked order, a cursor for the next page, and an `interpretation` of your description when the API inferred something from it. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "9d4e5f60-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      "name": "Acme Dental Cloud",
+      "domain": "acme-dental-cloud.example",
+      "description": "Acme Dental Cloud builds practice management software for dental clinics.",
+      "employees": "51-200",
+      "industry": "Software Publishers",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "interpretation": {
+    "boost": { "categories": ["saas"] }
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+Each item is a full [company record](/docs/company-schema). The later examples on this page reuse the `client` created here.
+
+## Check how your description was read, for free
+
+By default, the API reads some attributes from your description and applies them. A location, a size, a founding year, or funding filters the results. A category such as SaaS, a revenue range, or a company name only changes the ranking. The count endpoint returns this `interpretation` and costs nothing, so check a new description there before you pay for results.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "vertical SaaS for dentists in Canada"}
+  }'
+```
+
+```javascript JavaScript
+const result = await client.companies.count({
+  semantic: { query: 'vertical SaaS for dentists in Canada' },
+});
+
+console.log(result.count);
+console.log(result.interpretation?.filter); // applied as filters
+console.log(result.interpretation?.boost); // only affects ranking
+```
+
+```python Python
+result = client.companies.count(
+    semantic={"query": "vertical SaaS for dentists in Canada"},
+)
+
+interpretation = result.get("interpretation") or {}
+print(result["count"])
+print(interpretation.get("filter"))  # applied as filters
+print(interpretation.get("boost"))  # only affects ranking
+```
+
+```ruby Ruby
+result = client.companies.count(
+  semantic: { query: "vertical SaaS for dentists in Canada" }
+)
+
+puts result["count"]
+p result.dig("interpretation", "filter") # applied as filters
+p result.dig("interpretation", "boost") # only affects ranking
+```
+
+```php PHP
+$result = $client->companies->count(
+    semantic: ['query' => 'vertical SaaS for dentists in Canada'],
+);
+
+echo $result['count'], PHP_EOL;
+print_r($result['interpretation']['filter'] ?? []); // applied as filters
+print_r($result['interpretation']['boost'] ?? []); // only affects ranking
+```
+
+```bash CLI
+companyenrich company count --semantic "vertical SaaS for dentists in Canada"
+```
+
+</CodeGroup>
+
+The response reports what was inferred. These values are illustrative.
+
+```json
+{
+  "count": 10000,
+  "total": 48210,
+  "interpretation": {
+    "filter": { "country": ["CA"] },
+    "boost": { "categories": ["saas"] }
+  }
+}
+```
+
+Here the place in the description became a filter, so every result is in Canada, and SaaS companies rank higher without the others being removed. `interpretation.filter` uses the same format as the request `filter`. For a semantic query, `total` describes the pool of candidates the search draws from, and `count` is the number your plan can access. Do not read either one as the size of the niche.
+
+## Set hard requirements with filters
+
+A description says what the companies do. Filters set the exact criteria around it. This search requires every result to be a SaaS company in the United States or Canada with 11 to 200 employees, where the description alone would only rank SaaS companies higher.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "vertical SaaS for dentists"},
+    "filter": {
+      "categories": "saas",
+      "country": ["US", "CA"],
+      "employees": ["11-50", "51-200"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'vertical SaaS for dentists' },
+  filter: {
+    categories: 'saas',
+    country: ['US', 'CA'],
+    employees: ['11-50', '51-200'],
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.employees);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "vertical SaaS for dentists"},
+    filter={
+        "categories": "saas",
+        "country": ["US", "CA"],
+        "employees": ["11-50", "51-200"],
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("employees"))
+```
+
+```ruby Ruby
+page = client.companies.search(
+  semantic: { query: "vertical SaaS for dentists" },
+  filter: {
+    categories: "saas",
+    country: ["US", "CA"],
+    employees: ["11-50", "51-200"]
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['employees']}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    semantic: ['query' => 'vertical SaaS for dentists'],
+    filter: [
+        'categories' => 'saas',
+        'country' => ['US', 'CA'],
+        'employees' => ['11-50', '51-200'],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "vertical SaaS for dentists" --category saas \
+  --country US,CA --employees 11-50,51-200 --limit 25
+```
+
+</CodeGroup>
+
+A filter you send takes precedence over a value inferred from the description. Use a filter for anything the description is not read for, such as a technology, a company type, or headcount growth. See [Semantic Company Search API filters](/docs/semantic-company-search-api-filters).
+
+## Leave out companies you already know
+
+Use `notIn` to remove companies from the results. An exclusion applies together with what was inferred from the description. This request removes agencies and two companies you already have:
+
+```json
+{
+  "semantic": { "query": "vertical SaaS for dentists" },
+  "filter": {
+    "keywords": { "notIn": ["agency"] },
+    "domain": { "notIn": ["acme-dental-cloud.example", "sample-dental.example"] }
+  }
+}
+```
+
+In the CLI, these are `--exclude-keyword agency --exclude-domain acme-dental-cloud.example,sample-dental.example`.
+
+## Save the niche as a list
+
+A search returns one page of up to 100 companies. For the whole niche in one file, run an export with the same `semantic` and `filter` fields. It costs the same 2 credits per company, and `limit` sets the most companies it returns.
+
+```bash
+companyenrich company export --semantic "vertical SaaS for dentists" --country US,CA \
+  --limit 2000 --wait -o dental-saas.csv
+```
+
+See [Export a semantic search to CSV](/docs/semantic-company-search-api-examples#export-a-semantic-search-to-csv) for the same export in cURL and the SDKs.
+
+## Common questions
+
+### How is this different from a keyword filter?
+
+A keyword filter matches exact values you choose. A semantic search matches the meaning of a description, so it finds companies you could not list keywords for. You can use both in one request.
+
+### Why are my results limited to one country?
+
+Your description probably mentioned a place, and an inferred location filters the results. Check `interpretation.filter`, and set `semantic.autoFilter` to `false` if you do not want anything inferred.
+
+### How do I find the people who work at these companies?
+
+Put the same description in `company.semantic` on a people search. See [Find people at companies that match a description](/docs/semantic-company-search-api-examples#find-people-at-companies-that-match-a-description).
+
+### What does a niche search cost?
+
+2 credits for each company returned, plus 1 credit per company for each expansion. The count is free. A search that returns no companies costs 2 credits.
+
+### When should I use filters or a lookalike search instead?
+
+Use a [filter search](/docs/company-search-api-filters) when you have exact criteria, at 1 credit per company. Use a [lookalike search](/docs/similar-companies-api) when you have example companies and want more like them, at 5 credits per company.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Semantic Company Search API" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    How a description is interpreted, ranked, and priced.
+  </Card>
+  <Card title="Semantic search filters" icon="filter" href="/docs/semantic-company-search-api-filters">
+    What a description covers and when to add a filter.
+  </Card>
+  <Card title="Give an AI agent a company search tool" icon="robot" href="/docs/company-search-tool-for-ai-agents">
+    Wrap this search in a tool an agent can call.
+  </Card>
+  <Card title="Find companies by industry or NAICS code" icon="building" href="/docs/find-companies-by-industry">
+    Use exact filters when the industry has a code.
+  </Card>
+</CardGroup>

@@ -111,9 +111,11 @@ A range is an object with `min`, `max`, or both. Both ends are inclusive.
 
 | Field        | Value                                                                                             | Description                                             |
 | ------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `period`     | `m6`, `y1`, or `y2`                                                                               | Measure growth over 6 months, 1 year, or 2 years.       |
-| `department` | `overall` or a [workforce department](/docs/field-values#workforce-departments), such as `sales`  | The department to measure growth for.                   |
+| `period`     | `m6`, `y1`, or `y2`                                                                               | Measure growth over 6 months, 1 year, or 2 years. Required when you set `min` or `max`. |
+| `department` | `overall` or a [workforce department](/docs/field-values#workforce-departments), such as `sales`  | The department to measure growth for. Use `overall` for the whole company. Required when you set `min` or `max`. |
 | `min`, `max` | number                                                                                            | The growth ratio range, inclusive. `0.15` means 15% growth. |
+
+A growth filter that sets `min` or `max` without both `period` and `department` returns `422`.
 
 Each `workforceSize` entry takes a `department`, which defaults to `overall`, and an inclusive `min` and `max` headcount.
 

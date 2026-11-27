@@ -1,0 +1,321 @@
+---
+title: "Find a person's work email"
+sidebarTitle: "Work email"
+description: "Find a work email address with the CompanyEnrich API: look it up by person ID or from a name and a company, handle each status, and see what is charged."
+---
+
+To find a person's work email, call `GET /v2/people/{personId}/email` with the person's CompanyEnrich ID, which you get from a [people search](/docs/people-search-api). The response has a `status` and, when the status is `found`, the `email` and a `certainty` level. A lookup costs 10 credits only when it finds an email your account has not accessed before.
+
+## Look up the email for a person
+
+The ID in this example is a placeholder that belongs to no one. Replace it with the `id` of a person from your own search results.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/people/9000000000001/email" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const result = await client.people.findEmail(9000000000001);
+console.log(result.status, result.email, result.certainty);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+result = client.people.find_email(9000000000001)
+print(result["status"], result.get("email"), result.get("certainty"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+result = client.people.find_email(9000000000001)
+puts result["status"], result["email"], result["certainty"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$result = $client->people->findEmail(9000000000001);
+echo $result['status'], ' ', $result['email'] ?? '', ' ', $result['certainty'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people email 9000000000001
+```
+
+</CodeGroup>
+
+The response reports the outcome. This example shows a fictional person.
+
+```json
+{
+  "personId": 9000000000001,
+  "domain": "acme-analytics.example",
+  "status": "found",
+  "email": "jane.doe@acme-analytics.example",
+  "certainty": "high"
+}
+```
+
+`status` is one of four values:
+
+| Status        | Meaning                                                | Charge                              |
+| ------------- | ------------------------------------------------------ | ----------------------------------- |
+| `found`       | A work email was found. The response includes `email`. | 10 credits the first time, then none |
+| `not-found`   | No work email was found.                               | None                                |
+| `unavailable` | No work email is available for this person.            | None                                |
+| `pending`     | The lookup is still running. Retry the request later.  | None                                |
+
+`certainty` is `very-high`, `high`, `medium`, or `unknown`, and is returned when the status is `found`. The later examples on this page reuse the `client` created here.
+
+## Find an email from a name and a company
+
+The lookup needs a person ID, so start with a search. `query` matches the person's name, and `domain` keeps the search to one company. This example takes the first match and looks up its email.
+
+<CodeGroup>
+
+```bash cURL
+# 1. Find the person. The response includes the person "id".
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {"query": "Jane Doe", "domain": "acme-analytics.example"},
+    "pageSize": 1
+  }'
+
+# 2. Look up the email with that ID.
+curl "https://api.companyenrich.com/v2/people/9000000000001/email" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const page = await client.people.search({
+  filter: { query: 'Jane Doe', domain: 'acme-analytics.example' },
+  pageSize: 1,
+});
+
+const person = page.items[0];
+
+if (person) {
+  const found = await client.people.findEmail(person.id);
+  console.log(person.name, person.position, found.status, found.email);
+}
+```
+
+```python Python
+page = client.people.search(
+    filter={"query": "Jane Doe", "domain": "acme-analytics.example"},
+    page_size=1,
+)
+
+if page["items"]:
+    person = page["items"][0]
+    found = client.people.find_email(person["id"])
+    print(person.get("name"), person.get("position"), found["status"], found.get("email"))
+```
+
+```ruby Ruby
+page = client.people.search(
+  filter: { query: "Jane Doe", domain: "acme-analytics.example" },
+  page_size: 1
+)
+
+person = page["items"].first
+
+if person
+  found = client.people.find_email(person["id"])
+  puts "#{person['name']} #{person['position']} #{found['status']} #{found['email']}"
+end
+```
+
+```php PHP
+$page = $client->people->search(
+    filter: ['query' => 'Jane Doe', 'domain' => 'acme-analytics.example'],
+    pageSize: 1,
+);
+
+$person = $page['items'][0] ?? null;
+
+if ($person !== null) {
+    $found = $client->people->findEmail($person['id']);
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $found['status'], ' ', $found['email'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --query "Jane Doe" --domain acme-analytics.example --limit 1 --format jsonl \
+  | jq '.id' | companyenrich people email -f -
+```
+
+</CodeGroup>
+
+A name can match more than one person at a company. Check the `position` of the match before you spend credits on the email, or raise `pageSize` and choose the right person yourself. The search costs 2 credits per person returned, on top of the email lookup.
+
+## Handle each status
+
+Only `found` carries an address. `pending` means the lookup has not finished, so ask again later.
+
+<CodeGroup>
+
+```javascript JavaScript
+const lookup = await client.people.findEmail(9000000000001);
+
+switch (lookup.status) {
+  case 'found':
+    console.log(lookup.email, lookup.certainty);
+    break;
+  case 'pending':
+    console.log('Still running. Ask again later.');
+    break;
+  default:
+    console.log('No work email for this person.');
+}
+```
+
+```python Python
+lookup = client.people.find_email(9000000000001)
+
+if lookup["status"] == "found":
+    print(lookup["email"], lookup.get("certainty"))
+elif lookup["status"] == "pending":
+    print("Still running. Ask again later.")
+else:
+    print("No work email for this person.")
+```
+
+```ruby Ruby
+lookup = client.people.find_email(9000000000001)
+
+case lookup["status"]
+when "found"
+  puts "#{lookup['email']} #{lookup['certainty']}"
+when "pending"
+  puts "Still running. Ask again later."
+else
+  puts "No work email for this person."
+end
+```
+
+```php PHP
+$lookup = $client->people->findEmail(9000000000001);
+
+echo match ($lookup['status']) {
+    'found' => $lookup['email'] . ' ' . ($lookup['certainty'] ?? ''),
+    'pending' => 'Still running. Ask again later.',
+    default => 'No work email for this person.',
+}, PHP_EOL;
+```
+
+```bash CLI
+companyenrich people email 9000000000001 --wait
+```
+
+</CodeGroup>
+
+In the CLI, `--wait` keeps checking a pending lookup until it settles.
+
+## Choose which company's address to look for
+
+By default, the lookup tries the domains of the person's current companies in seniority order. To get the address at one employer, send its `domain`. The domain must belong to one of the person's companies.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/people/9000000000001/email?domain=acme-analytics.example" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const atCompany = await client.people.findEmail(9000000000001, { domain: 'acme-analytics.example' });
+console.log(atCompany.status, atCompany.email);
+```
+
+```python Python
+at_company = client.people.find_email(9000000000001, domain="acme-analytics.example")
+print(at_company["status"], at_company.get("email"))
+```
+
+```ruby Ruby
+at_company = client.people.find_email(9000000000001, domain: "acme-analytics.example")
+puts at_company["status"], at_company["email"]
+```
+
+```php PHP
+$atCompany = $client->people->findEmail(9000000000001, domain: 'acme-analytics.example');
+echo $atCompany['status'], ' ', $atCompany['email'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people email 9000000000001 --domain acme-analytics.example
+```
+
+</CodeGroup>
+
+## Get emails for a list of people
+
+The lookup takes one person per request. To cover the results of a search, look up each `id` in turn. The CLI reads the IDs from a file or from another command:
+
+```bash
+companyenrich people search --domain stripe.com --department sales --seniority vp --format jsonl \
+  | jq '.id' | companyenrich people email -f - --format csv
+```
+
+You pay 10 credits for each new email that is found, and nothing for the people with no email. Look up only the people you intend to contact.
+
+## Common questions
+
+### When am I charged for a work email?
+
+10 credits when a lookup finds an email your account has not accessed before. A lookup that ends as `not-found`, `unavailable`, or `pending` costs nothing, and so does asking again for an email you already have.
+
+### Do people search results include email addresses?
+
+No. Email addresses are not part of the person record. Search for the person first, then look up the email with the person's `id`.
+
+### What does the certainty level mean?
+
+It says how certain the address is: `very-high`, `high`, `medium`, or `unknown`. Use it to decide which addresses to send to.
+
+### Can I find an email without a person ID?
+
+No. The lookup takes a person ID. Get one from a people search, such as a search by name and company, or from a [reverse email lookup](/docs/reverse-email-lookup-api) when you start from another address.
+
+### Does the API return phone numbers?
+
+No. Person records do not include phone numbers. Company records have the company's phone number in `location.phone`, when known.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find decision makers at your target accounts" icon="user" href="/docs/find-decision-makers">
+    Find the people to look up.
+  </Card>
+  <Card title="Person schema" icon="table-list" href="/docs/person-schema#work-email">
+    The work email response fields.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values#email-lookup-status">
+    Email lookup statuses and certainty levels.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each lookup costs and when you are not charged.
+  </Card>
+</CardGroup>

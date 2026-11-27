@@ -1,0 +1,305 @@
+---
+title: "Find fast-growing companies"
+sidebarTitle: "Fast-growing companies"
+description: "Find companies by headcount growth with the Company Search API: set a growth threshold over 6 months, 1 year, or 2 years, and combine it with industry and size."
+---
+
+To find fast-growing companies, filter the [Company Search API](/docs/company-search-api) by `workforceGrowth`. It matches companies whose headcount grew by a ratio you set over 6 months, 1 year, or 2 years, for the whole company or for one department. Combine it with industry, size, and location filters to keep the list to your market. A filter search costs 1 credit per company returned.
+
+## Find companies that grew 20% in a year
+
+This search returns SaaS companies in the United States with 51 to 500 employees whose headcount grew at least 20% in the last year.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
+      "categories": "saas",
+      "country": "US",
+      "employees": ["51-200", "201-500"]
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const growing = {
+  workforceGrowth: { period: 'y1', department: 'overall', min: 0.2 },
+  categories: 'saas',
+  country: 'US',
+  employees: ['51-200', '201-500'],
+};
+
+const page = await client.companies.search({ filter: growing, pageSize: 25 });
+
+for (const company of page.items) {
+  console.log(company.name, company.domain, company.employees);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+growing = {
+    "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
+    "categories": "saas",
+    "country": "US",
+    "employees": ["51-200", "201-500"],
+}
+
+page = client.companies.search(filter=growing, page_size=25)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"], company.get("employees"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+growing = {
+  workforceGrowth: { period: "y1", department: "overall", min: 0.2 },
+  categories: "saas",
+  country: "US",
+  employees: ["51-200", "201-500"]
+}
+
+page = client.companies.search(filter: growing, page_size: 25)
+
+page["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{company['employees']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$growing = [
+    'workforceGrowth' => ['period' => 'y1', 'department' => 'overall', 'min' => 0.2],
+    'categories' => 'saas',
+    'country' => 'US',
+    'employees' => ['51-200', '201-500'],
+];
+
+$page = $client->companies->search(filter: $growing, pageSize: 25);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $company['employees'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --growth 20%.. --growth-period y1 --growth-department overall \
+  --category saas --country US --employees 51-200,201-500 --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [company record](/docs/company-schema). This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "foundedYear": 2016,
+      "employees": "201-500",
+      "industry": "Software Publishers",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+The growth filter needs a `period` and a `department` whenever you set `min` or `max`. Use `overall` for the whole company. The later examples on this page reuse the `client` and the `growing` filter created here.
+
+## Choose the period and the threshold
+
+| Field        | Value                     | Meaning                                                                 |
+| ------------ | ------------------------- | ----------------------------------------------------------------------- |
+| `period`     | `m6`, `y1`, or `y2`       | Measure growth over 6 months, 1 year, or 2 years.                       |
+| `department` | `overall` or a department | The whole company, or one team such as `sales` or `engineering_technical`. |
+| `min`        | A ratio                   | The least growth to match. `0.2` is 20%.                                |
+| `max`        | A ratio                   | The most growth to match. A negative value is a decline.                |
+
+Set both `min` and `max` to match a band. This filter matches companies that grew between 20% and 50% in the last 6 months:
+
+```json
+{
+  "filter": {
+    "workforceGrowth": { "period": "m6", "department": "overall", "min": 0.2, "max": 0.5 }
+  }
+}
+```
+
+In the CLI, this is `--growth 20%..50% --growth-period m6 --growth-department overall`.
+
+## See the headcount behind each company
+
+The filter decides which companies match. To see the numbers, add the `workforce` expansion, which returns each company's current headcount and 12 months of history for 1 extra credit per company. This example prints the headcount now and at the oldest point in that history.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
+      "categories": "saas",
+      "country": "US",
+      "employees": ["51-200", "201-500"]
+    },
+    "expand": ["workforce"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const detailed = await client.companies.search({
+  filter: growing,
+  expand: ['workforce'],
+  pageSize: 25,
+});
+
+for (const company of detailed.items) {
+  const workforce = company.workforce;
+  const oldest = workforce?.history?.at(-1);
+  console.log(company.domain, oldest?.observedEmployeeCount, '->', workforce?.observedEmployeeCount);
+}
+```
+
+```python Python
+detailed = client.companies.search(filter=growing, expand=["workforce"], page_size=25)
+
+for company in detailed["items"]:
+    workforce = company.get("workforce") or {}
+    history = workforce.get("history") or []
+    oldest = history[-1] if history else {}
+    print(company["domain"], oldest.get("observedEmployeeCount"), "->", workforce.get("observedEmployeeCount"))
+```
+
+```ruby Ruby
+detailed = client.companies.search(filter: growing, expand: ["workforce"], page_size: 25)
+
+detailed["items"].each do |company|
+  workforce = company["workforce"] || {}
+  oldest = (workforce["history"] || []).last || {}
+  puts "#{company['domain']} #{oldest['observedEmployeeCount']} -> #{workforce['observedEmployeeCount']}"
+end
+```
+
+```php PHP
+$detailed = $client->companies->search(filter: $growing, expand: ['workforce'], pageSize: 25);
+
+foreach ($detailed['items'] as $company) {
+    $workforce = $company['workforce'] ?? [];
+    $history = $workforce['history'] ?? [];
+    $oldest = end($history) ?: [];
+    echo $company['domain'], ' ', $oldest['observedEmployeeCount'] ?? '', ' -> ',
+        $workforce['observedEmployeeCount'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --growth 20%.. --growth-period y1 --growth-department overall \
+  --category saas --country US --employees 51-200,201-500 --expand workforce --limit 25
+```
+
+</CodeGroup>
+
+With the expansion, this search costs 2 credits per company. `history` is ordered newest first, so its last point is the oldest.
+
+## Find companies that are shrinking
+
+A negative ratio is a decline. Set `max` to a negative number to find companies whose headcount fell. This filter matches companies with 201 to 1,000 employees that lost 10% or more of their headcount in the last 6 months:
+
+```json
+{
+  "filter": {
+    "employees": ["201-500", "501-1K"],
+    "workforceGrowth": { "period": "m6", "department": "overall", "max": -0.1 }
+  }
+}
+```
+
+In the CLI, this is `--employees 201-500,501-1K --growth ..-10% --growth-period m6 --growth-department overall`.
+
+## Count the matches and export the list
+
+The count endpoint takes the same filter and costs nothing, so check the size of the list before you pay for it. For the whole list in one file, run an export.
+
+```bash
+companyenrich company count --growth 20%.. --growth-period y1 --growth-department overall \
+  --category saas --country US --employees 51-200,201-500
+
+companyenrich company export --growth 20%.. --growth-period y1 --growth-department overall \
+  --category saas --country US --employees 51-200,201-500 --limit 2000 --wait -o growing.csv
+```
+
+An export costs the same per company as the search. See [Export the whole list to CSV](/docs/build-an-icp-company-list#export-the-whole-list-to-csv) for the same export in cURL and the SDKs.
+
+## Common questions
+
+### Is headcount growth the same as hiring?
+
+It is the closest signal the API has. `workforceGrowth` measures the change in a company's observed headcount over a period. It does not read job postings, so it shows that a company has grown, not which roles it is trying to fill.
+
+### Can I find companies where one team is growing?
+
+Yes. Set `department` to a team such as `sales` or `engineering_technical`. See [Track headcount growth by department](/docs/track-headcount-by-department).
+
+### How do I watch for growth at companies I already know?
+
+Add your account domains to the same filter, so that the search returns only the accounts that passed the threshold. See [Track headcount changes at your accounts](/docs/track-headcount-changes).
+
+### Why does my growth search return an error?
+
+A `workforceGrowth` filter that sets `min` or `max` needs both a `period` and a `department`. Without them, the request returns `422`. Add `"department": "overall"` to measure the whole company.
+
+### What does a growth search cost?
+
+1 credit for each company returned, plus 1 per company for the `workforce` expansion. The count is free, and a search that returns no companies costs 1 credit.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Track headcount changes at your accounts" icon="route" href="/docs/track-headcount-changes">
+    Apply the same filter to a list of accounts you already have.
+  </Card>
+  <Card title="Track headcount growth by department" icon="users" href="/docs/track-headcount-by-department">
+    Measure one team's growth and size.
+  </Card>
+  <Card title="Find startups in an industry" icon="rocket" href="/docs/find-startups-in-an-industry">
+    Combine growth with founding year and funding stage.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters#workforce">
+    The workforce growth and size filters in full.
+  </Card>
+</CardGroup>

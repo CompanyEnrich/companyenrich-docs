@@ -1,10 +1,12 @@
 ---
 title: "Reverse Email Lookup API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Reverse lookup basics"
 description: "Ready-to-run reverse email lookups: find the person behind an email, get their employer's company profile, handle an email with no match, and process a list of emails, in cURL, four SDKs, and the CLI."
 ---
 
 Each example on this page is a [Reverse Email Lookup API](/docs/reverse-email-lookup-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers the lookup, its expansions, no-match handling, and lists. For a specific job, such as enriching and routing a signup, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -106,6 +108,36 @@ companyenrich people enrich jane.doe@acme-analytics.example
 ```
 
 </CodeGroup>
+
+The response is one [person record](/docs/person-schema). The job at the email's company has `isMatched` set to `true`. This example is shortened and shows a fictional person.
+
+```json
+{
+  "id": 9000000000001,
+  "name": "Jane Doe",
+  "position": "VP of Sales",
+  "seniority": "vp",
+  "department": "sales",
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+  },
+  "experiences": [
+    {
+      "startDate": "2021-03-01",
+      "isCurrent": true,
+      "isMatched": true,
+      "position": "VP of Sales",
+      "company": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "industry": "Software Publishers"
+      }
+    }
+  ],
+  "updatedAt": "2026-09-15T08:30:00Z"
+}
+```
 
 ## Get the person with their company profile
 
@@ -323,6 +355,16 @@ companyenrich people enrich jane.doe@acme-analytics.example john.smith@acme-anal
 </CodeGroup>
 
 In the CLI, `-f emails.txt` reads the addresses from a file, one per line. Add `--format csv -o people.csv` to save the results.
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                              | Page                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Qualify and route a signup from its email         | [Enrich a signup from its email address](/docs/enrich-a-signup-from-its-email)        |
+| Get the company only, for 1 credit                | [Identify the company behind a signup email](/docs/identify-company-from-email)       |
+| Go from a person to their email address           | [Find a person's work email](/docs/find-a-work-email)                                 |
 
 ## Related pages
 

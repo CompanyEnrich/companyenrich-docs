@@ -1,0 +1,481 @@
+---
+title: "Find people who recently started a new role"
+sidebarTitle: "New in role"
+description: "Find people who recently changed jobs or were promoted with the People Search API: filter by the date they started their position or joined their company."
+---
+
+To find people who recently started a new role, filter the [People Search API](/docs/people-search-api) by `currentPositionStartDate`, the date a person started their current position. It covers new hires and people who moved into a new position at the same company. Use `currentCompanyStartDate` to match only people who joined a new employer. A search costs 2 credits per person returned.
+
+| Filter                     | Matches the date a person                | CLI flags                                               |
+| -------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| `currentPositionStartDate` | Started their current position           | `--position-started-after`, `--position-started-before` |
+| `currentCompanyStartDate`  | Joined their current company             | `--joined-after`, `--joined-before`                     |
+
+A date range takes `after`, `before`, or both, and both ends are inclusive.
+
+## Find people who started a role in the last 90 days
+
+This search returns sales VPs in the United States who started their current position in the last 90 days.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "seniority": "vp",
+      "department": "sales",
+      "country": "US",
+      "currentPositionStartDate": {"after": "2026-09-01T00:00:00Z"}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+const page = await client.people.search({
+  filter: {
+    seniority: 'vp',
+    department: 'sales',
+    country: 'US',
+    currentPositionStartDate: { after: since },
+  },
+  pageSize: 25,
+});
+
+for (const person of page.items) {
+  const job = person.experiences?.find((experience) => experience.isCurrent);
+  console.log(person.name, person.position, job?.company?.name, job?.startDate);
+}
+```
+
+```python Python
+from datetime import datetime, timedelta, timezone
+
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+since = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+page = client.people.search(
+    filter={
+        "seniority": "vp",
+        "department": "sales",
+        "country": "US",
+        "currentPositionStartDate": {"after": since},
+    },
+    page_size=25,
+)
+
+for person in page["items"]:
+    job = next((e for e in person.get("experiences") or [] if e.get("isCurrent")), {})
+    print(person.get("name"), person.get("position"), (job.get("company") or {}).get("name"), job.get("startDate"))
+```
+
+```ruby Ruby
+require "time"
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+since = (Time.now.utc - (90 * 24 * 60 * 60)).iso8601
+
+page = client.people.search(
+  filter: {
+    seniority: "vp",
+    department: "sales",
+    country: "US",
+    currentPositionStartDate: { after: since }
+  },
+  page_size: 25
+)
+
+page["items"].each do |person|
+  job = (person["experiences"] || []).find { |experience| experience["isCurrent"] } || {}
+  puts "#{person['name']} #{person['position']} #{job.dig('company', 'name')} #{job['startDate']}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$since = (new DateTimeImmutable('-90 days', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+
+$page = $client->people->search(
+    filter: [
+        'seniority' => 'vp',
+        'department' => 'sales',
+        'country' => 'US',
+        'currentPositionStartDate' => ['after' => $since],
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $person) {
+    $job = [];
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isCurrent']) {
+            $job = $experience;
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ',
+        $job['company']['name'] ?? '', ' ', $job['startDate'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --seniority vp --department sales --country US \
+  --position-started-after 90d --limit 25
+```
+
+</CodeGroup>
+
+Each item is a full [person record](/docs/person-schema), with the start date of every job in `experiences`. This example is shortened and shows a fictional person.
+
+```json
+{
+  "items": [
+    {
+      "id": 9000000000001,
+      "name": "Jane Doe",
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "socials": {
+        "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+      },
+      "experiences": [
+        {
+          "startDate": "2026-10-01",
+          "isCurrent": true,
+          "isMatched": true,
+          "position": "VP of Sales",
+          "seniority": "vp",
+          "department": "sales",
+          "company": {
+            "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+            "name": "Acme Analytics",
+            "domain": "acme-analytics.example"
+          }
+        },
+        {
+          "startDate": "2022-04-01",
+          "endDate": "2026-09-01",
+          "isCurrent": false,
+          "isMatched": false,
+          "position": "Director of Sales",
+          "seniority": "director",
+          "department": "sales",
+          "companyName": "Example Corp"
+        }
+      ],
+      "updatedAt": "2026-10-20T08:30:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+In the CLI, a relative value such as `90d` means the last 90 days, so the command needs no fixed date. The later examples on this page reuse the `client` and the `since` date created here.
+
+## Tell new hires from internal moves
+
+The two date filters separate the cases. A person who joined the company after your date is a new hire. A person whose position started after your date, but who joined the company before it, moved into the role from inside. This search returns the second group.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "seniority": "vp",
+      "department": "sales",
+      "country": "US",
+      "currentPositionStartDate": {"after": "2026-09-01T00:00:00Z"},
+      "currentCompanyStartDate": {"before": "2026-08-31T00:00:00Z"}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const promoted = await client.people.search({
+  filter: {
+    seniority: 'vp',
+    department: 'sales',
+    country: 'US',
+    currentPositionStartDate: { after: since },
+    currentCompanyStartDate: { before: since },
+  },
+  pageSize: 25,
+});
+
+for (const person of promoted.items) {
+  console.log(person.name, person.position);
+}
+```
+
+```python Python
+promoted = client.people.search(
+    filter={
+        "seniority": "vp",
+        "department": "sales",
+        "country": "US",
+        "currentPositionStartDate": {"after": since},
+        "currentCompanyStartDate": {"before": since},
+    },
+    page_size=25,
+)
+
+for person in promoted["items"]:
+    print(person.get("name"), person.get("position"))
+```
+
+```ruby Ruby
+promoted = client.people.search(
+  filter: {
+    seniority: "vp",
+    department: "sales",
+    country: "US",
+    currentPositionStartDate: { after: since },
+    currentCompanyStartDate: { before: since }
+  },
+  page_size: 25
+)
+
+promoted["items"].each do |person|
+  puts "#{person['name']} #{person['position']}"
+end
+```
+
+```php PHP
+$promoted = $client->people->search(
+    filter: [
+        'seniority' => 'vp',
+        'department' => 'sales',
+        'country' => 'US',
+        'currentPositionStartDate' => ['after' => $since],
+        'currentCompanyStartDate' => ['before' => $since],
+    ],
+    pageSize: 25,
+);
+
+foreach ($promoted['items'] as $person) {
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --seniority vp --department sales --country US \
+  --position-started-after 2026-09-01 --joined-before 2026-08-31 --limit 25
+```
+
+</CodeGroup>
+
+For new hires only, use `currentCompanyStartDate` on its own:
+
+```json
+{
+  "filter": {
+    "seniority": "vp",
+    "department": "sales",
+    "country": "US",
+    "currentCompanyStartDate": { "after": "2026-09-01T00:00:00Z" }
+  }
+}
+```
+
+## Find people who recently left a company
+
+Filters inside `pastExperience` match a previous job. Add `endDate` to find people who left a company after a date. This search returns people in the United States who left Google since June 2026, with the role they hold now.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "pastExperience": {
+        "domain": "google.com",
+        "endDate": {"after": "2026-06-01T00:00:00Z"}
+      },
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const leavers = await client.people.search({
+  filter: {
+    pastExperience: { domain: 'google.com', endDate: { after: '2026-06-01T00:00:00Z' } },
+    country: 'US',
+  },
+  pageSize: 25,
+});
+
+for (const person of leavers.items) {
+  const now = person.experiences?.find((experience) => experience.isCurrent);
+  console.log(person.name, person.position, now?.company?.name);
+}
+```
+
+```python Python
+leavers = client.people.search(
+    filter={
+        "pastExperience": {"domain": "google.com", "endDate": {"after": "2026-06-01T00:00:00Z"}},
+        "country": "US",
+    },
+    page_size=25,
+)
+
+for person in leavers["items"]:
+    now = next((e for e in person.get("experiences") or [] if e.get("isCurrent")), {})
+    print(person.get("name"), person.get("position"), (now.get("company") or {}).get("name"))
+```
+
+```ruby Ruby
+leavers = client.people.search(
+  filter: {
+    pastExperience: { domain: "google.com", endDate: { after: "2026-06-01T00:00:00Z" } },
+    country: "US"
+  },
+  page_size: 25
+)
+
+leavers["items"].each do |person|
+  now = (person["experiences"] || []).find { |experience| experience["isCurrent"] } || {}
+  puts "#{person['name']} #{person['position']} #{now.dig('company', 'name')}"
+end
+```
+
+```php PHP
+$leavers = $client->people->search(
+    filter: [
+        'pastExperience' => ['domain' => 'google.com', 'endDate' => ['after' => '2026-06-01T00:00:00Z']],
+        'country' => 'US',
+    ],
+    pageSize: 25,
+);
+
+foreach ($leavers['items'] as $person) {
+    $employer = '';
+    foreach ($person['experiences'] ?? [] as $experience) {
+        if ($experience['isCurrent']) {
+            $employer = $experience['company']['name'] ?? '';
+            break;
+        }
+    }
+    echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $employer, PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich people search --past-domain google.com --past-ended-after 2026-06-01 \
+  --country US --limit 25
+```
+
+</CodeGroup>
+
+Every value inside `pastExperience` must match the same past job, and people who still work at that company are left out.
+
+## Narrow it to your accounts or your market
+
+The date filters combine with every other filter. Two common cases:
+
+New leaders at accounts you already track. `filter.domain` takes up to 2,500 domains.
+
+```json
+{
+  "filter": {
+    "domain": ["stripe.com", "adyen.com", "checkout.com"],
+    "seniority": ["c-suite", "vp", "head", "director"],
+    "currentCompanyStartDate": { "after": "2026-09-01T00:00:00Z" }
+  }
+}
+```
+
+New sales leaders at companies that match your ICP. The `company` field takes the same filters as a company search.
+
+```json
+{
+  "filter": {
+    "seniority": ["c-suite", "vp"],
+    "department": "sales",
+    "currentPositionStartDate": { "after": "2026-09-01T00:00:00Z" }
+  },
+  "company": {
+    "filter": { "country": "US", "categories": "saas", "employees": ["51-200", "201-500"] }
+  }
+}
+```
+
+## Run the search on a schedule
+
+The API has no webhook for job changes, so run the search yourself at an interval to keep up with new starts.
+
+1. Keep the date of your last run, and use it as `after` in the next one.
+2. Count the matches first. The count endpoint takes the same query and costs nothing.
+3. Search when the count is above zero, and skip the people whose `id` you have already stored.
+
+## Common questions
+
+### What is the difference between the two date filters?
+
+`currentPositionStartDate` is the date a person started their current position, at any company. `currentCompanyStartDate` is the date they joined their current company. A person promoted last month at a company they joined five years ago matches a recent position date, and not a recent company date.
+
+### How do I find people who changed employers?
+
+Use `currentCompanyStartDate` with an `after` date. To start from the employer they left, use `pastExperience` with its `endDate`, as shown in [Find people who recently left a company](#find-people-who-recently-left-a-company).
+
+### Can I get notified when someone changes jobs?
+
+Not by the API. It has no webhooks, so run the search at an interval and compare the results with the people you already have.
+
+### How do I reach the people I find?
+
+Each record has the LinkedIn URL in `socials.linkedinUrl`. To get a work email, look it up with the person's `id`. See [Find a person's work email](/docs/find-a-work-email).
+
+### What does it cost?
+
+2 credits for each person returned. The count is free, and a search that returns no people costs 2 credits.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find decision makers at your target accounts" icon="user" href="/docs/find-decision-makers">
+    Search by seniority and department at a list of accounts.
+  </Card>
+  <Card title="People Search API filters" icon="filter" href="/docs/people-search-api-filters#date-ranges">
+    Date ranges and the past experience filters.
+  </Card>
+  <Card title="Find the employees of a company" icon="users" href="/docs/find-employees-of-a-company">
+    List the people who joined one company recently.
+  </Card>
+  <Card title="Find a person's work email" icon="at" href="/docs/find-a-work-email">
+    Get an email address for the people you found.
+  </Card>
+</CardGroup>

@@ -1,0 +1,414 @@
+---
+title: "Track headcount changes at your accounts"
+sidebarTitle: "Track headcount changes"
+description: "Monitor a list of accounts for headcount growth or decline: one search restricted to your account domains returns only the accounts past your threshold."
+---
+
+To track headcount changes at a list of accounts, run a company search restricted to your account domains with the `workforceGrowth` filter. It returns only the accounts whose headcount grew or shrank past your threshold over 6 months, 1 year, or 2 years, so you pay for the accounts that changed. A filter search costs 1 credit per company returned.
+
+## Find the accounts that grew
+
+Put your accounts in `filter.domain` and the threshold in `filter.workforceGrowth`. This search returns the accounts whose headcount grew at least 10% in the last 6 months, with their headcount data.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": ["stripe.com", "adyen.com", "notion.com", "linear.app", "shopify.com"],
+      "workforceGrowth": {"period": "m6", "department": "overall", "min": 0.1}
+    },
+    "expand": ["workforce"],
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const accounts = ['stripe.com', 'adyen.com', 'notion.com', 'linear.app', 'shopify.com'];
+
+const grew = await client.companies.search({
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: 'm6', department: 'overall', min: 0.1 },
+  },
+  expand: ['workforce'],
+  pageSize: 100,
+});
+
+for (const company of grew.items) {
+  console.log(company.domain, company.workforce?.observedEmployeeCount);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+accounts = ["stripe.com", "adyen.com", "notion.com", "linear.app", "shopify.com"]
+
+grew = client.companies.search(
+    filter={
+        "domain": accounts,
+        "workforceGrowth": {"period": "m6", "department": "overall", "min": 0.1},
+    },
+    expand=["workforce"],
+    page_size=100,
+)
+
+for company in grew["items"]:
+    print(company["domain"], (company.get("workforce") or {}).get("observedEmployeeCount"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+accounts = ["stripe.com", "adyen.com", "notion.com", "linear.app", "shopify.com"]
+
+grew = client.companies.search(
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: "m6", department: "overall", min: 0.1 }
+  },
+  expand: ["workforce"],
+  page_size: 100
+)
+
+grew["items"].each do |company|
+  puts "#{company['domain']} #{company.dig('workforce', 'observedEmployeeCount')}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$accounts = ['stripe.com', 'adyen.com', 'notion.com', 'linear.app', 'shopify.com'];
+
+$grew = $client->companies->search(
+    filter: [
+        'domain' => $accounts,
+        'workforceGrowth' => ['period' => 'm6', 'department' => 'overall', 'min' => 0.1],
+    ],
+    expand: ['workforce'],
+    pageSize: 100,
+);
+
+foreach ($grew['items'] as $company) {
+    echo $company['domain'], ' ', $company['workforce']['observedEmployeeCount'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --domain stripe.com,adyen.com,notion.com,linear.app,shopify.com \
+  --growth 10%.. --growth-period m6 --growth-department overall --expand workforce --limit 100
+```
+
+</CodeGroup>
+
+Only the accounts that passed the threshold come back. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "employees": "201-500",
+      "updatedAt": "2026-10-01T12:00:00Z",
+      "workforce": {
+        "observedEmployeeCount": 312,
+        "employeeCountRange": "201-500",
+        "historyFrom": "2025-11-01",
+        "historyTo": "2026-11-01",
+        "history": [
+          { "date": "2026-10-01", "observedEmployeeCount": 312 },
+          { "date": "2026-04-01", "observedEmployeeCount": 271 }
+        ]
+      }
+    }
+  ]
+}
+```
+
+The parts of the growth filter:
+
+| Field        | Value                         | Meaning                                                            |
+| ------------ | ----------------------------- | ------------------------------------------------------------------ |
+| `period`     | `m6`, `y1`, or `y2`           | Measure the change over 6 months, 1 year, or 2 years.              |
+| `department` | `overall` or a department     | `overall` measures the whole company. A department, such as `sales`, measures that team. |
+| `min`, `max` | A ratio                       | `0.1` is 10% growth, and a negative number is a decline.           |
+
+`period` and `department` are both required when you set `min` or `max`. The `workforce` expansion adds 1 credit per company, so this search costs 2 credits for each account returned. Leave it out to pay 1 credit and get the list without the numbers. The later examples on this page reuse the `client` and the `accounts` list created here.
+
+## Find the accounts that shrank
+
+A negative ratio is a decline. Set `max` to find the accounts whose headcount fell by at least that much. This search returns the accounts that lost 10% or more of their headcount in the last year.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": ["stripe.com", "adyen.com", "notion.com", "linear.app", "shopify.com"],
+      "workforceGrowth": {"period": "y1", "department": "overall", "max": -0.1}
+    },
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+const shrank = await client.companies.search({
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: 'y1', department: 'overall', max: -0.1 },
+  },
+  pageSize: 100,
+});
+
+for (const company of shrank.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+shrank = client.companies.search(
+    filter={
+        "domain": accounts,
+        "workforceGrowth": {"period": "y1", "department": "overall", "max": -0.1},
+    },
+    page_size=100,
+)
+
+for company in shrank["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+shrank = client.companies.search(
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: "y1", department: "overall", max: -0.1 }
+  },
+  page_size: 100
+)
+
+shrank["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$shrank = $client->companies->search(
+    filter: [
+        'domain' => $accounts,
+        'workforceGrowth' => ['period' => 'y1', 'department' => 'overall', 'max' => -0.1],
+    ],
+    pageSize: 100,
+);
+
+foreach ($shrank['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --domain stripe.com,adyen.com,notion.com,linear.app,shopify.com \
+  --growth ..-10% --growth-period y1 --growth-department overall --limit 100
+```
+
+</CodeGroup>
+
+Set both `min` and `max` to match a band, such as accounts that grew between 10% and 30%.
+
+## Check for free whether anything changed
+
+The count endpoint takes the same filter and costs nothing. Run it as often as you like, and search only when the count is above zero. A search that returns no companies costs 1 credit, and the count avoids that.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/count \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "domain": ["stripe.com", "adyen.com", "notion.com", "linear.app", "shopify.com"],
+      "workforceGrowth": {"period": "m6", "department": "overall", "min": 0.1}
+    }
+  }'
+```
+
+```javascript JavaScript
+const { count } = await client.companies.count({
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: 'm6', department: 'overall', min: 0.1 },
+  },
+});
+
+console.log(`${count} of ${accounts.length} accounts grew at least 10%`);
+```
+
+```python Python
+result = client.companies.count(
+    filter={
+        "domain": accounts,
+        "workforceGrowth": {"period": "m6", "department": "overall", "min": 0.1},
+    },
+)
+
+print(f"{result['count']} of {len(accounts)} accounts grew at least 10%")
+```
+
+```ruby Ruby
+result = client.companies.count(
+  filter: {
+    domain: accounts,
+    workforceGrowth: { period: "m6", department: "overall", min: 0.1 }
+  }
+)
+
+puts "#{result['count']} of #{accounts.length} accounts grew at least 10%"
+```
+
+```php PHP
+$result = $client->companies->count(
+    filter: [
+        'domain' => $accounts,
+        'workforceGrowth' => ['period' => 'm6', 'department' => 'overall', 'min' => 0.1],
+    ],
+);
+
+echo $result['count'], ' of ', count($accounts), ' accounts grew at least 10%', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company count --domain stripe.com,adyen.com,notion.com,linear.app,shopify.com \
+  --growth 10%.. --growth-period m6 --growth-department overall
+```
+
+</CodeGroup>
+
+## Measure the change for each account
+
+To report the size of the change, compare the current headcount with the oldest point in the 12 months of history that the `workforce` expansion returns. This example uses the `grew` response from the first search.
+
+<CodeGroup>
+
+```javascript JavaScript
+for (const company of grew.items) {
+  const workforce = company.workforce;
+  const oldest = workforce?.history?.at(-1);
+  if (!oldest?.observedEmployeeCount) continue;
+
+  const change = (workforce.observedEmployeeCount - oldest.observedEmployeeCount) / oldest.observedEmployeeCount;
+  console.log(company.domain, oldest.date, `${(change * 100).toFixed(1)}%`);
+}
+```
+
+```python Python
+for company in grew["items"]:
+    workforce = company.get("workforce") or {}
+    history = workforce.get("history") or []
+    if not history or not history[-1].get("observedEmployeeCount"):
+        continue
+
+    oldest = history[-1]
+    change = (workforce["observedEmployeeCount"] - oldest["observedEmployeeCount"]) / oldest["observedEmployeeCount"]
+    print(company["domain"], oldest["date"], f"{change * 100:.1f}%")
+```
+
+```ruby Ruby
+grew["items"].each do |company|
+  workforce = company["workforce"] || {}
+  oldest = (workforce["history"] || []).last
+  next unless oldest && oldest["observedEmployeeCount"].to_i.positive?
+
+  change = (workforce["observedEmployeeCount"] - oldest["observedEmployeeCount"]).to_f / oldest["observedEmployeeCount"]
+  puts "#{company['domain']} #{oldest['date']} #{(change * 100).round(1)}%"
+end
+```
+
+```php PHP
+foreach ($grew['items'] as $company) {
+    $workforce = $company['workforce'] ?? [];
+    $history = $workforce['history'] ?? [];
+    $oldest = end($history);
+    if (!$oldest || empty($oldest['observedEmployeeCount'])) {
+        continue;
+    }
+
+    $change = ($workforce['observedEmployeeCount'] - $oldest['observedEmployeeCount']) / $oldest['observedEmployeeCount'];
+    echo $company['domain'], ' ', $oldest['date'], ' ', round($change * 100, 1), '%', PHP_EOL;
+}
+```
+
+</CodeGroup>
+
+`history` is ordered newest first, so the last point is the oldest. For a longer view, page back through earlier years. See [Get a company's headcount history](/docs/get-company-headcount-history).
+
+## Run the check on a schedule
+
+The API has no webhook for headcount changes, so run the check yourself at an interval. History is recorded by month, which makes a monthly run a natural fit.
+
+1. Count the accounts past your threshold. This step is free.
+2. When the count is above zero, run the search to get those accounts.
+3. Compare the result with the last run, and act on the accounts that are new.
+
+## Common questions
+
+### How do I get notified when an account's headcount changes?
+
+Poll on a schedule. The API has no webhooks, so run the count and the search at an interval, such as once a month, and compare the result with the previous run.
+
+### Can I track one department only?
+
+Yes. Set `department` on `workforceGrowth` to a department such as `sales` or `engineering_technical`. See [Track headcount growth by department](/docs/track-headcount-by-department).
+
+### Why is one of my accounts never returned?
+
+Either its headcount has not passed the threshold, or its domain does not match a company in the dataset. Check the domain with an [enrichment lookup](/docs/company-enrichment-api).
+
+### How many accounts can I check in one request?
+
+A page returns at most 100 companies. For a longer list, follow `nextCursor` to get the remaining accounts that passed the threshold.
+
+### What does tracking cost?
+
+The count is free. The search costs 1 credit for each account returned, plus 1 for the `workforce` expansion. Accounts that did not pass the threshold are not returned and cost nothing.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Get a company's headcount history" icon="chart-line" href="/docs/get-company-headcount-history">
+    Month-by-month headcount for one company, year by year.
+  </Card>
+  <Card title="Find fast-growing companies" icon="rocket" href="/docs/find-fast-growing-companies">
+    Find new companies by growth, not only accounts you have.
+  </Card>
+  <Card title="Track headcount growth by department" icon="users" href="/docs/track-headcount-by-department">
+    Measure one team's growth at a company or across a market.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters#workforce">
+    The workforce growth and size filters in full.
+  </Card>
+</CardGroup>

@@ -1,10 +1,12 @@
 ---
 title: "Company Search API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Search basics"
 description: "Ready-to-run Company Search API queries for prospecting, technology targeting, funding and growth signals, semantic and lookalike search, market sizing, pagination, and CSV exports."
 ---
 
 Each example on this page is one [Company Search API](/docs/company-search-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers every search mode, counting, paging, and exports. For a specific job, such as building an ICP list or finding companies by technology, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -142,6 +144,29 @@ companyenrich company search --country US,CA --employees 51-200,201-500 --catego
 </CodeGroup>
 
 An array of countries or employee ranges matches any of the values. See [Company Search API filters](/docs/company-search-api-filters) for every filter.
+
+The response holds the matching companies and a cursor for the next page. This example is shortened and shows a fictional company, as do the other responses on this page. Every search on this page returns the same shape.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "type": "private",
+      "employees": "201-500",
+      "industry": "Software Publishers",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
 
 ## Target companies by technology
 
@@ -321,6 +346,22 @@ companyenrich company search --funding-round series_a,series_b --funding-year 20
 
 </CodeGroup>
 
+With the expansion, each company has a `financial` object:
+
+```json
+{
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "financial": {
+    "totalFunding": 48000000,
+    "fundingStage": "Series B",
+    "fundingDate": "2025-03-15T00:00:00Z"
+  }
+}
+```
+
+See [Find recently funded companies](/docs/find-recently-funded-companies) for more funding searches.
+
 ## Find fast-growing companies
 
 Find fintech companies whose headcount grew at least 20% over the last year and that have at least 10 people in engineering.
@@ -334,7 +375,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
   -d '{
     "filter": {
       "keywords": "fintech",
-      "workforceGrowth": {"period": "y1", "min": 0.2},
+      "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
       "workforceSize": [{"department": "engineering_technical", "min": 10}]
     },
     "pageSize": 25
@@ -345,7 +386,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/search \
 const page = await client.companies.search({
   filter: {
     keywords: 'fintech',
-    workforceGrowth: { period: 'y1', min: 0.2 },
+    workforceGrowth: { period: 'y1', department: 'overall', min: 0.2 },
     workforceSize: [{ department: 'engineering_technical', min: 10 }],
   },
   pageSize: 25,
@@ -360,7 +401,7 @@ for (const company of page.items) {
 page = client.companies.search(
     filter={
         "keywords": "fintech",
-        "workforceGrowth": {"period": "y1", "min": 0.2},
+        "workforceGrowth": {"period": "y1", "department": "overall", "min": 0.2},
         "workforceSize": [{"department": "engineering_technical", "min": 10}],
     },
     page_size=25,
@@ -374,7 +415,7 @@ for company in page["items"]:
 page = client.companies.search(
   filter: {
     keywords: "fintech",
-    workforceGrowth: { period: "y1", min: 0.2 },
+    workforceGrowth: { period: "y1", department: "overall", min: 0.2 },
     workforceSize: [{ department: "engineering_technical", min: 10 }]
   },
   page_size: 25
@@ -389,7 +430,7 @@ end
 $page = $client->companies->search(
     filter: [
         'keywords' => 'fintech',
-        'workforceGrowth' => ['period' => 'y1', 'min' => 0.2],
+        'workforceGrowth' => ['period' => 'y1', 'department' => 'overall', 'min' => 0.2],
         'workforceSize' => [['department' => 'engineering_technical', 'min' => 10]],
     ],
     pageSize: 25,
@@ -401,13 +442,13 @@ foreach ($page['items'] as $company) {
 ```
 
 ```bash CLI
-companyenrich company search --keyword fintech --growth 20%.. --growth-period y1 \
+companyenrich company search --keyword fintech --growth 20%.. --growth-period y1 --growth-department overall \
   --headcount engineering_technical=10.. --limit 25
 ```
 
 </CodeGroup>
 
-A growth ratio of `0.2` means 20%. Workforce filters use underscore department names, such as `engineering_technical`.
+A growth ratio of `0.2` means 20%. `workforceGrowth` needs both a `period` and a `department`, and `overall` measures the whole company. Workforce filters use underscore department names, such as `engineering_technical`.
 
 ## Describe the companies you want
 
@@ -564,6 +605,22 @@ companyenrich company search --similar-to stripe.com,adyen.com --country US \
 
 The response includes a `scores` object keyed by company ID. Scores are not probabilities. Keep the companies in the order returned.
 
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example"
+    }
+  ],
+  "scores": {
+    "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23": 0.87
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
 ## Size a market for free
 
 The count endpoint takes the same query as a search and costs nothing. Use it to size a market, or to check a query before you pay for results.
@@ -612,6 +669,15 @@ companyenrich company count --country DE --category saas --employees 11-50
 ```
 
 </CodeGroup>
+
+The response has two numbers. These values are illustrative.
+
+```json
+{
+  "count": 2140,
+  "total": 2140
+}
+```
 
 `total` is the number of companies that match. `count` is the number your plan can access.
 
@@ -776,6 +842,19 @@ companyenrich company export --country US --category saas --limit 5000 --wait -o
 </CodeGroup>
 
 `limit` is the most companies to export. It can be up to 1,000,000, and no more than your plan's search limit. If your credits run out partway, the export stops and the companies already exported stay downloadable.
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                             | Page                                                                                      |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Turn an ideal customer profile into a list       | [Build a list of companies that match your ICP](/docs/build-an-icp-company-list)          |
+| Search by NAICS code, category, or keyword       | [Find companies by industry or NAICS code](/docs/find-companies-by-industry)              |
+| Search by country, state, city, or region        | [Find companies in a country, state, or city](/docs/find-companies-by-location)           |
+| Search by tech stack                             | [Find companies that use a technology](/docs/find-companies-using-a-technology)           |
+| Search by funding year, round, and amount        | [Find recently funded companies](/docs/find-recently-funded-companies)                    |
+| Search for young companies in one industry       | [Find startups in an industry](/docs/find-startups-in-an-industry)                        |
 
 ## Related pages
 

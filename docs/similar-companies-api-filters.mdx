@@ -55,7 +55,7 @@ The `require` filter keeps only companies that have the fields you need, such as
 
 ```json
 {
-  "lookalike": { "domains": ["notion.so"] },
+  "lookalike": { "domains": ["notion.com"] },
   "filter": { "require": ["linkedin", "revenue"] }
 }
 ```
@@ -71,7 +71,7 @@ Use both to get close matches inside your market.
 
 ```json
 {
-  "lookalike": { "domains": ["notion.so"], "minScore": 0.7 },
+  "lookalike": { "domains": ["notion.com"], "minScore": 0.7 },
   "filter": { "country": "US", "employees": ["11-50", "51-200"] }
 }
 ```
@@ -113,7 +113,7 @@ Add filter flags to `company similar`. Use `--exclude-domain` to leave companies
 
 ```bash
 companyenrich company similar stripe.com adyen.com --country US,CA --employees 51-200,201-500
-companyenrich company similar notion.so --min-score 0.7 --exclude-domain notion.so,coda.io
+companyenrich company similar notion.com --min-score 0.7 --exclude-domain notion.com,coda.io
 ```
 
 ## Related pages

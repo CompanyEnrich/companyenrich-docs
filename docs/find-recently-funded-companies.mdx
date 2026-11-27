@@ -1,0 +1,394 @@
+---
+title: "Find recently funded companies"
+sidebarTitle: "Recently funded"
+description: "Find companies that raised funding recently with the Company Search API: filter by funding year, round, and amount, and return each round with its investors."
+---
+
+To find recently funded companies, filter the [Company Search API](/docs/company-search-api) by `fundingYear`, `fundingRounds`, and `fundingAmount`. `fundingYear` is the year of a company's latest funding, so a minimum of 2026 returns companies that raised in 2026 or later. Add the `financial` expansion to get each round and its investors. A search costs 1 credit per company, or 2 with the expansion.
+
+| Filter          | Takes                                                                                   | Example                                        |
+| --------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `fundingYear`   | A range of years for the company's latest funding                                       | `"fundingYear": {"min": 2026}`                 |
+| `fundingRounds` | One or more [funding rounds](/docs/field-values#funding-rounds), such as `series_a`     | `"fundingRounds": ["series_a", "series_b"]`    |
+| `fundingAmount` | A range of amounts in USD                                                               | `"fundingAmount": {"min": 10000000}`           |
+
+A range is an object with `min`, `max`, or both, and both ends are inclusive.
+
+## Find companies that raised a round this year
+
+This search returns companies with a Series A or Series B round whose latest funding was in 2026 or later. The `financial` expansion adds the funding details to each company.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "fundingYear": {"min": 2026},
+      "fundingRounds": ["series_a", "series_b"]
+    },
+    "expand": ["financial"],
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const page = await client.companies.search({
+  filter: {
+    fundingYear: { min: 2026 },
+    fundingRounds: ['series_a', 'series_b'],
+  },
+  expand: ['financial'],
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  const financial = company.financial ?? {};
+  console.log(company.name, company.domain, financial.fundingStage, financial.fundingDate, financial.totalFunding);
+}
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+    filter={
+        "fundingYear": {"min": 2026},
+        "fundingRounds": ["series_a", "series_b"],
+    },
+    expand=["financial"],
+    page_size=25,
+)
+
+for company in page["items"]:
+    financial = company.get("financial") or {}
+    print(
+        company.get("name"),
+        company["domain"],
+        financial.get("fundingStage"),
+        financial.get("fundingDate"),
+        financial.get("totalFunding"),
+    )
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  filter: {
+    fundingYear: { min: 2026 },
+    fundingRounds: ["series_a", "series_b"]
+  },
+  expand: ["financial"],
+  page_size: 25
+)
+
+page["items"].each do |company|
+  financial = company["financial"] || {}
+  puts [
+    company["name"],
+    company["domain"],
+    financial["fundingStage"],
+    financial["fundingDate"],
+    financial["totalFunding"]
+  ].join(" ")
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    filter: [
+        'fundingYear' => ['min' => 2026],
+        'fundingRounds' => ['series_a', 'series_b'],
+    ],
+    expand: ['financial'],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    $financial = $company['financial'] ?? [];
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ',
+        $financial['fundingStage'] ?? '', ' ', $financial['fundingDate'] ?? '', ' ',
+        $financial['totalFunding'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --funding-year 2026.. --funding-round series_a,series_b \
+  --expand financial --limit 25
+```
+
+</CodeGroup>
+
+Each company has a `financial` object with its funding history. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+      "name": "Acme Analytics",
+      "domain": "acme-analytics.example",
+      "employees": "201-500",
+      "updatedAt": "2026-10-01T12:00:00Z",
+      "financial": {
+        "totalFunding": 48000000,
+        "fundingStage": "Series B",
+        "fundingDate": "2026-03-15T00:00:00Z",
+        "fundingRounds": [
+          {
+            "date": "2026-03-15T00:00:00Z",
+            "amount": "$36M",
+            "type": "Series B",
+            "investors": "Example Ventures, Sample Capital"
+          },
+          {
+            "date": "2023-06-04T00:00:00Z",
+            "amount": "$12M",
+            "type": "Series A",
+            "investors": "Example Ventures"
+          }
+        ]
+      }
+    }
+  ],
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+The filter values and the response labels differ. The `fundingRounds` filter takes fixed values such as `series_a`, and the record's `fundingStage` and round `type` are descriptive labels such as `Series A`. The later examples on this page reuse the `client` created here.
+
+## Filter by the amount raised
+
+`fundingAmount` takes a range in USD. This search returns companies in the United States with $10 million to $50 million in funding whose latest funding was in 2025 or later.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "fundingAmount": {"min": 10000000, "max": 50000000},
+      "fundingYear": {"min": 2025},
+      "country": "US"
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: {
+    fundingAmount: { min: 10000000, max: 50000000 },
+    fundingYear: { min: 2025 },
+    country: 'US',
+  },
+  pageSize: 25,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    filter={
+        "fundingAmount": {"min": 10000000, "max": 50000000},
+        "fundingYear": {"min": 2025},
+        "country": "US",
+    },
+    page_size=25,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+page = client.companies.search(
+  filter: {
+    fundingAmount: { min: 10000000, max: 50000000 },
+    fundingYear: { min: 2025 },
+    country: "US"
+  },
+  page_size: 25
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: [
+        'fundingAmount' => ['min' => 10000000, 'max' => 50000000],
+        'fundingYear' => ['min' => 2025],
+        'country' => 'US',
+    ],
+    pageSize: 25,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --funding 10M..50M --funding-year 2025.. --country US --limit 25
+```
+
+</CodeGroup>
+
+Without the `financial` expansion, the search costs 1 credit per company and the records do not include the funding details.
+
+## Keep only companies funded in the last 90 days
+
+The funding filter works by year. For a shorter window, request the `financial` expansion and compare `financial.fundingDate`, the date of the latest round, in your own code.
+
+<CodeGroup>
+
+```javascript JavaScript
+const page = await client.companies.search({
+  filter: { fundingYear: { min: 2026 } },
+  expand: ['financial'],
+  pageSize: 100,
+});
+
+const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+const recent = page.items.filter((company) => {
+  const fundingDate = company.financial?.fundingDate;
+  return fundingDate && new Date(fundingDate) >= cutoff;
+});
+
+for (const company of recent) {
+  console.log(company.domain, company.financial.fundingDate);
+}
+```
+
+```python Python
+from datetime import datetime, timedelta, timezone
+
+page = client.companies.search(
+    filter={"fundingYear": {"min": 2026}},
+    expand=["financial"],
+    page_size=100,
+)
+
+cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+
+def funded_since(company, cutoff):
+    funding_date = (company.get("financial") or {}).get("fundingDate")
+    if not funding_date:
+        return False
+    return datetime.fromisoformat(funding_date.replace("Z", "+00:00")) >= cutoff
+
+
+for company in page["items"]:
+    if funded_since(company, cutoff):
+        print(company["domain"], company["financial"]["fundingDate"])
+```
+
+```ruby Ruby
+require "time"
+
+page = client.companies.search(
+  filter: { fundingYear: { min: 2026 } },
+  expand: ["financial"],
+  page_size: 100
+)
+
+cutoff = Time.now.utc - (90 * 24 * 60 * 60)
+
+recent = page["items"].select do |company|
+  funding_date = company.dig("financial", "fundingDate")
+  funding_date && Time.parse(funding_date) >= cutoff
+end
+
+recent.each do |company|
+  puts "#{company['domain']} #{company.dig('financial', 'fundingDate')}"
+end
+```
+
+```php PHP
+$page = $client->companies->search(
+    filter: ['fundingYear' => ['min' => 2026]],
+    expand: ['financial'],
+    pageSize: 100,
+);
+
+$cutoff = new DateTimeImmutable('-90 days');
+
+foreach ($page['items'] as $company) {
+    $fundingDate = $company['financial']['fundingDate'] ?? null;
+    if ($fundingDate !== null && new DateTimeImmutable($fundingDate) >= $cutoff) {
+        echo $company['domain'], ' ', $fundingDate, PHP_EOL;
+    }
+}
+```
+
+</CodeGroup>
+
+This request fetches one page of up to 100 companies, at 2 credits each. To check every match, page through the results with the SDK `searchAll` helpers. See [Fetch every result](/docs/company-search-api-examples#fetch-every-result).
+
+## Common questions
+
+### Can I filter by an exact funding date?
+
+No. `fundingYear` filters by the year of the latest funding. For a shorter window, request the `financial` expansion and compare `financial.fundingDate` in your code.
+
+### Which funding rounds can I filter on?
+
+`seed`, `angel`, `venture`, `series_a` through `series_h`, `debt_financing`, and `other`. See [Funding rounds](/docs/field-values#funding-rounds).
+
+### Does the search return investors?
+
+Yes, with the `financial` expansion. Each entry in `financial.fundingRounds` has the disclosed `investors`, along with the round's date, amount, and type.
+
+### How many companies raised funding this year?
+
+Send the same filter to the count endpoint, [`POST /v2/companies/search/count`](/api-reference/v2/post-companies-search-count). It returns the number of matches and costs nothing. In the CLI, this is `companyenrich company count --funding-year 2026..`.
+
+### How do I get the funding rounds of one company?
+
+Enrich its domain with the `financial` expansion. See [Get a company's funding rounds](/docs/get-company-funding-rounds).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Get a company's funding rounds" icon="sack-dollar" href="/docs/get-company-funding-rounds">
+    Read the funding history of a company you already know.
+  </Card>
+  <Card title="Find startups in an industry" icon="rocket" href="/docs/find-startups-in-an-industry">
+    Combine funding stage with founding year and industry.
+  </Card>
+  <Card title="Company Search API filters" icon="filter" href="/docs/company-search-api-filters">
+    Every filter, with matching rules and accepted values.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values#funding-rounds">
+    Every funding round value the filter accepts.
+  </Card>
+</CardGroup>

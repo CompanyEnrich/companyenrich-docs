@@ -1,0 +1,250 @@
+---
+title: "Get a company's employee count"
+sidebarTitle: "Employee count"
+description: "Get the number of employees at any company from its domain with the Company Headcount API: the observed count, the size range, and a count per department."
+---
+
+To get a company's employee count from its domain, call the [Company Headcount API](/docs/company-headcount-api), `GET /v2/companies/workforce`. It returns the number of employees observed at the company, an estimated size range, and a headcount for each of 14 departments, for 1 credit. If a size range is enough, every company record already has one in `employees`.
+
+## Get the employee count from a domain
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/workforce?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const workforce = await client.companies.workforce({ domain: 'stripe.com' });
+
+console.log(workforce.observedEmployeeCount, workforce.employeeCountRange);
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain="stripe.com")
+
+print(workforce.get("observedEmployeeCount"), workforce.get("employeeCountRange"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+workforce = client.companies.workforce(domain: "stripe.com")
+
+puts workforce["observedEmployeeCount"], workforce["employeeCountRange"]
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$workforce = $client->companies->workforce(domain: 'stripe.com');
+
+echo $workforce['observedEmployeeCount'] ?? '', ' ', $workforce['employeeCountRange'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company workforce stripe.com
+```
+
+</CodeGroup>
+
+The response has two size fields and a breakdown by department. This example is shortened and shows a fictional company.
+
+```json
+{
+  "companyId": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "domain": "acme-analytics.example",
+  "observedEmployeeCount": 312,
+  "employeeCountRange": "201-500",
+  "departmentHeadcount": {
+    "cSuite": 6,
+    "engineeringTechnical": 124,
+    "sales": 58,
+    "marketing": 27
+  },
+  "unclassifiedHeadcount": 41,
+  "historyFrom": "2025-11-01",
+  "historyTo": "2026-11-01"
+}
+```
+
+You can look a company up by its CompanyEnrich ID in place of the domain. Send exactly one of `domain` or `id`. A company that is not found returns `404` and costs nothing. The later examples on this page reuse the `client` created here.
+
+## Observed count or size range
+
+The two size fields answer different questions, so choose the one that fits your use.
+
+| Field                   | What it is                                                                                    | Use it for                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `observedEmployeeCount` | The number of people in the CompanyEnrich people dataset who currently work at the company.   | Comparing companies, and measuring change over time. |
+| `employeeCountRange`    | The estimated size range of the whole company, such as `201-500`.                             | Segmenting and routing by company size.       |
+
+The department numbers break down the observed count. People who could not be assigned to a department are counted in `unclassifiedHeadcount`.
+
+## Get only the size range
+
+Every company record has the same size range in `employees`, with no expansion. When a range is all you need, an enrichment by domain returns it with the rest of the company profile for 1 credit.
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=stripe.com" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+const company = await client.companies.enrich({ domain: 'stripe.com' });
+console.log(company.name, company.employees);
+```
+
+```python Python
+company = client.companies.enrich("stripe.com")
+print(company.get("name"), company.get("employees"))
+```
+
+```ruby Ruby
+company = client.companies.enrich("stripe.com")
+puts company["name"], company["employees"]
+```
+
+```php PHP
+$company = $client->companies->enrich('stripe.com');
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich stripe.com --fields name,domain,employees
+```
+
+</CodeGroup>
+
+`employees` is one of eight [employee ranges](/docs/field-values#employee-ranges), from `1-10` to `over-10K`.
+
+## Get employee counts for a list of companies
+
+The `workforce` expansion adds the headcount data to a company record, so a batch enrichment returns the counts for up to 50 domains in one request. Each company found costs 2 credits: 1 for the company and 1 for the expansion.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["stripe.com", "adyen.com", "notion.com"],
+    "expand": ["workforce"]
+  }'
+```
+
+```javascript JavaScript
+const { items } = await client.companies.enrichBatch({
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
+  expand: ['workforce'],
+});
+
+for (const item of items) {
+  const workforce = item.company?.workforce;
+  console.log(item.domain, item.status, workforce?.observedEmployeeCount, workforce?.employeeCountRange);
+}
+```
+
+```python Python
+batch = client.companies.enrich_batch(
+    ["stripe.com", "adyen.com", "notion.com"],
+    expand=["workforce"],
+)
+
+for item in batch["items"]:
+    workforce = (item.get("company") or {}).get("workforce") or {}
+    print(item["domain"], item["status"], workforce.get("observedEmployeeCount"), workforce.get("employeeCountRange"))
+```
+
+```ruby Ruby
+batch = client.companies.enrich_batch(
+  ["stripe.com", "adyen.com", "notion.com"],
+  expand: ["workforce"]
+)
+
+batch["items"].each do |item|
+  workforce = item.dig("company", "workforce") || {}
+  puts "#{item['domain']} #{item['status']} #{workforce['observedEmployeeCount']} #{workforce['employeeCountRange']}"
+end
+```
+
+```php PHP
+$batch = $client->companies->enrichBatch(
+    ['stripe.com', 'adyen.com', 'notion.com'],
+    expand: ['workforce'],
+);
+
+foreach ($batch['items'] as $item) {
+    $workforce = $item['company']['workforce'] ?? [];
+    echo $item['domain'], ' ', $item['status'], ' ',
+        $workforce['observedEmployeeCount'] ?? '', ' ', $workforce['employeeCountRange'] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company enrich stripe.com adyen.com notion.com --expand workforce \
+  --fields domain,status,company.workforce.observedEmployeeCount,company.workforce.employeeCountRange
+```
+
+</CodeGroup>
+
+For more than 50 domains, run a bulk job with the same expansion. See [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains).
+
+## Common questions
+
+### Why is the observed count different from the size range?
+
+They measure different things. The observed count is the number of people in the CompanyEnrich people dataset who work at the company, and the range is an estimate of the company's total size, so the two do not always agree.
+
+### How current is the employee count?
+
+The response gives the current observed headcount, and its `history` lists the months in which the headcount changed. See [Get a company's headcount history](/docs/get-company-headcount-history).
+
+### Can I get the count for one department?
+
+Yes. `departmentHeadcount` has a number for each of 14 departments, such as `sales` and `engineeringTechnical`. See [Track headcount growth by department](/docs/track-headcount-by-department).
+
+### Can I look a company up by name?
+
+The lookup takes a domain or a CompanyEnrich ID. To start from a name, see [Find a company's domain from its name](/docs/find-company-domain-by-name).
+
+### What does an employee count cost?
+
+1 credit for a lookup, which includes the latest 12 months of history. As an expansion on enrichment or search, it adds 1 credit per company. A company that is not found costs nothing.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Company Headcount API" icon="chart-line" href="/docs/company-headcount-api">
+    Response fields, history, search filters, pricing, and limits.
+  </Card>
+  <Card title="Get a company's headcount history" icon="chart-line" href="/docs/get-company-headcount-history">
+    Month-by-month headcount, going back year by year.
+  </Card>
+  <Card title="Track headcount growth by department" icon="users" href="/docs/track-headcount-by-department">
+    Department numbers for one company or a whole market.
+  </Card>
+  <Card title="Company schema" icon="table-list" href="/docs/company-schema#workforce">
+    Every field in the workforce object.
+  </Card>
+</CardGroup>

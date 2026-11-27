@@ -1,0 +1,309 @@
+---
+title: "Rank a prospect list by similarity to your customers"
+sidebarTitle: "Rank a prospect list"
+description: "Score the prospects you already have against your best customers: run a lookalike search with customers as seeds and restrict it to your prospect domains."
+---
+
+To rank a prospect list by how closely each company resembles your customers, run a lookalike search with your customers as seeds and restrict it to your prospects with the `domain` filter. The [Similar Companies API](/docs/similar-companies-api) returns the prospects that resemble the seeds, in ranked order, each with a score. A lookalike search costs 5 credits per company returned.
+
+## Score your prospects against your customers
+
+Put up to 10 customers in `lookalike.domains` and your prospects in `filter.domain`. An array in `filter.domain` matches any of the domains, so the search considers only the companies on your list.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com"]},
+    "filter": {"domain": ["checkout.com", "mollie.com", "notion.com", "linear.app"]},
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const customers = ['stripe.com', 'adyen.com'];
+const prospects = ['checkout.com', 'mollie.com', 'notion.com', 'linear.app'];
+
+const ranked = await client.companies.search({
+  lookalike: { domains: customers },
+  filter: { domain: prospects },
+  pageSize: 100,
+});
+
+ranked.items.forEach((company, index) => {
+  console.log(index + 1, company.domain, ranked.scores?.[company.id]);
+});
+```
+
+```python Python
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+customers = ["stripe.com", "adyen.com"]
+prospects = ["checkout.com", "mollie.com", "notion.com", "linear.app"]
+
+ranked = client.companies.search(
+    lookalike={"domains": customers},
+    filter={"domain": prospects},
+    page_size=100,
+)
+
+scores = ranked.get("scores") or {}
+for rank, company in enumerate(ranked["items"], start=1):
+    print(rank, company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+customers = ["stripe.com", "adyen.com"]
+prospects = ["checkout.com", "mollie.com", "notion.com", "linear.app"]
+
+ranked = client.companies.search(
+  lookalike: { domains: customers },
+  filter: { domain: prospects },
+  page_size: 100
+)
+
+scores = ranked["scores"] || {}
+ranked["items"].each_with_index do |company, index|
+  puts "#{index + 1} #{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$customers = ['stripe.com', 'adyen.com'];
+$prospects = ['checkout.com', 'mollie.com', 'notion.com', 'linear.app'];
+
+$ranked = $client->companies->search(
+    lookalike: ['domains' => $customers],
+    filter: ['domain' => $prospects],
+    pageSize: 100,
+);
+
+foreach ($ranked['items'] as $index => $company) {
+    echo $index + 1, ' ', $company['domain'], ' ', $ranked['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com \
+  --domain checkout.com,mollie.com,notion.com,linear.app --limit 100
+```
+
+</CodeGroup>
+
+The response holds the matching prospects, most similar first, and a `scores` object keyed by company ID. This example is shortened and shows fictional companies.
+
+```json
+{
+  "items": [
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Acme Payments",
+      "domain": "acme-payments.example",
+      "employees": "201-500",
+      "industry": "Financial Transactions Processing",
+      "updatedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "id": "6d7e8f90-1a2b-4c3d-8e4f-5a6b7c8d9e0f",
+      "name": "Sample Checkout",
+      "domain": "sample-checkout.example",
+      "employees": "51-200",
+      "industry": "Financial Transactions Processing",
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "scores": {
+    "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d": 0.97,
+    "6d7e8f90-1a2b-4c3d-8e4f-5a6b7c8d9e0f": 0.84
+  }
+}
+```
+
+How to read the result:
+
+* **The order is the ranking.** Keep the prospects in the order returned.
+* **Not every prospect comes back.** The response holds the prospects that resemble the seeds. A prospect that is missing was not close enough to be returned.
+* **You pay for what comes back.** Each returned company costs 5 credits. A search that returns no companies costs 5 credits.
+* **Scores are not percentages.** They rank companies within one response, and a score can be above 1.
+
+The later examples on this page reuse the `client`, `customers`, and `prospects` created here.
+
+## Mark the prospects that did not come back
+
+Compare the domains in the response with your list to split it into prospects that resemble your customers and prospects that do not.
+
+<CodeGroup>
+
+```javascript JavaScript
+const matched = new Set(ranked.items.map((company) => company.domain));
+const notSimilar = prospects.filter((domain) => !matched.has(domain));
+
+console.log('Resemble your customers:', [...matched]);
+console.log('Did not come back:', notSimilar);
+```
+
+```python Python
+matched = [company["domain"] for company in ranked["items"]]
+not_similar = [domain for domain in prospects if domain not in matched]
+
+print("Resemble your customers:", matched)
+print("Did not come back:", not_similar)
+```
+
+```ruby Ruby
+matched = ranked["items"].map { |company| company["domain"] }
+not_similar = prospects - matched
+
+puts "Resemble your customers: #{matched.join(', ')}"
+puts "Did not come back: #{not_similar.join(', ')}"
+```
+
+```php PHP
+$matched = array_column($ranked['items'], 'domain');
+$notSimilar = array_values(array_diff($prospects, $matched));
+
+echo 'Resemble your customers: ', implode(', ', $matched), PHP_EOL;
+echo 'Did not come back: ', implode(', ', $notSimilar), PHP_EOL;
+```
+
+</CodeGroup>
+
+The `domain` in a record is the company's primary domain, so list each prospect under the domain of its main website.
+
+## See the ranking for free first
+
+If your plan includes previews, the preview endpoint takes the same fields and returns up to 25 company summaries with their scores, at no cost. Use it to rank a short list, or to check a longer one before you pay.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search/preview \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com"]},
+    "filter": {"domain": ["checkout.com", "mollie.com", "notion.com", "linear.app"]}
+  }'
+```
+
+```javascript JavaScript
+const preview = await client.companies.preview({
+  lookalike: { domains: customers },
+  filter: { domain: prospects },
+});
+
+for (const company of preview.items) {
+  console.log(company.name, preview.scores?.[company.id]);
+}
+```
+
+```python Python
+preview = client.companies.preview(
+    lookalike={"domains": customers},
+    filter={"domain": prospects},
+)
+
+preview_scores = preview.get("scores") or {}
+for company in preview["items"]:
+    print(company.get("name"), preview_scores.get(company["id"]))
+```
+
+```ruby Ruby
+preview = client.companies.preview(
+  lookalike: { domains: customers },
+  filter: { domain: prospects }
+)
+
+preview_scores = preview["scores"] || {}
+preview["items"].each do |company|
+  puts "#{company['name']} #{preview_scores[company['id']]}"
+end
+```
+
+```php PHP
+$preview = $client->companies->preview(
+    lookalike: ['domains' => $customers],
+    filter: ['domain' => $prospects],
+);
+
+foreach ($preview['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $preview['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company preview --similar-to stripe.com,adyen.com \
+  --domain checkout.com,mollie.com,notion.com,linear.app
+```
+
+</CodeGroup>
+
+A preview summary has the company's `id`, `name`, `logoUrl`, `industry`, and `updatedAt`. It does not include the domain, so match the summaries to your list by name, or run the paid search when you need the full records.
+
+## Rank a longer list
+
+A page holds at most 100 companies. For a longer prospect list, follow `nextCursor` with the same request, or use the SDK helper that does it for you, and keep the companies in the order they arrive. See [Fetch every result](/docs/company-search-api-examples#fetch-every-result).
+
+A filter accepts a limited number of domains, and the limit depends on your plan. A request over the limit returns `400` with the message `Too many search terms supplied`. Split a list that long across several searches. Each part is ranked on its own, because scores do not compare across responses.
+
+To get the ranking as a file, run an export with the same `lookalike` and `filter` fields. The CSV has a `score` column next to the company columns. See [Export lookalikes to CSV](/docs/similar-companies-api-examples#export-lookalikes-to-csv).
+
+## Common questions
+
+### Why did some of my prospects not come back?
+
+The search returns the prospects that resemble your seeds. A prospect that is missing from the response was not close enough to the seeds to be returned, so treat it as a weak fit.
+
+### Can I compare scores from two different searches?
+
+No. A score ranks a company within its own response. To compare two sets of prospects, send them in the same request.
+
+### How many seeds can I use?
+
+Between 1 and 10 customer domains. With more customers, see [Use more than 10 customers](/docs/find-companies-like-your-customers#use-more-than-10-customers).
+
+### What does ranking a list cost?
+
+5 credits for each prospect that comes back. Prospects that are not returned cost nothing, and a search that returns no companies costs 5 credits. Previews are free on plans that include them.
+
+### How do I find new companies instead of ranking ones I have?
+
+Leave out the `domain` filter. The search then returns lookalikes from the whole dataset. See [Find companies like your best customers](/docs/find-companies-like-your-customers).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find companies like your best customers" icon="users" href="/docs/find-companies-like-your-customers">
+    Find new accounts that resemble your customers.
+  </Card>
+  <Card title="Similar Companies API" icon="clone" href="/docs/similar-companies-api">
+    Seeds, ranking, scores, pricing, and limits.
+  </Card>
+  <Card title="Similar Companies API filters" icon="filter" href="/docs/similar-companies-api-filters">
+    Every way to narrow a lookalike search.
+  </Card>
+  <Card title="Enrich a list of company domains" icon="list" href="/docs/enrich-a-list-of-company-domains">
+    Add company data to the same prospect list.
+  </Card>
+</CardGroup>

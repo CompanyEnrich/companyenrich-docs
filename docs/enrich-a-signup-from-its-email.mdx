@@ -1,0 +1,409 @@
+---
+title: "Enrich a signup from its email address"
+sidebarTitle: "Enrich a signup"
+description: "Turn a signup's work email into the person and their company: name, job title, seniority, and employer, then route the lead by seniority and company size."
+---
+
+To enrich a signup from its email address, send the address to the [Reverse Email Lookup API](/docs/reverse-email-lookup-api), `POST /v2/people/enrich`. It returns the person behind a work email: name, job title, seniority, department, LinkedIn URL, and work history, with the employer marked. A lookup costs 5 credits when a person is returned, and nothing when there is no match.
+
+| You want                      | Use                                                                                     | Credits                          |
+| ----------------------------- | --------------------------------------------------------------------------------------- | -------------------------------- |
+| The person and their employer | The reverse email lookup on this page                                                   | 5 when a person is returned      |
+| The company only              | [Enrich the email's domain](/docs/identify-company-from-email)                          | 1 when a company is returned     |
+
+## Look up the person behind a signup email
+
+This example skips addresses at free email providers, looks up the rest, and treats a `404` as no match. The address shown is a placeholder on a reserved domain, so replace it with a real work email.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/people/enrich \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.doe@acme-analytics.example"
+  }'
+```
+
+```javascript JavaScript
+import { CompanyEnrich, NotFoundError } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const FREE_PROVIDERS = new Set([
+  'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me',
+]);
+
+async function personForEmail(email) {
+  const domain = email.split('@').pop().trim().toLowerCase();
+  if (FREE_PROVIDERS.has(domain)) return null;
+
+  try {
+    return await client.people.enrich({ email });
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
+  }
+}
+
+const person = await personForEmail('jane.doe@acme-analytics.example');
+const job = person?.experiences?.find((experience) => experience.isMatched);
+
+console.log(person?.name, person?.position, person?.seniority, job?.company?.name);
+```
+
+```python Python
+from companyenrich import CompanyEnrich, NotFoundError
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+FREE_PROVIDERS = {
+    "gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
+}
+
+
+def person_for_email(email):
+    domain = email.rsplit("@", 1)[-1].strip().lower()
+    if domain in FREE_PROVIDERS:
+        return None
+
+    try:
+        return client.people.enrich(email)
+    except NotFoundError:
+        return None
+
+
+person = person_for_email("jane.doe@acme-analytics.example") or {}
+job = next((e for e in person.get("experiences") or [] if e.get("isMatched")), {})
+
+print(person.get("name"), person.get("position"), person.get("seniority"), (job.get("company") or {}).get("name"))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+FREE_PROVIDERS = %w[gmail.com outlook.com hotmail.com yahoo.com icloud.com proton.me].freeze
+
+person_for_email = lambda do |email|
+  domain = email.split("@").last.strip.downcase
+  next nil if FREE_PROVIDERS.include?(domain)
+
+  begin
+    client.people.enrich(email)
+  rescue CompanyEnrich::NotFoundError
+    nil
+  end
+end
+
+person = person_for_email.call("jane.doe@acme-analytics.example") || {}
+job = (person["experiences"] || []).find { |experience| experience["isMatched"] } || {}
+
+puts "#{person['name']} #{person['position']} #{person['seniority']} #{job.dig('company', 'name')}"
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+use CompanyEnrich\Exception\NotFoundException;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+const FREE_PROVIDERS = ['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me'];
+
+function personForEmail(Client $client, string $email): ?array
+{
+    $parts = explode('@', $email);
+    $domain = strtolower(trim(end($parts)));
+    if (in_array($domain, FREE_PROVIDERS, true)) {
+        return null;
+    }
+
+    try {
+        return $client->people->enrich($email);
+    } catch (NotFoundException) {
+        return null;
+    }
+}
+
+$person = personForEmail($client, 'jane.doe@acme-analytics.example') ?? [];
+
+$job = [];
+foreach ($person['experiences'] ?? [] as $experience) {
+    if ($experience['isMatched']) {
+        $job = $experience;
+        break;
+    }
+}
+
+echo $person['name'] ?? '', ' ', $person['position'] ?? '', ' ', $person['seniority'] ?? '', ' ',
+    $job['company']['name'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich people enrich jane.doe@acme-analytics.example
+```
+
+</CodeGroup>
+
+The response is one [person record](/docs/person-schema). This example is shortened and shows a fictional person.
+
+```json
+{
+  "id": 9000000000001,
+  "name": "Jane Doe",
+  "position": "VP of Sales",
+  "seniority": "vp",
+  "department": "sales",
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/in/janedoe-example"
+  },
+  "experiences": [
+    {
+      "startDate": "2021-03-01",
+      "isCurrent": true,
+      "isMatched": true,
+      "position": "VP of Sales",
+      "seniority": "vp",
+      "department": "sales",
+      "company": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example",
+        "industry": "Software Publishers"
+      }
+    }
+  ],
+  "updatedAt": "2026-09-15T08:30:00Z"
+}
+```
+
+How to read it:
+
+* **The employer.** The job at the company behind the email's domain has `isMatched` set to `true`.
+* **The match.** The API returns the best match for the address at that company, based on common email address patterns. Check the name against what the signup entered before you rely on it.
+* **Work addresses only.** The lookup starts from the company behind the email's domain, so an address at a free email provider has nothing to resolve. The example skips those.
+
+The list of free providers is a starting point. Extend it with the providers your signups use. The later examples on this page reuse the `client`, the `person`, and the matched `job` from this one.
+
+## Add the company profile
+
+A person record names each employer with a short summary: `id`, `name`, `domain`, `logoUrl`, and `industry`. To get the company's size, revenue range, and location, you have two options.
+
+| Option                                    | What you get                                             | Credits                                                        |
+| ----------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| Enrich the employer's domain separately   | The profile of the one company you need                  | 5 for the person, plus 1 for the company                       |
+| The `company` expansion on the lookup     | The profile of every employer in the work history        | 5 for the person, plus 1 for each unique company, current and past |
+
+The separate enrichment costs the same for every signup. The expansion costs more for a person with a long work history. This example enriches the matched employer's domain.
+
+<CodeGroup>
+
+```bash cURL
+# Use the "domain" of the matched company from the lookup response.
+curl "https://api.companyenrich.com/v2/companies/enrich?domain=acme-analytics.example" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+```javascript JavaScript
+let company = null;
+
+if (job?.company?.domain) {
+  try {
+    company = await client.companies.enrich({ domain: job.company.domain });
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error;
+  }
+}
+
+console.log(company?.name, company?.employees, company?.revenue, company?.location?.country?.code);
+```
+
+```python Python
+company = {}
+domain = (job.get("company") or {}).get("domain")
+
+if domain:
+    try:
+        company = client.companies.enrich(domain)
+    except NotFoundError:
+        pass
+
+print(
+    company.get("name"),
+    company.get("employees"),
+    company.get("revenue"),
+    ((company.get("location") or {}).get("country") or {}).get("code"),
+)
+```
+
+```ruby Ruby
+company = {}
+domain = job.dig("company", "domain")
+
+if domain
+  begin
+    company = client.companies.enrich(domain)
+  rescue CompanyEnrich::NotFoundError
+    company = {}
+  end
+end
+
+puts "#{company['name']} #{company['employees']} #{company['revenue']} #{company.dig('location', 'country', 'code')}"
+```
+
+```php PHP
+$company = [];
+$domain = $job['company']['domain'] ?? null;
+
+if ($domain !== null) {
+    try {
+        $company = $client->companies->enrich($domain);
+    } catch (NotFoundException) {
+        $company = [];
+    }
+}
+
+echo $company['name'] ?? '', ' ', $company['employees'] ?? '', ' ', $company['revenue'] ?? '', ' ',
+    $company['location']['country']['code'] ?? '', PHP_EOL;
+```
+
+```bash CLI
+companyenrich company enrich acme-analytics.example --fields name,domain,employees,revenue,industry
+```
+
+</CodeGroup>
+
+To use the expansion instead, send `"expand": ["company"]` with the lookup. See [Get the person with their company profile](/docs/reverse-email-lookup-api-examples#get-the-person-with-their-company-profile).
+
+## Route the signup by seniority and company size
+
+With the person and the company, you can decide where a signup goes. This example sends senior people at companies with more than 200 employees to sales, and flags the signups that meet one of the two conditions for review.
+
+<CodeGroup>
+
+```javascript JavaScript
+const SENIOR = new Set(['owner', 'founder', 'c-suite', 'partner', 'vp', 'head', 'director']);
+const LARGE = new Set(['201-500', '501-1K', '1K-5K', '5K-10K', 'over-10K']);
+
+function routeFor(person, company) {
+  const senior = SENIOR.has(person?.seniority);
+  const large = LARGE.has(company?.employees);
+
+  if (senior && large) return 'sales';
+  if (senior || large) return 'review';
+  return 'self-serve';
+}
+
+console.log(routeFor(person, company));
+```
+
+```python Python
+SENIOR = {"owner", "founder", "c-suite", "partner", "vp", "head", "director"}
+LARGE = {"201-500", "501-1K", "1K-5K", "5K-10K", "over-10K"}
+
+
+def route_for(person, company):
+    senior = (person or {}).get("seniority") in SENIOR
+    large = (company or {}).get("employees") in LARGE
+
+    if senior and large:
+        return "sales"
+    if senior or large:
+        return "review"
+    return "self-serve"
+
+
+print(route_for(person, company))
+```
+
+```ruby Ruby
+SENIOR = %w[owner founder c-suite partner vp head director].freeze
+LARGE = %w[201-500 501-1K 1K-5K 5K-10K over-10K].freeze
+
+route_for = lambda do |person, company|
+  senior = SENIOR.include?((person || {})["seniority"])
+  large = LARGE.include?((company || {})["employees"])
+
+  next "sales" if senior && large
+  next "review" if senior || large
+
+  "self-serve"
+end
+
+puts route_for.call(person, company)
+```
+
+```php PHP
+function routeFor(?array $person, ?array $company): string
+{
+    $senior = in_array($person['seniority'] ?? null, ['owner', 'founder', 'c-suite', 'partner', 'vp', 'head', 'director'], true);
+    $large = in_array($company['employees'] ?? null, ['201-500', '501-1K', '1K-5K', '5K-10K', 'over-10K'], true);
+
+    return match (true) {
+        $senior && $large => 'sales',
+        $senior || $large => 'review',
+        default => 'self-serve',
+    };
+}
+
+echo routeFor($person, $company), PHP_EOL;
+```
+
+</CodeGroup>
+
+`seniority` is one of 11 [seniority levels](/docs/field-values#seniority-levels), and `employees` is one of eight [employee ranges](/docs/field-values#employee-ranges). The person's `department` and the company's `industry` and `revenue` work the same way for other rules.
+
+## Handle signups that do not match
+
+Not every address resolves to a person. Plan for both cases:
+
+* **No person at a known company.** The lookup returns `404` and costs nothing. You can still get the company by enriching the email's domain for 1 credit. See [Identify the company behind a signup email](/docs/identify-company-from-email).
+* **A personal address.** An address at a free email provider has no company behind its domain, so there is no person or company to return. Ask for a work email or a company name on the form.
+
+## Common questions
+
+### Can the lookup find the employer behind a personal Gmail address?
+
+No. The lookup resolves the company from the email's domain and then matches a person at that company, so it is built for work email addresses. For a signup with a personal address, ask for a work email or a company name.
+
+### Am I charged when no person is found?
+
+No. A lookup with no match returns `404` and costs nothing.
+
+### How sure is the match?
+
+The API returns the best match for the address at that company, based on common email address patterns such as `first.last`. Compare the returned name with the name the signup entered before you rely on it.
+
+### Can I enrich many signups in one request?
+
+No. The lookup takes one email address per request, so send one request for each signup. See [Look up a list of emails](/docs/reverse-email-lookup-api-examples#look-up-a-list-of-emails).
+
+### What does enriching a signup cost?
+
+5 credits when a person is returned, plus 1 credit when you enrich the employer's domain for the company profile. A signup with no match costs nothing for the lookup.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reverse Email Lookup API" icon="at" href="/docs/reverse-email-lookup-api">
+    How the match works, expansions, pricing, and limits.
+  </Card>
+  <Card title="Identify the company behind a signup email" icon="building" href="/docs/identify-company-from-email">
+    Get the company only, for 1 credit.
+  </Card>
+  <Card title="Person schema" icon="table-list" href="/docs/person-schema">
+    Every field in a person record.
+  </Card>
+  <Card title="Field values" icon="list" href="/docs/field-values#seniority-levels">
+    Seniority levels, departments, and employee ranges.
+  </Card>
+</CardGroup>

@@ -1,0 +1,316 @@
+---
+title: "Give an AI agent a company search tool"
+sidebarTitle: "Search tool for AI agents"
+description: "Let an AI agent find companies from a plain-language description: a tool definition for semantic company search, its handler, and limits on credit spend."
+---
+
+To give an AI agent company search, define one tool that takes a plain-language description and calls the [Semantic Company Search API](/docs/semantic-company-search-api). The agent describes the companies it wants, and the API returns full company records that the agent can use in its next steps without a second lookup. A semantic search costs 2 credits per company returned.
+
+There are three ways to connect an agent. This page covers the second.
+
+| Route                  | Use it when                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| [MCP server](/docs/mcp-server) | The agent runs in an MCP client such as Claude, Codex, Cursor, or VS Code. No code is needed. |
+| A tool you define      | You build the agent yourself and control its tool list.                     |
+| [CLI](/docs/cli#use-it-in-scripts-and-ai-agents) | The agent can run shell commands.                 |
+
+## Define the tool
+
+A tool has a name, a description the model reads to decide when to call it, and a JSON Schema for its input. This definition takes a description of the companies, two optional exact filters, and a limit.
+
+```json
+{
+  "name": "find_companies",
+  "description": "Find companies from a plain-language description of what they do, such as \"vertical SaaS for dentists\". Returns up to `limit` companies with their name, domain, description, industry, size, and country. Costs 2 credits per company returned.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "description": {
+        "type": "string",
+        "maxLength": 500,
+        "description": "What the companies do, in plain language."
+      },
+      "countries": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Two-letter country codes, such as US or DE. Use only when the user names a country."
+      },
+      "employees": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["1-10", "11-50", "51-200", "201-500", "501-1K", "1K-5K", "5K-10K", "over-10K"]
+        },
+        "description": "Employee ranges. Use only when the user gives a company size."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25,
+        "default": 10,
+        "description": "The most companies to return."
+      }
+    },
+    "required": ["description"]
+  }
+}
+```
+
+Model providers name the outer fields differently, so adapt `parameters` to the key your provider uses for the input schema. Put the cost in the tool description, as this one does, so the model can weigh it before it calls the tool.
+
+## Write the handler
+
+The handler turns the tool input into a search. It counts the matches first, which is free, then fetches one page and returns a short version of each company to the model.
+
+<CodeGroup>
+
+```javascript JavaScript
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+async function findCompanies({ description, countries, employees, limit = 10 }) {
+  const filter = {};
+  if (countries?.length) filter.country = countries;
+  if (employees?.length) filter.employees = employees;
+
+  const query = { semantic: { query: description } };
+  if (Object.keys(filter).length) query.filter = filter;
+
+  // The count is free. A count of 0 means a search would return nothing and still cost 2 credits.
+  const { count, interpretation } = await client.companies.count(query);
+  if (count === 0) {
+    return { companies: [], interpretation, note: 'No companies match. Try a broader description.' };
+  }
+
+  const page = await client.companies.search({ ...query, pageSize: Math.min(limit, 25) });
+
+  return {
+    interpretation: page.interpretation,
+    companies: page.items.map((company) => ({
+      id: company.id,
+      name: company.name,
+      domain: company.domain,
+      description: company.description,
+      industry: company.industry,
+      employees: company.employees,
+      country: company.location?.country?.code,
+    })),
+  };
+}
+
+const result = await findCompanies({
+  description: 'vertical SaaS for dentists',
+  countries: ['US', 'CA'],
+});
+console.log(JSON.stringify(result, null, 2));
+```
+
+```python Python
+import json
+
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+
+def find_companies(description, countries=None, employees=None, limit=10):
+    filters = {}
+    if countries:
+        filters["country"] = countries
+    if employees:
+        filters["employees"] = employees
+
+    query = {"semantic": {"query": description}}
+    if filters:
+        query["filter"] = filters
+
+    # The count is free. A count of 0 means a search would return nothing and still cost 2 credits.
+    counted = client.companies.count(**query)
+    if counted["count"] == 0:
+        return {
+            "companies": [],
+            "interpretation": counted.get("interpretation"),
+            "note": "No companies match. Try a broader description.",
+        }
+
+    page = client.companies.search(**query, page_size=min(limit, 25))
+
+    return {
+        "interpretation": page.get("interpretation"),
+        "companies": [
+            {
+                "id": company["id"],
+                "name": company.get("name"),
+                "domain": company["domain"],
+                "description": company.get("description"),
+                "industry": company.get("industry"),
+                "employees": company.get("employees"),
+                "country": ((company.get("location") or {}).get("country") or {}).get("code"),
+            }
+            for company in page["items"]
+        ],
+    }
+
+
+result = find_companies("vertical SaaS for dentists", countries=["US", "CA"])
+print(json.dumps(result, indent=2))
+```
+
+</CodeGroup>
+
+Register the definition with your model provider, and call the handler when the model uses the tool. The handler returns this to the model. The example is shortened and shows a fictional company.
+
+```json
+{
+  "interpretation": {
+    "boost": { "categories": ["saas"] }
+  },
+  "companies": [
+    {
+      "id": "9d4e5f60-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      "name": "Acme Dental Cloud",
+      "domain": "acme-dental-cloud.example",
+      "description": "Acme Dental Cloud builds practice management software for dental clinics.",
+      "industry": "Software Publishers",
+      "employees": "51-200",
+      "country": "US"
+    }
+  ]
+}
+```
+
+`interpretation` reports what the API read from the description, such as a location or a size. Passing it to the model lets the agent see how its words were understood and rephrase when the reading is wrong.
+
+## Send the same request yourself
+
+Before you connect the tool, send the request it makes and look at the full response. This is the search the handler runs for the call above.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semantic": {"query": "vertical SaaS for dentists"},
+    "filter": {"country": ["US", "CA"]},
+    "pageSize": 10
+  }'
+```
+
+```javascript JavaScript
+const page = await client.companies.search({
+  semantic: { query: 'vertical SaaS for dentists' },
+  filter: { country: ['US', 'CA'] },
+  pageSize: 10,
+});
+
+for (const company of page.items) {
+  console.log(company.name, company.domain);
+}
+```
+
+```python Python
+page = client.companies.search(
+    semantic={"query": "vertical SaaS for dentists"},
+    filter={"country": ["US", "CA"]},
+    page_size=10,
+)
+
+for company in page["items"]:
+    print(company.get("name"), company["domain"])
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+page = client.companies.search(
+  semantic: { query: "vertical SaaS for dentists" },
+  filter: { country: ["US", "CA"] },
+  page_size: 10
+)
+
+page["items"].each do |company|
+  puts "#{company['name']} (#{company['domain']})"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$page = $client->companies->search(
+    semantic: ['query' => 'vertical SaaS for dentists'],
+    filter: ['country' => ['US', 'CA']],
+    pageSize: 10,
+);
+
+foreach ($page['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company search --semantic "vertical SaaS for dentists" --country US,CA --limit 10
+```
+
+</CodeGroup>
+
+Each item in the response is a full [company record](/docs/company-schema), so the agent does not need to enrich the companies it finds. The handler above returns seven fields from each record to keep the model's context small. Return more fields when your agent needs them.
+
+## Keep the agent's spending in check
+
+An agent decides for itself when to call a tool, so set the limits in the handler and not in the prompt.
+
+* **Count before you search.** The count endpoint is free and takes the same query. A search that returns nothing still costs 2 credits, and the count catches it first.
+* **Cap the page size.** You pay for every company on a page. The handler above allows at most 25, which is at most 50 credits per call.
+* **Return one page per call.** Do not follow `nextCursor` automatically. If the agent needs more, let it ask again.
+* **Add expansions only when needed.** Each value in `expand`, such as `technologies` or `financial`, adds 1 credit per company.
+* **Watch the balance.** [`GET /v2/me`](/api-reference/v2/get-me) is free and returns the credits used and the total allowance.
+
+## Common questions
+
+### Does the agent need to enrich the companies it finds?
+
+No. A search returns full company records with the name, domain, description, industry, size, revenue range, location, and social profiles. Enrich a company only to add an expansion you did not request in the search. See [Company Enrichment API](/docs/company-enrichment-api).
+
+### What does one tool call cost?
+
+2 credits for each company returned, so 20 credits for 10 companies. The count that runs first is free.
+
+### Why did the search apply a filter the agent did not send?
+
+By default, the API reads a location, a size, a founding year, or funding from the description and applies it as a filter. The `interpretation` in the response shows what it applied. A filter the tool sends takes precedence over an inferred value of the same kind, and `semantic.autoFilter` set to `false` turns the inference off.
+
+### Should the tool use semantic search or filters?
+
+Semantic search fits an agent that starts from a description. When the agent already has exact criteria, such as a country, a size range, and a technology, a [filter search](/docs/company-search-api-filters) costs 1 credit per company. The two work together in one request.
+
+### Can the agent search for people in the same way?
+
+Yes. People search has its own semantic mode. See [Describe who you want](/docs/people-search-api-examples#describe-who-you-want).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="MCP server" icon="robot" href="/docs/mcp-server">
+    Connect Claude, Codex, Cursor, and other MCP clients with no code.
+  </Card>
+  <Card title="Semantic Company Search API" icon="wand-magic-sparkles" href="/docs/semantic-company-search-api">
+    How a description is interpreted, ranked, and priced.
+  </Card>
+  <Card title="Find companies in a niche from a description" icon="magnifying-glass" href="/docs/find-companies-in-a-niche">
+    Check a description for free, then narrow it with filters.
+  </Card>
+  <Card title="Credits" icon="coins" href="/docs/credits">
+    What each search and expansion costs.
+  </Card>
+</CardGroup>

@@ -1,0 +1,378 @@
+---
+title: "Find lookalikes of your closed-won deals"
+sidebarTitle: "Closed-won lookalikes"
+description: "Turn a CRM export of closed-won deals into net-new lookalike accounts: pick the seeds, exclude accounts already in your CRM, and rank your open pipeline."
+---
+
+To find lookalikes of your closed-won deals, send the domains of up to 10 won accounts as seeds to the [Similar Companies API](/docs/similar-companies-api). It returns the companies that resemble them, in ranked order, each with a similarity score. Exclude the accounts already in your CRM to get net-new companies only. A lookalike search costs 5 credits per company returned.
+
+## Find net-new accounts that resemble your wins
+
+A closed-won deal is an opportunity your team marked as won in the CRM. The API needs only the domain of the account behind it. The examples on this page read a deal export named `deals.csv` with one row per deal:
+
+```csv
+domain,stage,amount,close_date
+stripe.com,closed-won,48000,2026-09-12
+adyen.com,closed-won,36000,2026-08-03
+checkout.com,closed-won,30000,2026-06-21
+mollie.com,open,24000,
+linear.app,open,12000,
+notion.com,closed-lost,18000,2026-07-15
+```
+
+This example takes the 10 largest closed-won deals as seeds and excludes every account in the file, whatever its stage, so the results are companies your team has not worked yet.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com", "checkout.com"]},
+    "filter": {
+      "domain": {"notIn": ["stripe.com", "adyen.com", "checkout.com", "mollie.com", "linear.app", "notion.com"]}
+    },
+    "pageSize": 25
+  }'
+```
+
+```javascript JavaScript
+import { readFileSync } from 'node:fs';
+
+import { CompanyEnrich } from '@companyenrich/sdk';
+
+const client = new CompanyEnrich(); // reads COMPANYENRICH_API_KEY
+
+const [header, ...rows] = readFileSync('deals.csv', 'utf8').trim().split(/\r?\n/);
+const columns = header.split(',');
+const deals = rows.map((row) => Object.fromEntries(row.split(',').map((value, i) => [columns[i], value])));
+
+const won = deals
+  .filter((deal) => deal.stage === 'closed-won')
+  .sort((a, b) => Number(b.amount) - Number(a.amount));
+
+const seeds = [...new Set(won.map((deal) => deal.domain))].slice(0, 10);
+const inCrm = [...new Set(deals.map((deal) => deal.domain))];
+
+const lookalikes = await client.companies.search({
+  lookalike: { domains: seeds },
+  filter: { domain: { notIn: inCrm } },
+  pageSize: 25,
+});
+
+for (const company of lookalikes.items) {
+  console.log(company.name, company.domain, lookalikes.scores?.[company.id]);
+}
+```
+
+```python Python
+import csv
+
+from companyenrich import CompanyEnrich
+
+client = CompanyEnrich()  # reads COMPANYENRICH_API_KEY
+
+with open("deals.csv", newline="") as file:
+    deals = list(csv.DictReader(file))
+
+won = sorted(
+    (deal for deal in deals if deal["stage"] == "closed-won"),
+    key=lambda deal: float(deal["amount"]),
+    reverse=True,
+)
+
+seeds = list(dict.fromkeys(deal["domain"] for deal in won))[:10]
+in_crm = list(dict.fromkeys(deal["domain"] for deal in deals))
+
+lookalikes = client.companies.search(
+    lookalike={"domains": seeds},
+    filter={"domain": {"notIn": in_crm}},
+    page_size=25,
+)
+
+scores = lookalikes.get("scores") or {}
+for company in lookalikes["items"]:
+    print(company.get("name"), company["domain"], scores.get(company["id"]))
+```
+
+```ruby Ruby
+require "companyenrich"
+
+client = CompanyEnrich::Client.new # reads COMPANYENRICH_API_KEY
+
+header, *rows = File.readlines("deals.csv", chomp: true)
+columns = header.split(",")
+deals = rows.map { |row| columns.zip(row.split(",", -1)).to_h }
+
+won = deals.select { |deal| deal["stage"] == "closed-won" }
+           .sort_by { |deal| -deal["amount"].to_f }
+
+seeds = won.map { |deal| deal["domain"] }.uniq.first(10)
+in_crm = deals.map { |deal| deal["domain"] }.uniq
+
+lookalikes = client.companies.search(
+  lookalike: { domains: seeds },
+  filter: { domain: { notIn: in_crm } },
+  page_size: 25
+)
+
+scores = lookalikes["scores"] || {}
+lookalikes["items"].each do |company|
+  puts "#{company['name']} #{company['domain']} #{scores[company['id']]}"
+end
+```
+
+```php PHP
+<?php
+
+require 'vendor/autoload.php';
+
+use CompanyEnrich\Client;
+
+$client = new Client(); // reads COMPANYENRICH_API_KEY
+
+$rows = array_map(
+    fn (string $line) => str_getcsv($line, ',', '"', ''),
+    file('deals.csv', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES),
+);
+$columns = array_shift($rows);
+$deals = array_map(fn (array $row) => array_combine($columns, $row), $rows);
+
+$won = array_values(array_filter($deals, fn (array $deal) => $deal['stage'] === 'closed-won'));
+usort($won, fn (array $a, array $b) => (float) $b['amount'] <=> (float) $a['amount']);
+
+$seeds = array_slice(array_values(array_unique(array_column($won, 'domain'))), 0, 10);
+$inCrm = array_values(array_unique(array_column($deals, 'domain')));
+
+$lookalikes = $client->companies->search(
+    lookalike: ['domains' => $seeds],
+    filter: ['domain' => ['notIn' => $inCrm]],
+    pageSize: 25,
+);
+
+foreach ($lookalikes['items'] as $company) {
+    echo $company['name'] ?? '', ' ', $company['domain'], ' ', $lookalikes['scores'][$company['id']] ?? '', PHP_EOL;
+}
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com checkout.com \
+  --exclude-domain stripe.com,adyen.com,checkout.com,mollie.com,linear.app,notion.com --limit 25
+```
+
+</CodeGroup>
+
+The response lists the lookalikes in ranked order and has a `scores` object keyed by company ID. This example is shortened and shows a fictional company.
+
+```json
+{
+  "items": [
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Acme Payments",
+      "domain": "acme-payments.example",
+      "employees": "201-500",
+      "industry": "Financial Transactions Processing",
+      "categories": ["saas", "b2b"],
+      "location": {
+        "country": { "code": "US", "name": "United States" }
+      },
+      "updatedAt": "2026-10-01T12:00:00Z"
+    }
+  ],
+  "scores": {
+    "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d": 0.87
+  },
+  "nextCursor": "NEXT_CURSOR"
+}
+```
+
+How to read the result:
+
+* **Keep the order returned.** Scores are ranking scores, not probabilities, and they compare companies within one response only.
+* **You pay for the page.** 25 lookalikes cost 25 × 5 = 125 credits, so start with a small `pageSize`.
+* **Use each account's primary domain.** A record's `domain` is the domain of the company's main website, and the exclusion matches on it.
+
+The code reads a simple export with no quoted fields. If your CRM export has commas inside quoted values, such as account names, parse it with a CSV library. The later examples on this page reuse the `client`, the `deals`, and the `seeds` created here.
+
+## Choose which wins to use as seeds
+
+A request takes 1 to 10 seeds, and the seeds describe the kind of company you want more of. Pick them from the wins you want to repeat:
+
+| You want more of              | Choose the seeds by                                                   |
+| ----------------------------- | --------------------------------------------------------------------- |
+| Your largest deals            | Sorting closed-won deals by `amount`, as the example does             |
+| What is selling now           | Sorting by `close_date`, newest first                                 |
+| One segment at a time         | Keeping the rows for one segment, plan, or region before you sort     |
+
+With more than 10 wins to use, run one search for each group of up to 10 and merge the results by company ID. See [Use more than 10 customers](/docs/find-companies-like-your-customers#use-more-than-10-customers).
+
+## Rank your open pipeline against closed-won
+
+The same seeds can score the deals you are already working. Put the open accounts in `filter.domain`, and the search considers only those companies. The ones that most resemble your past wins come first.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.companyenrich.com/v2/companies/search \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lookalike": {"domains": ["stripe.com", "adyen.com", "checkout.com"]},
+    "filter": {"domain": ["mollie.com", "linear.app"]},
+    "pageSize": 100
+  }'
+```
+
+```javascript JavaScript
+const open = [...new Set(deals.filter((deal) => deal.stage === 'open').map((deal) => deal.domain))];
+
+const ranked = await client.companies.search({
+  lookalike: { domains: seeds },
+  filter: { domain: open },
+  pageSize: 100,
+});
+
+ranked.items.forEach((company, index) => {
+  console.log(index + 1, company.domain, ranked.scores?.[company.id]);
+});
+
+const returned = new Set(ranked.items.map((company) => company.domain));
+console.log('Did not come back:', open.filter((domain) => !returned.has(domain)));
+```
+
+```python Python
+open_accounts = list(dict.fromkeys(deal["domain"] for deal in deals if deal["stage"] == "open"))
+
+ranked = client.companies.search(
+    lookalike={"domains": seeds},
+    filter={"domain": open_accounts},
+    page_size=100,
+)
+
+ranked_scores = ranked.get("scores") or {}
+for rank, company in enumerate(ranked["items"], start=1):
+    print(rank, company["domain"], ranked_scores.get(company["id"]))
+
+returned = {company["domain"] for company in ranked["items"]}
+print("Did not come back:", [domain for domain in open_accounts if domain not in returned])
+```
+
+```ruby Ruby
+open_accounts = deals.select { |deal| deal["stage"] == "open" }.map { |deal| deal["domain"] }.uniq
+
+ranked = client.companies.search(
+  lookalike: { domains: seeds },
+  filter: { domain: open_accounts },
+  page_size: 100
+)
+
+ranked_scores = ranked["scores"] || {}
+ranked["items"].each_with_index do |company, index|
+  puts "#{index + 1} #{company['domain']} #{ranked_scores[company['id']]}"
+end
+
+returned = ranked["items"].map { |company| company["domain"] }
+puts "Did not come back: #{(open_accounts - returned).join(', ')}"
+```
+
+```php PHP
+$open = array_values(array_unique(array_column(
+    array_filter($deals, fn (array $deal) => $deal['stage'] === 'open'),
+    'domain',
+)));
+
+$ranked = $client->companies->search(
+    lookalike: ['domains' => $seeds],
+    filter: ['domain' => $open],
+    pageSize: 100,
+);
+
+foreach ($ranked['items'] as $index => $company) {
+    echo $index + 1, ' ', $company['domain'], ' ', $ranked['scores'][$company['id']] ?? '', PHP_EOL;
+}
+
+$returned = array_column($ranked['items'], 'domain');
+echo 'Did not come back: ', implode(', ', array_diff($open, $returned)), PHP_EOL;
+```
+
+```bash CLI
+companyenrich company similar stripe.com adyen.com checkout.com \
+  --domain mollie.com,linear.app --limit 100
+```
+
+</CodeGroup>
+
+Two things to know before you rely on the ranking:
+
+* **Not every open deal comes back.** The response holds the accounts that resemble the seeds. Treat the ones that are missing as the least similar.
+* **You pay for what comes back.** Each returned company costs 5 credits, and a search that returns no companies costs 5 credits.
+
+See [Rank a prospect list by similarity to your customers](/docs/rank-prospects-by-similarity) for a free preview of the ranking and for longer lists.
+
+## Exclude a large CRM
+
+A filter accepts a limited number of values, and the limit depends on your plan. A request with too many domains in `notIn` returns `400` with the message `Too many search terms supplied`.
+
+When your CRM has more accounts than the filter accepts:
+
+1. Send as many CRM domains in `notIn` as the filter accepts.
+2. Drop the remaining CRM accounts from the results in your code, by comparing each returned `domain` with your list.
+
+A company you drop this way still costs 5 credits, because the search returned it. Filters such as `country` and `employees` keep the search in your market, which also keeps accounts outside it from coming back.
+
+## Send the list to your CRM
+
+For a long list, run an export with the same seeds and exclusions. It gives you one CSV file to import, with a `score` column next to the company columns.
+
+```bash
+companyenrich company export --similar-to stripe.com,adyen.com,checkout.com \
+  --exclude-domain stripe.com,adyen.com,checkout.com,mollie.com,linear.app,notion.com \
+  --limit 1000 --wait -o closed-won-lookalikes.csv
+```
+
+An export costs the same 5 credits per company as the search, and `limit` sets the most companies it returns. See [Export lookalikes to CSV](/docs/similar-companies-api-examples#export-lookalikes-to-csv) for the same export in cURL and the SDKs.
+
+## Common questions
+
+### What is a closed-won lookalike?
+
+A company that resembles the accounts behind your closed-won deals. The Similar Companies API finds these companies from the domains of the accounts you won. It uses no other CRM field.
+
+### How many closed-won deals can I use as seeds?
+
+Between 1 and 10 domains in one request. For more, run one search per group of up to 10 and merge the results by company ID.
+
+### Can I use closed-lost deals as negative examples?
+
+No. A search takes one set of seeds, so you cannot send won accounts as positive examples and lost accounts as negative examples together. You can keep closed-lost accounts out of the results by adding their domains to `notIn`.
+
+### What if my CRM accounts have no domain?
+
+Find the domain from the account name first. See [Find a company's domain from its name](/docs/find-company-domain-by-name).
+
+### What does a closed-won lookalike list cost?
+
+5 credits for each company returned, plus 1 credit per company for each expansion. A search that returns no companies costs 5 credits. Previews are free on plans that include them.
+
+### How do I find contacts at the lookalike accounts?
+
+Search for people at the returned domains by seniority and department. See [Find decision makers at your target accounts](/docs/find-decision-makers).
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Find companies like your best customers" icon="users" href="/docs/find-companies-like-your-customers">
+    Seeds, previews, and searches with more than 10 customers.
+  </Card>
+  <Card title="Rank a prospect list by similarity" icon="ranking-star" href="/docs/rank-prospects-by-similarity">
+    Score the accounts you already have.
+  </Card>
+  <Card title="Similar Companies API filters" icon="filter" href="/docs/similar-companies-api-filters">
+    Keep lookalikes in your market.
+  </Card>
+  <Card title="Find decision makers at your target accounts" icon="user" href="/docs/find-decision-makers">
+    Get the people to contact at each account.
+  </Card>
+</CardGroup>

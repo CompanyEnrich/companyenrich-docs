@@ -85,7 +85,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "domains": ["stripe.com", "adyen.com", "notion.so"]
+    "domains": ["stripe.com", "adyen.com", "notion.com"]
   }'
 
 # 2. Check the batch until "status" is "completed".
@@ -102,7 +102,7 @@ curl "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?fo
 import { writeFile } from 'node:fs/promises';
 
 const job = await client.companies.bulkEnrichment.create({
-  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
 });
 
 await client.batches.waitForCompletion(job.id, {
@@ -114,7 +114,7 @@ await writeFile('enriched.csv', await response.text());
 ```
 
 ```python Python
-job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.so"])
+job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.com"])
 
 client.batches.wait_for_completion(
     job["id"],
@@ -126,7 +126,7 @@ with open("enriched.csv", "w", encoding="utf-8") as file:
 ```
 
 ```ruby Ruby
-job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.so"])
+job = client.companies.bulk_enrichment.create(["stripe.com", "adyen.com", "notion.com"])
 
 client.batches.wait_for_completion(job["id"]) do |batch|
   puts "#{batch['progress']['succeeded']}/#{batch['progress']['total']}"
@@ -136,7 +136,7 @@ File.write("enriched.csv", client.companies.bulk_enrichment.csv(job["id"]))
 ```
 
 ```php PHP
-$job = $client->companies->bulkEnrichment->create(['stripe.com', 'adyen.com', 'notion.so']);
+$job = $client->companies->bulkEnrichment->create(['stripe.com', 'adyen.com', 'notion.com']);
 
 $client->batches->waitForCompletion(
     $job['id'],
@@ -147,7 +147,7 @@ file_put_contents('enriched.csv', $client->companies->bulkEnrichment->csv($job['
 ```
 
 ```bash CLI
-companyenrich company bulk-enrich stripe.com adyen.com notion.so --wait -o enriched.csv
+companyenrich company bulk-enrich stripe.com adyen.com notion.com --wait -o enriched.csv
 ```
 
 </CodeGroup>

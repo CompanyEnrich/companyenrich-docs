@@ -1,10 +1,12 @@
 ---
 title: "Company Enrichment API examples"
-sidebarTitle: "Examples"
+sidebarTitle: "Every method"
 description: "Ready-to-run Company Enrichment API requests: enrich by domain, by name or LinkedIn URL, in batches of 50, and in bulk jobs of up to 10,000 domains, in cURL, four SDKs, and the CLI."
 ---
 
 Each example on this page is one [Company Enrichment API](/docs/company-enrichment-api) request, shown in cURL, the four official SDKs, and the CLI. Every version sends the same request.
+
+This page covers every enrichment method. For a specific job, such as enriching a file of domains or getting a company's funding rounds, see [Examples by task](#examples-by-task).
 
 ## Before you start
 
@@ -89,7 +91,27 @@ companyenrich company enrich stripe.com
 
 </CodeGroup>
 
-The response is a full [company record](/docs/company-schema). Fields with no known value are omitted or `null`, so read them defensively.
+The response is a full [company record](/docs/company-schema). This example is shortened and shows a fictional company, as do the other responses on this page.
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "website": "https://acme-analytics.example",
+  "logoUrl": "https://api.companyenrich.com/companies/logo/3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "type": "private",
+  "employees": "201-500",
+  "revenue": "10m-50m",
+  "industry": "Software Publishers",
+  "location": {
+    "country": { "code": "US", "name": "United States" }
+  },
+  "updatedAt": "2026-10-01T12:00:00Z"
+}
+```
+
+Fields with no known value are omitted or `null`, so read them defensively.
 
 ## Add technologies and headcount
 
@@ -148,6 +170,27 @@ companyenrich company enrich stripe.com --expand technologies,workforce
 
 </CodeGroup>
 
+Each expansion adds its own field to the record:
+
+```json
+{
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "technologies": ["React", "PostgreSQL", "Amazon Web Services"],
+  "workforce": {
+    "observedEmployeeCount": 312,
+    "employeeCountRange": "201-500",
+    "departmentHeadcount": {
+      "engineeringTechnical": 124,
+      "sales": 58,
+      "marketing": 27
+    },
+    "historyFrom": "2025-11-01",
+    "historyTo": "2026-11-01"
+  }
+}
+```
+
 The five expansions are `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce`. The [company schema](/docs/company-schema#expansions) lists the fields each one returns.
 
 ## Enrich by name and LinkedIn URL
@@ -205,6 +248,19 @@ companyenrich company enrich --name "Stripe" \
 
 </CodeGroup>
 
+The response is the same company record as an enrichment by domain, so it gives you the company's `domain`:
+
+```json
+{
+  "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+  "name": "Acme Analytics",
+  "domain": "acme-analytics.example",
+  "socials": {
+    "linkedinUrl": "https://www.linkedin.com/company/acme-analytics-example"
+  }
+}
+```
+
 You can also send `linkedinId`, `twitterUrl`, `facebookUrl`, `instagramUrl`, or `youtubeUrl`. This method costs 1 credit when a company is returned. When no company matches, it returns `404` and costs nothing.
 
 ## Enrich up to 50 domains in one request
@@ -218,13 +274,13 @@ curl -X POST https://api.companyenrich.com/v2/companies/enrich/batch \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "domains": ["stripe.com", "adyen.com", "notion.so"]
+    "domains": ["stripe.com", "adyen.com", "notion.com"]
   }'
 ```
 
 ```javascript JavaScript
 const { items } = await client.companies.enrichBatch({
-  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
 });
 
 for (const item of items) {
@@ -234,7 +290,7 @@ for (const item of items) {
 
 ```python Python
 batch = client.companies.enrich_batch(
-    ["stripe.com", "adyen.com", "notion.so"],
+    ["stripe.com", "adyen.com", "notion.com"],
 )
 
 for item in batch["items"]:
@@ -244,7 +300,7 @@ for item in batch["items"]:
 
 ```ruby Ruby
 batch = client.companies.enrich_batch(
-  ["stripe.com", "adyen.com", "notion.so"]
+  ["stripe.com", "adyen.com", "notion.com"]
 )
 
 batch["items"].each do |item|
@@ -254,7 +310,7 @@ end
 
 ```php PHP
 $batch = $client->companies->enrichBatch(
-    ['stripe.com', 'adyen.com', 'notion.so'],
+    ['stripe.com', 'adyen.com', 'notion.com'],
 );
 
 foreach ($batch['items'] as $item) {
@@ -263,10 +319,32 @@ foreach ($batch['items'] as $item) {
 ```
 
 ```bash CLI
-companyenrich company enrich stripe.com adyen.com notion.so
+companyenrich company enrich stripe.com adyen.com notion.com
 ```
 
 </CodeGroup>
+
+The response has one item for each domain:
+
+```json
+{
+  "items": [
+    {
+      "domain": "acme-analytics.example",
+      "status": "found",
+      "company": {
+        "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+        "name": "Acme Analytics",
+        "domain": "acme-analytics.example"
+      }
+    },
+    {
+      "domain": "no-such-company.example",
+      "status": "not-found"
+    }
+  ]
+}
+```
 
 The other statuses are `not-found`, `invalid-domain`, and `pending`. Duplicate domains are enriched once, and domains that resolve to the same company are charged once.
 
@@ -343,7 +421,7 @@ companyenrich company enrich acme-analytics.example --no-wait-for-enrichment
 
 </CodeGroup>
 
-The SDKs raise a not-found error for a `404`, and the cURL example prints the status line with `-i`. Ask again later to get the company once it has been enriched.
+The SDKs raise a not-found error for a `404`, and the cURL example prints the status line with `-i`. The `404` body is a problem document, sent as `application/problem+json`. Ask again later to get the company once it has been enriched.
 
 ## Get a company by ID
 
@@ -384,6 +462,8 @@ companyenrich company get 3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23
 
 </CodeGroup>
 
+The response is the same company record as an enrichment by domain. The `expand` parameter works here too.
+
 ## Enrich thousands of domains in the background
 
 A bulk job enriches up to 10,000 domains in the background. You create the job, wait for it to finish, then read the results.
@@ -396,7 +476,7 @@ curl -X POST https://api.companyenrich.com/v2/companies/enrich/bulk \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "domains": ["stripe.com", "adyen.com", "notion.so"]
+    "domains": ["stripe.com", "adyen.com", "notion.com"]
   }'
 
 # 2. Check the batch until "status" is "completed".
@@ -411,7 +491,7 @@ curl "https://api.companyenrich.com/v2/companies/enrich/bulk/BATCH_ID/results?fo
 
 ```javascript JavaScript
 const job = await client.companies.bulkEnrichment.create({
-  domains: ['stripe.com', 'adyen.com', 'notion.so'],
+  domains: ['stripe.com', 'adyen.com', 'notion.com'],
 });
 
 await client.batches.waitForCompletion(job.id);
@@ -423,7 +503,7 @@ for await (const record of client.companies.bulkEnrichment.stream(job.id)) {
 
 ```python Python
 job = client.companies.bulk_enrichment.create(
-    ["stripe.com", "adyen.com", "notion.so"],
+    ["stripe.com", "adyen.com", "notion.com"],
 )
 
 client.batches.wait_for_completion(job["id"])
@@ -435,7 +515,7 @@ for record in client.companies.bulk_enrichment.stream(job["id"]):
 
 ```ruby Ruby
 job = client.companies.bulk_enrichment.create(
-  ["stripe.com", "adyen.com", "notion.so"]
+  ["stripe.com", "adyen.com", "notion.com"]
 )
 
 client.batches.wait_for_completion(job["id"])
@@ -447,7 +527,7 @@ end
 
 ```php PHP
 $job = $client->companies->bulkEnrichment->create(
-    ['stripe.com', 'adyen.com', 'notion.so'],
+    ['stripe.com', 'adyen.com', 'notion.com'],
 );
 
 $client->batches->waitForCompletion($job['id']);
@@ -460,7 +540,7 @@ foreach ($client->companies->bulkEnrichment->stream($job['id']) as $record) {
 ```
 
 ```bash CLI
-companyenrich company bulk-enrich stripe.com adyen.com notion.so --wait -o enriched.csv
+companyenrich company bulk-enrich stripe.com adyen.com notion.com --wait -o enriched.csv
 ```
 
 </CodeGroup>
@@ -469,6 +549,39 @@ companyenrich company bulk-enrich stripe.com adyen.com notion.so --wait -o enric
 * Each result has the input `domain`, a `success` flag, and either the `company` or an `error`.
 * Results download as JSON, NDJSON, or CSV. The SDK `stream` methods read NDJSON one record at a time, which suits large jobs.
 * In the CLI, `-f domains.txt` reads the domains from a file, one per line.
+
+One result record looks like this:
+
+```json
+{
+  "index": 0,
+  "domain": "acme-analytics.example",
+  "statusCode": 200,
+  "state": "succeeded",
+  "success": true,
+  "company": {
+    "id": "3f2b8c1e-6a4d-4f7a-9b21-0c5d8e7f1a23",
+    "name": "Acme Analytics",
+    "domain": "acme-analytics.example"
+  }
+}
+```
+
+For a file of domains, expansions, and failed rows, see [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains).
+
+## Examples by task
+
+Each of these pages works through one job from start to finish, with the response and the cost.
+
+| Task                                             | Page                                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Enrich a CSV or a file of domains                | [Enrich a list of company domains](/docs/enrich-a-list-of-company-domains)                        |
+| Get several kinds of data in one request         | [Get funding, headcount, and tech stack in one call](/docs/get-funding-headcount-and-tech-stack)  |
+| Read funding rounds and investors                | [Get a company's funding rounds](/docs/get-company-funding-rounds)                                |
+| Classify a company by industry                   | [Look up a company's NAICS codes](/docs/look-up-company-naics-codes)                              |
+| Show a company's logo                            | [Get a company logo by domain](/docs/get-company-logo-by-domain)                                  |
+| Start from a company name or a LinkedIn URL      | [Find a company's domain from its name](/docs/find-company-domain-by-name)                        |
+| Start from an email address                      | [Identify the company behind a signup email](/docs/identify-company-from-email)                   |
 
 ## Related pages
 
