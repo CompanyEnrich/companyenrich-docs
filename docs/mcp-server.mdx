@@ -7,7 +7,7 @@ The CompanyEnrich MCP server lets AI clients like Claude, Codex, Cursor, and VS 
 
 ## Hosted or local?
 
-There are two ways to connect. Both have the same tools.
+The hosted server and version 3 of the local npm package expose the same tools. Both use the [CompanyEnrich V2 API](/api-reference/v2/overview).
 
 |                  | Hosted                                  | Local (npm)                                                                                  |
 | :--------------- | :-------------------------------------- | :------------------------------------------------------------------------------------------- |
@@ -222,51 +222,51 @@ It runs `get_current_user`, which is free. If you see your balance, you're conne
 
 ## What you can ask
 
-| Ask                                                                           | Tool                                   | Usual cost                                        |
-| :---------------------------------------------------------------------------- | :------------------------------------- | :------------------------------------------------ |
-| "Get company information for stripe.com."                                     | `enrich_company`                       | 1 credit                                          |
-| "How many engineers does notion.com have?"                                    | `get_company_workforce`                | 5 credits                                         |
-| "Find 10 HVAC manufacturers in the United States."                            | `search_companies`                     | 10 credits                                        |
-| "Find 5 companies similar to stripe.com and square.com."                      | `find_similar_companies`               | 25 credits                                        |
-| "Find 10 VPs of sales at SaaS companies in Germany with 51 to 200 employees." | `search_people`                        | 20 credits                                        |
-| "Who is `jane@example.com`?"                                                  | `lookup_person_by_email`               | 5 credits                                         |
-| "Get the work email for the head of marketing at notion.com."                 | `search_people`, `enrich_person_email` | 2 credits per person found, plus 10 for the email |
+These examples assume the tools return the requested results without paid expansions.
+
+| Ask                                                                           | Tool                                   | Cost |
+| :---------------------------------------------------------------------------- | :------------------------------------- | :--- |
+| "Get company information for stripe.com."                                     | `enrich_company`                       | 1 credit |
+| "How many engineers does notion.com have?"                                    | `get_company_workforce`                | 1 credit |
+| "How many companies are headquartered in Germany?"                            | `count_companies`                      | Free |
+| "Find 10 companies headquartered in Germany using a country filter."          | `search_companies` with `filter`       | 10 credits |
+| "Use semantic search to find 10 HVAC manufacturers in the United States."     | `search_companies` with `semantic`     | 20 credits |
+| "Find 5 companies similar to stripe.com and square.com."                      | `search_companies` with `lookalike`    | 25 credits |
+| "Find 10 VPs of sales at SaaS companies in Germany with 51 to 200 employees." | `search_people`                        | 20 credits |
+| "Who is `jane@example.com`?"                                                  | `lookup_person_by_email`               | 5 credits |
+| "Get the work email for the head of marketing at notion.com."                 | `search_people`, `enrich_person_email` | 2 credits per person returned, plus 10 for a newly accessed email |
 
 ## Tools and credits
 
-Your client finds these tools by itself, so you don't have to remember them. The costs are here so you know what you're spending.
+| Tool                           | What it does                                                     | Base cost |
+| :----------------------------- | :--------------------------------------------------------------- | :-------- |
+| `enrich_company`               | Enrich a company by domain                                       | 1 credit per company returned |
+| `get_company_by_id`            | Get a company by its CompanyEnrich ID                            | 1 credit per company returned |
+| `enrich_company_by_properties` | Enrich a company from its name or a social profile URL           | 1 credit when a company is returned or the properties cannot resolve a domain |
+| `get_company_workforce`        | Get department headcounts and workforce history by domain or ID  | 1 credit per 12-month page returned |
+| `search_companies`             | Search with filters, a description, or 1 to 10 lookalike seed domains | 1 credit per company returned with filters alone, 2 with `semantic`, or 5 with `lookalike` |
+| `count_companies`              | Count matches for a company search                               | Free |
+| `search_people`                | Search people by role, location, employer, or description        | 2 credits per person returned |
+| `count_people`                 | Count matches for a people search                                | Free |
+| `get_person_by_id`             | Get a person by their CompanyEnrich ID                           | 2 credits per person returned |
+| `lookup_person_by_email`       | Find a person from an email address                              | 5 credits per person returned |
+| `enrich_person_email`          | Find a person's work email                                       | 10 credits when your account first accesses a found email |
+| `get_current_user`             | Check your credit balance and account limits                     | Free |
 
-<Note>
-The npm MCP server uses the V1 API. Its workforce pricing differs from the V2 API and the official SDKs. See the [V1 reference](/api-reference/v1/overview) for account eligibility.
-</Note>
+`search_companies` and `search_people` return up to 20 results by default. Set `pageSize` to limit how many you pay for in one call. An empty search page costs one result's base price.
 
-| Tool                           | What it does                                                     | Cost                                             |
-| :----------------------------- | :--------------------------------------------------------------- | :----------------------------------------------- |
-| `enrich_company`               | Enrich a company by domain                                       | 1 credit, plus 5 with `includeWorkforce`         |
-| `get_company_by_id`            | Get a company by its CompanyEnrich ID                            | 1 credit, plus 5 with `includeWorkforce`         |
-| `enrich_company_by_properties` | Enrich a company from its name or a social profile URL           | 1 credit, plus 5 with `includeWorkforce`         |
-| `get_company_workforce`        | Get workforce insights for one company                           | 5 credits per successful call                    |
-| `search_companies`             | Search companies by description, name, domain, or filters        | 1 credit per company returned, 1 credit minimum  |
-| `find_similar_companies`       | Find lookalikes from 1 to 10 seed domains                        | 5 credits per company returned, 5 credit minimum |
-| `search_people`                | Search people by name, job title, seniority, company, or country | 2 credits per person returned, 2 credit minimum  |
-| `get_person_by_id`             | Get a person by their CompanyEnrich ID                           | 2 credits                                        |
-| `lookup_person_by_email`       | Find a person from an email address                              | 5 credits per successful call                    |
-| `enrich_person_email`          | Find a person's work email (beta)                                | 10 credits per newly accessed found email        |
-| `get_current_user`             | Check your credit balance and account                            | Free                                             |
+Use `expand` to request extra data on company or person records.
 
-A few things to watch:
+* On company records, `financial`, `keywords`, `naicsCodes`, `technologies`, and `workforce` each add 1 credit per company returned. For example, enriching one domain with `expand: ["workforce"]` costs 2 credits when the company is found.
+* On person records, `education` adds 1 credit per person returned. The `company` expansion adds 1 credit per unique company profile included in the response.
 
-* Search tools charge per result. A default page has 20 results, so one `find_similar_companies` call can cost up to 100 credits and one `search_people` call up to 40. Say how many results you want.
-* `includeWorkforce` adds 5 credits per company, including every company in a search.
-* Your client can make several calls for one question. Most clients ask before running a tool, so keep that on while you're testing.
-
-Tool responses include your balance under `creditInfo`. See [Credits](/docs/credits) for how credits work.
+Your client can make several tool calls for one question. When the API returns credit information, the tool response includes it under `creditInfo`. See [Credits](/docs/credits).
 
 ## Install or pin the npm package
 
 The Local tabs use `npx`, which runs the package without you installing it.
 
-**Lock a version:** keep `npx` and put the version in `args`: `["-y", "@companyenrich/mcp@2.0.0"]`.
+To pin the local server to version 3.0.0, set `args` to `["-y", "@companyenrich/mcp@3.0.0"]`. If you have prompts or code written for 2.x, see the [package upgrade guide](https://github.com/CompanyEnrich/mcp-server#upgrading-from-2x).
 
 **Install as a Node module:** use this if you don't want your client going through `npx` every time it starts.
 

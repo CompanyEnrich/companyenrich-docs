@@ -155,18 +155,18 @@ The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code,
 
 | Explorium tool | CompanyEnrich tool | Notes |
 | --- | --- | --- |
-| `match-business` | `enrich_company` or `enrich_company_by_properties` | Returns the full record in one step, by domain or by name or social profile. |
-| `enrich-business` | `enrich_company` or `get_company_workforce` | The company record includes technologies, keywords, and funding. For headcount by department, set `includeWorkforce` or use `get_company_workforce`. |
+| `match-business` | `enrich_company` or `enrich_company_by_properties` | Returns the company profile in one step, by domain or by name or social profile. |
+| `enrich-business` | `enrich_company` or `get_company_workforce` | Use `expand` to request `technologies`, `keywords`, `financial` (funding), or `workforce` (headcount by department). Use `get_company_workforce` for earlier workforce history. |
 | `fetch-businesses` | `search_companies` | Takes filters or a plain-language description. |
-| `fetch-businesses-statistics` | None | No statistics tool. Your agent can call the free count endpoint through the API. |
+| `fetch-businesses-statistics` | `count_companies` | Counts companies matching a search for free. Returns the number accessible on your plan and the total matching count. |
 | `fetch-businesses-events` | None | No events. |
 | `match-prospects` | `lookup_person_by_email` or `search_people` | By work email, or by name and company. |
 | `fetch-prospects` | `search_people` | Filters by seniority, department, title, country, and employer. |
-| `fetch-prospects-statistics` | None | No statistics tool. |
+| `fetch-prospects-statistics` | `count_people` | Counts people matching a search for free. Returns the number accessible on your plan and the total matching count. |
 | `fetch-prospects-events` | None | No events. |
 | `enrich-prospects` | `get_person_by_id` or `enrich_person_email` | Profile and work email. No phone numbers. |
-| `autocomplete` | None | Not needed. `search_companies` and `search_people` accept plain values and descriptions. |
-| None | `find_similar_companies` | Lookalikes from 1 to 10 seed domains. Explorium offered this as an enrichment rather than a tool. |
+| `autocomplete` | None | Pass structured filters in `filter` or a description in `semantic.query` directly to `search_companies` or `search_people`. |
+| None | `search_companies` | Pass 1 to 10 seed domains in `lookalike.domains`. Explorium offered lookalikes through business enrichment. |
 | None | `get_current_user` | Free. Checks your credit balance. |
 
 {/* end generated */}

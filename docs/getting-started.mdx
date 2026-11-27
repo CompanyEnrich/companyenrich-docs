@@ -20,7 +20,7 @@ You can call the REST API directly, use an official SDK or the CLI, or connect a
 | Get a work email address for a person                              | [Work email lookup](/docs/people-search-api-examples#get-a-work-email-for-a-person-you-found) | 10 per new email found |
 | Get employee counts by department, with history                    | [Company Headcount API](/docs/company-headcount-api)                   | 1 per 12 months of history      |
 | Enrich thousands of domains or export a large search               | [Bulk jobs and exports](/docs/bulk-jobs-and-exports)                   | The same as single requests     |
-| Give an AI agent access to company and people data                 | [MCP server](/docs/mcp-server)                                         | Charged per tool call           |
+| Give an AI agent access to company and people data                 | [MCP server](/docs/mcp-server)                                         | Varies by tool                  |
 
 You pay for results, not for requests: a lookup that finds nothing is usually free. Counting the matches for a search and checking your account are always free. See [Credits](/docs/credits) for every price.
 
@@ -64,9 +64,9 @@ The SDKs and the CLI handle authentication, retries, pagination, and bulk job do
 
 ## API versions
 
-The guides, SDKs, and CLI use the V2 API, whose paths start with `/v2`. The V1 API is documented separately under [API V1](/api-reference/v1/overview). Prices and request formats can differ between the two, so check the reference for the version you call. The MCP server lists its own [tool prices](/docs/mcp-server#tools-and-credits), which differ from V2 in places.
+The guides, SDKs, CLI, and MCP server use the V2 API, whose paths start with `/v2`. For the cost of each MCP operation, see [Tools and credits](/docs/mcp-server#tools-and-credits).
 
-V1 is available only to accounts created before December 1, 2026. Accounts created on or after that date must use V2.
+V1 is available only to accounts created before December 1, 2026. Accounts created on or after that date must use V2. For V1 prices and request formats, see the [V1 reference](/api-reference/v1/overview).
 
 ## Next steps
 

@@ -609,7 +609,7 @@
         "enrich_company",
         "enrich_company_by_properties"
       ],
-      "note": "By domain, or by name or social profile. The record includes technologies, keywords, and funding."
+      "note": "By domain, or by name or social profile. Use `expand` to request `technologies`, `keywords`, or `financial` (funding)."
     },
     {
       "crustdata": "Company headcount and growth",
@@ -621,10 +621,9 @@
     {
       "crustdata": "Search companies",
       "ce": [
-        "search_companies",
-        "find_similar_companies"
+        "search_companies"
       ],
-      "note": "Filters, a plain-language description, or 1 to 10 seed domains for lookalikes."
+      "note": "Use `filter` for structured criteria, `semantic.query` for a description, or `lookalike.domains` for 1 to 10 seed domains."
     },
     {
       "crustdata": "Search people",

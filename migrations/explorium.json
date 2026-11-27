@@ -314,18 +314,18 @@
     }
   ],
   "mcp": [
-    { "explorium": "match-business", "ce": ["enrich_company", "enrich_company_by_properties"], "note": "Returns the full record in one step, by domain or by name or social profile." },
-    { "explorium": "enrich-business", "ce": ["enrich_company", "get_company_workforce"], "note": "The company record includes technologies, keywords, and funding. For headcount by department, set `includeWorkforce` or use `get_company_workforce`." },
+    { "explorium": "match-business", "ce": ["enrich_company", "enrich_company_by_properties"], "note": "Returns the company profile in one step, by domain or by name or social profile." },
+    { "explorium": "enrich-business", "ce": ["enrich_company", "get_company_workforce"], "note": "Use `expand` to request `technologies`, `keywords`, `financial` (funding), or `workforce` (headcount by department). Use `get_company_workforce` for earlier workforce history." },
     { "explorium": "fetch-businesses", "ce": ["search_companies"], "note": "Takes filters or a plain-language description." },
-    { "explorium": "fetch-businesses-statistics", "ce": null, "note": "No statistics tool. Your agent can call the free count endpoint through the API." },
+    { "explorium": "fetch-businesses-statistics", "ce": ["count_companies"], "note": "Counts companies matching a search for free. Returns the number accessible on your plan and the total matching count." },
     { "explorium": "fetch-businesses-events", "ce": null, "note": "No events." },
     { "explorium": "match-prospects", "ce": ["lookup_person_by_email", "search_people"], "note": "By work email, or by name and company." },
     { "explorium": "fetch-prospects", "ce": ["search_people"], "note": "Filters by seniority, department, title, country, and employer." },
-    { "explorium": "fetch-prospects-statistics", "ce": null, "note": "No statistics tool." },
+    { "explorium": "fetch-prospects-statistics", "ce": ["count_people"], "note": "Counts people matching a search for free. Returns the number accessible on your plan and the total matching count." },
     { "explorium": "fetch-prospects-events", "ce": null, "note": "No events." },
     { "explorium": "enrich-prospects", "ce": ["get_person_by_id", "enrich_person_email"], "note": "Profile and work email. No phone numbers." },
-    { "explorium": "autocomplete", "ce": null, "note": "Not needed. `search_companies` and `search_people` accept plain values and descriptions." },
-    { "explorium": null, "ce": ["find_similar_companies"], "note": "Lookalikes from 1 to 10 seed domains. Explorium offered this as an enrichment rather than a tool." },
+    { "explorium": "autocomplete", "ce": null, "note": "Pass structured filters in `filter` or a description in `semantic.query` directly to `search_companies` or `search_people`." },
+    { "explorium": null, "ce": ["search_companies"], "note": "Pass 1 to 10 seed domains in `lookalike.domains`. Explorium offered lookalikes through business enrichment." },
     { "explorium": null, "ce": ["get_current_user"], "note": "Free. Checks your credit balance." }
   ],
   "fields": {

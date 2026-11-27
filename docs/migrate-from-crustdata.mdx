@@ -154,9 +154,9 @@ The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code,
 
 | Crustdata tool | CompanyEnrich tool | Notes |
 | --- | --- | --- |
-| Identify or enrich a company | `enrich_company` or `enrich_company_by_properties` | By domain, or by name or social profile. The record includes technologies, keywords, and funding. |
+| Identify or enrich a company | `enrich_company` or `enrich_company_by_properties` | By domain, or by name or social profile. Use `expand` to request `technologies`, `keywords`, or `financial` (funding). |
 | Company headcount and growth | `get_company_workforce` | Headcount by department, with monthly history. |
-| Search companies | `search_companies` or `find_similar_companies` | Filters, a plain-language description, or 1 to 10 seed domains for lookalikes. |
+| Search companies | `search_companies` | Use `filter` for structured criteria, `semantic.query` for a description, or `lookalike.domains` for 1 to 10 seed domains. |
 | Search people | `search_people` | By name, title, seniority, department, country, and employer. |
 | Enrich a person or identify one from an email | `lookup_person_by_email` or `get_person_by_id` | By work email, or by a CompanyEnrich person ID from search. No lookup by profile URL. |
 | Contact enrichment | `enrich_person_email` | Work email only. No personal emails or phone numbers. |

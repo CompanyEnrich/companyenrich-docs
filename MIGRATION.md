@@ -25,7 +25,7 @@ Corrections made where source documentation conflicted with current contracts:
 - Rate limits now describe the global 500 requests/minute/IP limit and separate plan-based user/route limits, replacing the old universal 300 requests/minute/key claim.
 - Credits no longer claim every endpoint is charged; each operation's price, expansion charges, and empty-result behavior remain in its reference.
 - Getting started distinguishes V1's 10,000-domain job/webhook behavior from V2's batch workflows.
-- The MCP guide keeps the published MCP package's V1 pricing and explicitly distinguishes it from V2. Its workforce price is 5 credits; the V2 workforce operation is 1 credit per page.
+- At migration time, the MCP guide documented the 2.x package's V1 workforce price of 5 credits. Version 3 moved the MCP tools to V2, where workforce costs 1 credit per page.
 - SDK documentation identifies the checked version as 1.0.1 instead of promising it is always the latest release.
 
 Quickstart and authentication pages were added with requests that match the V2 specification. No authenticated requests or billable operations were executed during initialization.
