@@ -44,7 +44,7 @@ This page lists every field with its type and meaning. Field names are exactly a
 | `location.state.code`   | string  | The ISO 3166-2 subdivision code, when known. |
 | `location.city.id`      | integer | The CompanyEnrich city ID.           |
 | `location.city.name`    | string  | The city name.                       |
-| `location.address`      | string  | The person's reported location.      |
+| `location.address`      | string  | The person's location, in a standard form when it names a city or a more precise place; otherwise, as reported. |
 
 The `state` and `city` objects are present only once the reported location has been resolved to that state or city. Their IDs are the same IDs returned by the [state lookup](/api-reference/v2/post-geo-states) and [city lookup](/api-reference/v2/post-geo-cities), and accepted by [people search filters](/docs/people-search-api-filters#location).
 

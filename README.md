@@ -26,7 +26,7 @@ This checks generated endpoint coverage, runs Mintlify's strict validation/build
 - `quickstart.mdx` and `authentication.mdx`: first-request instructions.
 - `api-reference/v2/` and `api-reference/v1/`: endpoint pages plus hand-written overview pages.
 - `openapi/`: snapshots of the published API specifications.
-- `changelog/`: all 13 original release posts and their original publication dates.
+- `changelog/`: the 13 original release posts with their original publication dates, and the posts added since.
 - `logo/` and `favicon.ico`: existing CompanyEnrich branding, stored locally.
 - `MIGRATION.md`: source inventory and migration decisions.
 - `migrations/`: competitor migration mappings (for example `people-data-labs.json`). They are served at `/migrations/<vendor>.json` and generate the tables in `docs/migrate-from-*.mdx`. Run `npm run sync:migrations` after editing one.

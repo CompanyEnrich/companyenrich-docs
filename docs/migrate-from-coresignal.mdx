@@ -155,7 +155,7 @@ The [MCP server guide](/docs/mcp-server) covers Claude Desktop, Cursor, VS Code,
 
 | Coresignal tool | CompanyEnrich tool | Notes |
 | --- | --- | --- |
-| `entity_search` | `search_companies` or `find_similar_companies` or `search_people` | Filters, a plain-language description, or 1 to 10 seed domains for lookalikes. Records come back in the response, with no separate preview or file step. Job searches have no equivalent. |
+| `entity_search` | `search_companies` or `search_people` | Use `filter` for structured criteria or `semantic.query` for a description. On `search_companies`, `lookalike.domains` takes 1 to 10 seed domains. Records come back in the response, with no separate preview or file step. Job searches have no equivalent. |
 | `entity_fetch` | `enrich_company` or `enrich_company_by_properties` or `get_company_by_id` or `lookup_person_by_email` or `get_person_by_id` | A company by domain, name, social profile, or CompanyEnrich ID, and a person by work email or CompanyEnrich ID. No person lookup by profile URL, and no job records. |
 | `email_enrich` | `enrich_person_email` | Work email for a CompanyEnrich person ID. |
 | None | `get_company_workforce` | Headcount by department, with monthly history, for one company. |

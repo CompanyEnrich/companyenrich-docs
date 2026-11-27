@@ -10066,7 +10066,7 @@
           },
           "address": {
             "type": "string",
-            "description": "The person's reported location",
+            "description": "The person's location, written out in a standard form when it names a city or a more precise place, otherwise as reported",
             "nullable": true
           }
         },

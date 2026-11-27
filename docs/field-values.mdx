@@ -245,6 +245,19 @@ Returned in `status` by the [batch endpoints](/api-reference/v2/get-batches-id) 
 | `cancelling` | A cancellation was requested and remaining work is stopping. |
 | `cancelled`  | The batch was cancelled.                   |
 
+### Batch request state
+
+Returned in `state` for each record of a [bulk enrichment result](/api-reference/v2/get-companies-enrich-bulk-id-results) and of the [raw batch results](/api-reference/v2/get-batches-id-results). The batch status reports a count for each of these states in `progress`.
+
+| Value       | Meaning                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `pending`   | The request is waiting to be sent, including retries.      |
+| `running`   | The request is being processed.                            |
+| `succeeded` | The request returned a successful response.                |
+| `failed`    | The request returned an error response.                    |
+| `unknown`   | The outcome of the request could not be confirmed.         |
+| `cancelled` | The request was cancelled before its result was published. |
+
 ## Lookup endpoints
 
 These values are open-ended, so the API provides free endpoints to find them:
